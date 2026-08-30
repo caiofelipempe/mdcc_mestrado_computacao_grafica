@@ -27,13 +27,14 @@ using namespace geometry;
 #include <string>
 
 class AlgebraLinear : public Renderer {
+public:
+
 protected:
     void onInit(int w, int h, const std::string&) override {}
     void onWindowResize(int, int) override {}
     void onUpdate(float) override {}
 
     void onUI() override {
-        // Janela principal ocupando a tela inteira
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(viewport->Pos);
         ImGui::SetNextWindowSize(viewport->Size);
@@ -48,12 +49,10 @@ protected:
         ImGui::Text("Cálculo de Determinante de Matriz N x N");
         ImGui::Separator();
 
-        // 1. Controle do Tamanho da Matriz
         if (ImGui::SliderInt("Ordem da Matriz (N)", &matrixSize, 1, 10)) {
             resizeMatrix(matrixSize);
         }
 
-        // Botões de Ação Rápida
         if (ImGui::Button("Zerar Matriz")) setZeros();
         ImGui::SameLine();
         if (ImGui::Button("Matriz Identidade")) setIdentity();
@@ -65,7 +64,6 @@ protected:
         ImGui::Text("Entradas da Matriz:");
         ImGui::Spacing();
 
-        // 2. Tabela Dinâmica com TextFields para os elementos
         if (ImGui::BeginTable("MatrixTable", matrixSize, ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedSame)) {
             for (int i = 0; i < matrixSize; ++i) {
                 ImGui::TableNextRow();
@@ -110,7 +108,7 @@ private:
     void resizeMatrix(int newSize) {
         matrix.assign(newSize, std::vector<double>(newSize, 0.0));
         for (int i = 0; i < newSize; ++i) {
-            matrix[i][i] = 1.0; // Padrão Inicial: Identidade
+            matrix[i][i] = 1.0;
         }
     }
 
@@ -130,19 +128,17 @@ private:
     void setRandom() {
         for (int i = 0; i < matrixSize; ++i) {
             for (int j = 0; j < matrixSize; ++j) {
-                matrix[i][j] = (std::rand() % 21) - 10.0; // [-10, 10]
+                matrix[i][j] = (std::rand() % 21) - 10.0;
             }
         }
     }
 
-    // 4. Algoritmo de Cálculo do Determinante (Eliminação Gaussiana com Pivoteamento)
     double calculateDeterminant() const {
         int n = matrixSize;
-        auto mat = matrix; // Cópia de trabalho
+        auto mat = matrix;
         double det = 1.0;
 
         for (int i = 0; i < n; ++i) {
-            // Pivoteamento parcial
             int pivot = i;
             for (int j = i + 1; j < n; ++j) {
                 if (std::abs(mat[j][i]) > std::abs(mat[pivot][i])) {
@@ -151,17 +147,16 @@ private:
             }
 
             if (std::abs(mat[pivot][i]) < 1e-9) {
-                return 0.0; // Coluna nula = determinante 0
+                return 0.0;
             }
 
             if (i != pivot) {
                 std::swap(mat[i], mat[pivot]);
-                det = -det; // Troca de linhas inverte o sinal do det
+                det = -det;
             }
 
             det *= mat[i][i];
 
-            // Eliminação Gaussiana
             for (int j = i + 1; j < n; ++j) {
                 double factor = mat[j][i] / mat[i][i];
                 for (int k = i + 1; k < n; ++k) {

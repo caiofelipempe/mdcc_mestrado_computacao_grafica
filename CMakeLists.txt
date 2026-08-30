@@ -27,9 +27,14 @@ find_package(CGAL REQUIRED)
 # Pastas de compilações
 # -----------------------------
 option(BUILD_DISCIPLINES "Compilar trabalhos das disciplinas" ON)
+option(BUILD_PROJECT "Compilar projeto de conclusão" ON)
 
 add_subdirectory(common)
 
 if(BUILD_DISCIPLINES)
     add_subdirectory(disciplines)
+endif()
+
+if(BUILD_PROJECT)
+    add_subdirectory(project)
 endif()
