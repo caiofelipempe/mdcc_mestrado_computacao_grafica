@@ -316,13 +316,13 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
 
 ---
 
-## Aeronave Sketch(topo)
+## Aeronave Sketch
 
 ![height:350px](images/aeronave_sketch.png)
 
 ---
 
-## Aeronave Sólido(topo)
+## Aeronave Sólido
 
 ![height:350px](images/aeronave_solido.png)
 
