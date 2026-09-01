@@ -262,43 +262,69 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
 
 ---
 
-## Modelagem Paramétrica
-
-Cubo e Cilindro
+## Cubo e Cilindro
 
 ![height:350px](images/cubo_e_cilindro.png)
 
 ---
 
-## Modelagem Paramétrica
-
-Cubo ∪ Cilindro
+## Cubo ∪ Cilindro
 
 ![height:350px](images/cubo_e_cilindro_uniao.png)
 
 ---
 
-## Modelagem Paramétrica
-
-Cubo ∩ Cilindro
+## Cubo ∩ Cilindro
 
 ![height:350px](images/cubo_e_cilindro_intersecao.png)
 
 ---
 
-## Modelagem Paramétrica
-
-Cubo - Cilindro
+## Cubo - Cilindro
 
 ![height:350px](images/cubo_e_cilindro_diferenca.png)
 
 ---
 
-## Modelagem Paramétrica
-
-Cilindro - Cubo
+## Cilindro - Cubo
 
 ![height:350px](images/cubo_e_cilindro_diferenca_2.png)
+
+---
+
+## Revolução do círculo
+
+![height:350px](images/circulo.png)
+
+---
+
+## Revolução do círculo
+
+![height:350px](images/circulo_rotacionado.png)
+
+---
+
+## Cone a partir de um cículo e um ponto(Loft)
+
+![height:350px](images/circulo_e_ponto.png)
+
+---
+
+## Cone a partir de um cículo e um ponto(Loft)
+
+![height:350px](images/circulo_e_ponto_loft.png)
+
+---
+
+## Aeronave Sketch(topo)
+
+![height:350px](images/aeronave_sketch.png)
+
+---
+
+## Aeronave Sólido(topo)
+
+![height:350px](images/aeronave_solido.png)
 
 ---
 
