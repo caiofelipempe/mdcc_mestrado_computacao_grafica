@@ -8,6 +8,7 @@
 
 #include <iomanip>
 #include <vector.hpp>
+#include <chrono>
 
 // ============================================================
 // CLASSE BASE - ATIVIDADE (ABSTRATA)
@@ -52,6 +53,7 @@ private:
     bool hasSolution = false;
     bool solutionComputed = false;
     double maxError = 0.0;
+    double elapsedTimeMs = 0.0;
 
 public:
     TotalPivotActivity() {
@@ -108,8 +110,15 @@ public:
     }
 
     void solveSystem() override {
+        // Inicia a medicao de tempo
+        auto start = std::chrono::high_resolution_clock::now();
+        
         hasSolution = Utils::solveTotalPivot(matrix, vectorB, solution);
         solutionComputed = true;
+        
+        // Finaliza a medicao de tempo
+        auto end = std::chrono::high_resolution_clock::now();
+        elapsedTimeMs = std::chrono::duration<double, std::milli>(end - start).count();
         
         if (hasSolution) {
             maxError = Utils::computeError(matrix, vectorB, solution);
@@ -125,6 +134,7 @@ private:
             {-2.0, 1.0, 2.0}
         };
         vectorB = {8.0, -11.0, -3.0};
+        elapsedTimeMs = 0.0;
     }
 
     void clearSolution() {
@@ -132,6 +142,7 @@ private:
         hasSolution = false;
         solution.clear();
         maxError = 0.0;
+        elapsedTimeMs = 0.0;
     }
 
     void renderControls() {
@@ -254,6 +265,11 @@ private:
         ImGui::TextColored(ImVec4(0.0f, 0.5f, 1.0f, 1.0f), "RESULTADO");
         ImGui::Spacing();
         
+        // Exibe o tempo de resolucao
+        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.0f, 1.0f), 
+            "Tempo de resolucao: %.3f ms", elapsedTimeMs);
+        ImGui::Spacing();
+        
         if (hasSolution) {
             ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), 
                 "Sistema resolvido com sucesso!");
@@ -311,6 +327,7 @@ private:
     bool hasSolution = false;
     bool solutionComputed = false;
     double maxError = 0.0;
+    double elapsedTimeMs = 0.0;
 
 public:
     PartialPivotActivity() {
@@ -347,7 +364,7 @@ public:
     }
 
     void render() override {
-        ImGui::BeginChild("ScrollTotal2", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
+        ImGui::BeginChild("ScrollPartial", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
         
         ImGui::TextColored(ImVec4(0.0f, 0.7f, 1.0f, 1.0f), "%s", getTitle());
         ImGui::Spacing();
@@ -367,8 +384,15 @@ public:
     }
 
     void solveSystem() override {
+        // Inicia a medicao de tempo
+        auto start = std::chrono::high_resolution_clock::now();
+        
         hasSolution = Utils::solvePartialPivot(matrix, vectorB, solution);
         solutionComputed = true;
+        
+        // Finaliza a medicao de tempo
+        auto end = std::chrono::high_resolution_clock::now();
+        elapsedTimeMs = std::chrono::duration<double, std::milli>(end - start).count();
         
         if (hasSolution) {
             maxError = Utils::computeError(matrix, vectorB, solution);
@@ -384,6 +408,7 @@ private:
             {-2.0, 1.0, 2.0}
         };
         vectorB = {8.0, -11.0, -3.0};
+        elapsedTimeMs = 0.0;
     }
 
     void clearSolution() {
@@ -391,6 +416,7 @@ private:
         hasSolution = false;
         solution.clear();
         maxError = 0.0;
+        elapsedTimeMs = 0.0;
     }
 
     void renderControls() {
@@ -513,6 +539,11 @@ private:
         ImGui::TextColored(ImVec4(0.0f, 0.5f, 1.0f, 1.0f), "RESULTADO");
         ImGui::Spacing();
         
+        // Exibe o tempo de resolucao
+        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.0f, 1.0f), 
+            "Tempo de resolucao: %.3f ms", elapsedTimeMs);
+        ImGui::Spacing();
+        
         if (hasSolution) {
             ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), 
                 "Sistema resolvido com sucesso!");
@@ -558,6 +589,309 @@ private:
 };
 
 // ============================================================
+// CLASSE ATIVIDADE 3 - GAUSS-JORDAN
+// ============================================================
+class GaussJordanActivity : public MatrixActivity {
+private:
+    int matrixSize = 3;
+    std::vector<std::vector<double>> matrix;
+    std::vector<double> vectorB;
+    
+    std::vector<double> solution;
+    bool hasSolution = false;
+    bool solutionComputed = false;
+    double maxError = 0.0;
+    double elapsedTimeMs = 0.0;
+    
+    // Tipo de pivotacao (parcial ou total)
+    bool useTotalPivot = false;
+
+public:
+    GaussJordanActivity() {
+        initExampleSystem();
+    }
+
+    const char* getTitle() const override {
+        return "Atividade 3 - Gauss-Jordan";
+    }
+
+    std::vector<std::vector<double>>& getMatrix() override {
+        return matrix;
+    }
+
+    std::vector<double>& getVectorB() override {
+        return vectorB;
+    }
+
+    int getSize() const override {
+        return matrixSize;
+    }
+
+    void setSize(int newSize) override {
+        if (newSize >= 2 && newSize <= 20) {
+            matrixSize = newSize;
+            Utils::identityMatrix(matrix, matrixSize);
+            vectorB.assign(matrixSize, 0.0);
+            clearSolution();
+        }
+    }
+
+    void onMatrixModified() override {
+        clearSolution();
+    }
+
+    void render() override {
+        ImGui::BeginChild("ScrollGaussJordan", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
+        
+        ImGui::TextColored(ImVec4(0.0f, 0.7f, 1.0f, 1.0f), "%s", getTitle());
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        
+        renderPivotControls();
+        renderControls();
+        renderMatrixAndVector();
+        renderButtons();
+        renderResult();
+        
+        ImGui::EndChild();
+    }
+
+    bool solveGauss(std::vector<double>& x) const override {
+        Utils::PivotType pivotType = useTotalPivot ? 
+            Utils::PivotType::TOTAL : Utils::PivotType::PARTIAL;
+        return Utils::solveGaussJordan(matrix, vectorB, x, pivotType);
+    }
+
+    void solveSystem() override {
+        // Inicia a medicao de tempo
+        auto start = std::chrono::high_resolution_clock::now();
+        
+        Utils::PivotType pivotType = useTotalPivot ? 
+            Utils::PivotType::TOTAL : Utils::PivotType::PARTIAL;
+        
+        hasSolution = Utils::solveGaussJordan(matrix, vectorB, solution, pivotType);
+        solutionComputed = true;
+        
+        // Finaliza a medicao de tempo
+        auto end = std::chrono::high_resolution_clock::now();
+        elapsedTimeMs = std::chrono::duration<double, std::milli>(end - start).count();
+        
+        if (hasSolution) {
+            maxError = Utils::computeError(matrix, vectorB, solution);
+        }
+    }
+
+private:
+    void initExampleSystem() {
+        matrixSize = 3;
+        matrix = {
+            {2.0, 1.0, -1.0},
+            {-3.0, -1.0, 2.0},
+            {-2.0, 1.0, 2.0}
+        };
+        vectorB = {8.0, -11.0, -3.0};
+        useTotalPivot = false;
+        elapsedTimeMs = 0.0;
+    }
+
+    void clearSolution() {
+        solutionComputed = false;
+        hasSolution = false;
+        solution.clear();
+        maxError = 0.0;
+        elapsedTimeMs = 0.0;
+    }
+
+    void renderPivotControls() {
+        ImGui::Text("Tipo de Pivotacao:");
+        ImGui::SameLine();
+        
+        if (ImGui::RadioButton("Parcial", !useTotalPivot)) {
+            useTotalPivot = false;
+            clearSolution();
+        }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("Total", useTotalPivot)) {
+            useTotalPivot = true;
+            clearSolution();
+        }
+        
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+    }
+
+    void renderControls() {
+        ImGui::Text("Tamanho da Matriz:");
+        ImGui::SameLine();
+        
+        if (ImGui::Button("-##size3")) {
+            if (matrixSize > 2) {
+                setSize(matrixSize - 1);
+            }
+        }
+        ImGui::SameLine();
+        ImGui::Text("%d", matrixSize);
+        ImGui::SameLine();
+        if (ImGui::Button("+##size3")) {
+            if (matrixSize < 20) {
+                setSize(matrixSize + 1);
+            }
+        }
+        ImGui::SameLine();
+        ImGui::Spacing();
+        ImGui::SameLine();
+        
+        if (ImGui::Button("Gerar Sistema Aleatorio")) {
+            generateRandomSystem();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Resetar Exemplo")) {
+            initExampleSystem();
+            clearSolution();
+        }
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+    }
+
+    void generateRandomSystem() {
+        Utils::generateRandomSystem(matrix, vectorB, matrixSize);
+        clearSolution();
+    }
+
+    void renderMatrixAndVector() {
+        float fieldWidth = 70.0f;
+        
+        if (matrixSize > 10) {
+            fieldWidth = 50.0f;
+        } else if (matrixSize > 6) {
+            fieldWidth = 60.0f;
+        }
+        
+        ImGui::Text("Matriz A (Coeficientes):");
+        
+        for (int i = 0; i < matrixSize; ++i) {
+            ImGui::Text("  Linha %d:", i + 1);
+            ImGui::SameLine();
+            
+            for (int j = 0; j < matrixSize; ++j) {
+                ImGui::PushID(i * matrixSize + j + 5000);
+                ImGui::SetNextItemWidth(fieldWidth);
+                std::string label = "##A" + std::to_string(i) + std::to_string(j);
+                if (ImGui::InputDouble(label.c_str(), &matrix[i][j], 0.0, 0.0, "%.2f")) {
+                    onMatrixModified();
+                }
+                ImGui::PopID();
+                
+                if (j < matrixSize - 1) {
+                    ImGui::SameLine();
+                }
+            }
+        }
+        
+        ImGui::Spacing();
+        
+        ImGui::Text("Vetor b (Termos Independentes):");
+        ImGui::SameLine();
+        for (int i = 0; i < matrixSize; ++i) {
+            ImGui::PushID(i + 6000);
+            ImGui::SetNextItemWidth(fieldWidth);
+            std::string label = "b[" + std::to_string(i) + "]";
+            if (ImGui::InputDouble(label.c_str(), &vectorB[i], 0.0, 0.0, "%.2f")) {
+                onMatrixModified();
+            }
+            ImGui::PopID();
+            
+            if (i < matrixSize - 1) {
+                ImGui::SameLine();
+            }
+        }
+        
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+    }
+
+    void renderButtons() {
+        if (ImGui::Button("Resolver Sistema (Gauss-Jordan)")) {
+            solveSystem();
+        }
+        
+        if (solutionComputed) {
+            ImGui::SameLine();
+            if (ImGui::Button("Limpar Resultado")) {
+                clearSolution();
+            }
+        }
+        ImGui::Spacing();
+    }
+
+    void renderResult() {
+        if (!solutionComputed) {
+            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), 
+                "Clique em 'Resolver Sistema (Gauss-Jordan)' para calcular a solucao.");
+            return;
+        }
+        
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+        
+        ImGui::TextColored(ImVec4(0.0f, 0.5f, 1.0f, 1.0f), "RESULTADO");
+        ImGui::Spacing();
+        
+        // Exibe o tempo de resolucao
+        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.0f, 1.0f), 
+            "Tempo de resolucao: %.3f ms", elapsedTimeMs);
+        ImGui::Spacing();
+        
+        if (hasSolution) {
+            ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), 
+                "Sistema resolvido com sucesso usando Gauss-Jordan!");
+            ImGui::Spacing();
+            
+            ImGui::Text("Vetor Solucao X:");
+            
+            if (ImGui::BeginTable("ResultTable3", 2, 
+                ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedSame)) {
+                
+                ImGui::TableSetupColumn("Variavel", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                ImGui::TableSetupColumn("Valor", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableHeadersRow();
+
+                for (int i = 0; i < matrixSize; ++i) {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::Text("x%d", i + 1);
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "%.8f", solution[i]);
+                }
+                ImGui::EndTable();
+            }
+            
+            ImGui::Spacing();
+            ImGui::Text("Verificacao: A*x ~= b");
+            
+            if (maxError < 1e-6) {
+                ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), 
+                    "Solucao verificada! Erro maximo: %.2e", maxError);
+            } else {
+                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), 
+                    "Atencao: Erro residual maximo = %.6f", maxError);
+            }
+            
+        } else {
+            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), 
+                "O sistema nao possui solucao unica!");
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), 
+                "Motivo: Matriz singular ou indeterminada.");
+        }
+    }
+};
+
+// ============================================================
 // CLASSE PRINCIPAL - GERENCIA AS ATIVIDADES
 // ============================================================
 class AlgebraLinear : public Renderer {
@@ -565,6 +899,7 @@ public:
     AlgebraLinear() {
         activities.push_back(std::make_unique<TotalPivotActivity>());
         activities.push_back(std::make_unique<PartialPivotActivity>());
+        activities.push_back(std::make_unique<GaussJordanActivity>());
     }
 
 protected:
