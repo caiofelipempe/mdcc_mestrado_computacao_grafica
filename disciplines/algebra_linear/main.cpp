@@ -77,7 +77,7 @@ public:
     void setSize(int newSize) override {
         if (newSize >= 2 && newSize <= 20) {
             matrixSize = newSize;
-            LinearAlgebraUtils::identityMatrix(matrix, matrixSize);
+            Utils::identityMatrix(matrix, matrixSize);
             vectorB.assign(matrixSize, 0.0);
             clearSolution();
         }
@@ -104,15 +104,15 @@ public:
     }
 
     bool solveGauss(std::vector<double>& x) const override {
-        return LinearAlgebraUtils::solveTotalPivot(matrix, vectorB, x);
+        return Utils::solveTotalPivot(matrix, vectorB, x);
     }
 
     void solveSystem() override {
-        hasSolution = LinearAlgebraUtils::solveTotalPivot(matrix, vectorB, solution);
+        hasSolution = Utils::solveTotalPivot(matrix, vectorB, solution);
         solutionComputed = true;
         
         if (hasSolution) {
-            maxError = LinearAlgebraUtils::computeError(matrix, vectorB, solution);
+            maxError = Utils::computeError(matrix, vectorB, solution);
         }
     }
 
@@ -169,7 +169,7 @@ private:
     }
 
     void generateRandomSystem() {
-        LinearAlgebraUtils::generateRandomSystem(matrix, vectorB, matrixSize);
+        Utils::generateRandomSystem(matrix, vectorB, matrixSize);
         clearSolution();
     }
 
@@ -336,7 +336,7 @@ public:
     void setSize(int newSize) override {
         if (newSize >= 2 && newSize <= 20) {
             matrixSize = newSize;
-            LinearAlgebraUtils::identityMatrix(matrix, matrixSize);
+            Utils::identityMatrix(matrix, matrixSize);
             vectorB.assign(matrixSize, 0.0);
             clearSolution();
         }
@@ -363,15 +363,15 @@ public:
     }
 
     bool solveGauss(std::vector<double>& x) const override {
-        return LinearAlgebraUtils::solvePartialPivot(matrix, vectorB, x);
+        return Utils::solvePartialPivot(matrix, vectorB, x);
     }
 
     void solveSystem() override {
-        hasSolution = LinearAlgebraUtils::solvePartialPivot(matrix, vectorB, solution);
+        hasSolution = Utils::solvePartialPivot(matrix, vectorB, solution);
         solutionComputed = true;
         
         if (hasSolution) {
-            maxError = LinearAlgebraUtils::computeError(matrix, vectorB, solution);
+            maxError = Utils::computeError(matrix, vectorB, solution);
         }
     }
 
@@ -428,7 +428,7 @@ private:
     }
 
     void generateRandomSystem() {
-        LinearAlgebraUtils::generateRandomSystem(matrix, vectorB, matrixSize);
+        Utils::generateRandomSystem(matrix, vectorB, matrixSize);
         clearSolution();
     }
 

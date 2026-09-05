@@ -1,10 +1,77 @@
 #include <random>
+#include <vector>
+#include <cmath>
+#include <numeric>
+#include <algorithm>
+#include <stdexcept>
 
 // ============================================================
 // CLASSE UTILS PARA OPERACOES DE ALGEBRA LINEAR
 // ============================================================
-class LinearAlgebraUtils {
+class Utils {
 public:
+    // Enumeracao para tipo de pivotacao
+    enum class PivotType {
+        PARTIAL,
+        TOTAL
+    };
+
+    // Eliminacao de Gauss com Pivotamento Parcial
+    static bool solvePartialPivot(
+        const std::vector<std::vector<double>>& A,
+        const std::vector<double>& b,
+        std::vector<double>& x
+    ) {
+        int n = A.size();
+        
+        auto matrix = A;
+        auto vectorB = b;
+        
+        for (int k = 0; k < n - 1; ++k) {
+            int maxRow = k;
+            double maxVal = std::abs(matrix[k][k]);
+            
+            for (int i = k + 1; i < n; ++i) {
+                if (std::abs(matrix[i][k]) > maxVal) {
+                    maxVal = std::abs(matrix[i][k]);
+                    maxRow = i;
+                }
+            }
+            
+            if (maxVal < 1e-9) {
+                return false;
+            }
+            
+            if (maxRow != k) {
+                std::swap(matrix[k], matrix[maxRow]);
+                std::swap(vectorB[k], vectorB[maxRow]);
+            }
+            
+            for (int i = k + 1; i < n; ++i) {
+                double factor = matrix[i][k] / matrix[k][k];
+                for (int j = k; j < n; ++j) {
+                    matrix[i][j] -= factor * matrix[k][j];
+                }
+                vectorB[i] -= factor * vectorB[k];
+            }
+        }
+        
+        if (std::abs(matrix[n-1][n-1]) < 1e-9) {
+            return false;
+        }
+        
+        x.assign(n, 0.0);
+        for (int i = n - 1; i >= 0; --i) {
+            double sum = 0.0;
+            for (int j = i + 1; j < n; ++j) {
+                sum += matrix[i][j] * x[j];
+            }
+            x[i] = (vectorB[i] - sum) / matrix[i][i];
+        }
+        
+        return true;
+    }
+    
     // Eliminacao de Gauss com Pivotamento Total
     static bool solveTotalPivot(
         const std::vector<std::vector<double>>& A,
@@ -12,23 +79,24 @@ public:
         std::vector<double>& x
     ) {
         int n = A.size();
+        
         auto matrix = A;
         auto vectorB = b;
         
-        std::vector<int> varOrder(n);
-        std::iota(varOrder.begin(), varOrder.end(), 0);
+        std::vector<int> perm(n);
+        std::iota(perm.begin(), perm.end(), 0);
         
         for (int k = 0; k < n - 1; ++k) {
-            int pivotRow = k;
-            int pivotCol = k;
+            int maxRow = k;
+            int maxCol = k;
             double maxVal = std::abs(matrix[k][k]);
             
             for (int i = k; i < n; ++i) {
                 for (int j = k; j < n; ++j) {
                     if (std::abs(matrix[i][j]) > maxVal) {
                         maxVal = std::abs(matrix[i][j]);
-                        pivotRow = i;
-                        pivotCol = j;
+                        maxRow = i;
+                        maxCol = j;
                     }
                 }
             }
@@ -37,16 +105,16 @@ public:
                 return false;
             }
             
-            if (pivotRow != k) {
-                std::swap(matrix[k], matrix[pivotRow]);
-                std::swap(vectorB[k], vectorB[pivotRow]);
+            if (maxRow != k) {
+                std::swap(matrix[k], matrix[maxRow]);
+                std::swap(vectorB[k], vectorB[maxRow]);
             }
             
-            if (pivotCol != k) {
+            if (maxCol != k) {
                 for (int i = 0; i < n; ++i) {
-                    std::swap(matrix[i][k], matrix[i][pivotCol]);
+                    std::swap(matrix[i][k], matrix[i][maxCol]);
                 }
-                std::swap(varOrder[k], varOrder[pivotCol]);
+                std::swap(perm[k], perm[maxCol]);
             }
             
             for (int i = k + 1; i < n; ++i) {
@@ -73,65 +141,120 @@ public:
         
         x.assign(n, 0.0);
         for (int i = 0; i < n; ++i) {
-            x[varOrder[i]] = xSolved[i];
+            x[perm[i]] = xSolved[i];
         }
         
         return true;
     }
     
-    // Eliminacao de Gauss com Pivotamento Parcial
-    static bool solvePartialPivot(
+    // Metodo de Gauss-Jordan com suporte a pivotacao parcial e total
+    static bool solveGaussJordan(
         const std::vector<std::vector<double>>& A,
         const std::vector<double>& b,
-        std::vector<double>& x
+        std::vector<double>& x,
+        PivotType pivotType = PivotType::PARTIAL
     ) {
         int n = A.size();
+        
+        // Copia a matriz e o vetor para nao modificar os originais
         auto matrix = A;
         auto vectorB = b;
         
-        for (int k = 0; k < n - 1; ++k) {
-            int pivotRow = k;
-            double maxVal = std::abs(matrix[k][k]);
-            
-            for (int i = k + 1; i < n; ++i) {
-                if (std::abs(matrix[i][k]) > maxVal) {
-                    maxVal = std::abs(matrix[i][k]);
-                    pivotRow = i;
-                }
-            }
-            
-            if (maxVal < 1e-9) {
-                return false;
-            }
-            
-            if (pivotRow != k) {
-                std::swap(matrix[k], matrix[pivotRow]);
-                std::swap(vectorB[k], vectorB[pivotRow]);
-            }
-            
-            for (int i = k + 1; i < n; ++i) {
-                double factor = matrix[i][k] / matrix[k][k];
-                for (int j = k; j < n; ++j) {
-                    matrix[i][j] -= factor * matrix[k][j];
-                }
-                vectorB[i] -= factor * vectorB[k];
-            }
-        }
+        // Vetor de permutacao para pivotacao total
+        std::vector<int> permutation(n);
+        std::iota(permutation.begin(), permutation.end(), 0);
         
-        if (std::abs(matrix[n-1][n-1]) < 1e-9) {
+        try {
+            for (int k = 0; k < n; ++k) {
+                // --- Pivotacao ---
+                if (pivotType == PivotType::PARTIAL) {
+                    // Pivotacao Parcial: encontra o maior elemento na coluna k
+                    int maxRow = k;
+                    double maxVal = std::abs(matrix[k][k]);
+                    
+                    for (int i = k + 1; i < n; ++i) {
+                        if (std::abs(matrix[i][k]) > maxVal) {
+                            maxVal = std::abs(matrix[i][k]);
+                            maxRow = i;
+                        }
+                    }
+                    
+                    // Troca as linhas se necessario
+                    if (maxRow != k) {
+                        std::swap(matrix[k], matrix[maxRow]);
+                        std::swap(vectorB[k], vectorB[maxRow]);
+                    }
+                    
+                } else if (pivotType == PivotType::TOTAL) {
+                    // Pivotacao Total: encontra o maior elemento na submatriz restante
+                    int maxRow = k;
+                    int maxCol = k;
+                    double maxVal = std::abs(matrix[k][k]);
+                    
+                    for (int i = k; i < n; ++i) {
+                        for (int j = k; j < n; ++j) {
+                            if (std::abs(matrix[i][j]) > maxVal) {
+                                maxVal = std::abs(matrix[i][j]);
+                                maxRow = i;
+                                maxCol = j;
+                            }
+                        }
+                    }
+                    
+                    // Troca as linhas se necessario
+                    if (maxRow != k) {
+                        std::swap(matrix[k], matrix[maxRow]);
+                        std::swap(vectorB[k], vectorB[maxRow]);
+                    }
+                    
+                    // Troca as colunas se necessario
+                    if (maxCol != k) {
+                        for (int i = 0; i < n; ++i) {
+                            std::swap(matrix[i][k], matrix[i][maxCol]);
+                        }
+                        std::swap(permutation[k], permutation[maxCol]);
+                    }
+                }
+                
+                // Verifica se o pivô e zero
+                double pivot = matrix[k][k];
+                if (std::abs(pivot) < 1e-9) {
+                    return false; // Matriz singular
+                }
+                
+                // Normaliza a linha do pivô
+                for (int j = k; j < n; ++j) {
+                    matrix[k][j] /= pivot;
+                }
+                vectorB[k] /= pivot;
+                
+                // Zera os elementos acima e abaixo do pivô
+                for (int i = 0; i < n; ++i) {
+                    if (i != k) {
+                        double factor = matrix[i][k];
+                        for (int j = k; j < n; ++j) {
+                            matrix[i][j] -= factor * matrix[k][j];
+                        }
+                        vectorB[i] -= factor * vectorB[k];
+                    }
+                }
+            }
+            
+            // Ajusta a ordem das solucoes se foi feita pivotacao total
+            x.assign(n, 0.0);
+            if (pivotType == PivotType::TOTAL) {
+                for (int i = 0; i < n; ++i) {
+                    x[permutation[i]] = vectorB[i];
+                }
+            } else {
+                x = vectorB;
+            }
+            
+            return true;
+            
+        } catch (const std::exception&) {
             return false;
         }
-        
-        x.assign(n, 0.0);
-        for (int i = n - 1; i >= 0; --i) {
-            double sum = 0.0;
-            for (int j = i + 1; j < n; ++j) {
-                sum += matrix[i][j] * x[j];
-            }
-            x[i] = (vectorB[i] - sum) / matrix[i][i];
-        }
-        
-        return true;
     }
     
     // Calcula o erro de A*x - b
@@ -167,24 +290,20 @@ public:
         std::mt19937 gen(rd());
         std::uniform_real_distribution<double> dis(minVal, maxVal);
         
-        // Redimensiona a matriz e o vetor
         A.assign(size, std::vector<double>(size, 0.0));
         b.assign(size, 0.0);
         
-        // Gera a matriz aleatoria
         for (int i = 0; i < size; ++i) {
             for (int j = 0; j < size; ++j) {
                 A[i][j] = dis(gen);
             }
         }
         
-        // Gera solucao conhecida
         std::vector<double> x_sol(size);
         for (int i = 0; i < size; ++i) {
             x_sol[i] = dis(gen);
         }
         
-        // Calcula b = A * x_sol
         for (int i = 0; i < size; ++i) {
             double sum = 0.0;
             for (int j = 0; j < size; ++j) {
