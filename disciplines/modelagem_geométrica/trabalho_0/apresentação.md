@@ -87,7 +87,7 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
 
 ---
 
-## 1. B-rep — como funciona por dentro
+## B-rep — como funciona por dentro
 
 - Estrutura hierárquica de topologia OCCT: **Compound → Solid → Shell → Face → Wire → Edge → Vertex**
 - Cada `Face` referencia uma **superfície matemática** (plano, cilindro, esfera, NURBS) e é delimitada por `Wires` (contornos de arestas)
@@ -97,7 +97,7 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
 
 ---
 
-## 2. Malha poligonal (Mesh)
+## Malha poligonal (Mesh)
 
 **Workbench:** Mesh
 
@@ -112,7 +112,7 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
 
 ---
 
-## 2. Malha — como funciona por dentro
+## Malha — como funciona por dentro
 
 - Estrutura simples: lista de **vértices** (coordenadas) + lista de **facetas** (geralmente triângulos) que conectam esses vértices
 - Não existe superfície matemática subjacente — a "curvatura" é apenas uma ilusão dada pela quantidade de triângulos
@@ -121,13 +121,13 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
 
 ---
 
-## 2. Malha — Modelagem
+## Malha — Modelagem
 
 É possível trabalhar com malhas (meshes) no FreeCAD, mas com uma ressalva importante: o FreeCAD é um software de modelagem sólida paramétrica (CAD). Isso significa que ele não foi feito para esculpir ou modelar malhas do zero como o Blender ou o Maya fazem.
 
 ---
 
-## 3. Nuvem de pontos (Point Cloud)
+## Nuvem de pontos (Point Cloud)
 
 **Workbench:** Points
 
@@ -139,7 +139,7 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
 
 ---
 
-## 3. Nuvem de pontos — como funciona por dentro
+## Nuvem de pontos — como funciona por dentro
 
 - É a representação **mais primitiva**: apenas coordenadas (x, y, z) — às vezes com cor/normal associada — sem nenhuma relação de vizinhança entre os pontos
 - Não tem relação direta com o OCCT enquanto permanece nuvem de pontos; a ligação acontece **depois**, quando algoritmos de reconstrução de superfície (ex.: triangulação, ajuste de superfícies) geram uma Mesh ou, em casos mais elaborados, superfícies B-rep aproximadas
@@ -147,7 +147,7 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
 
 ---
 
-## 4. Geometria com restrições (Constraint-Based 2D)
+## Geometria com restrições (Constraint-Based 2D)
 
 **Motor:** planeGCS (solver de restrições geométricas)
 
@@ -160,7 +160,7 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
 
 ---
 
-## 4. Restrições 2D — como funciona por dentro
+## Restrições 2D — como funciona por dentro
 
 - Cada elemento do esboço (linha, arco, círculo) é uma **variável simbólica**; cada restrição (coincidência, paralelismo, tangência, cota) vira uma **equação**
 - O planeGCS resolve esse **sistema de equações não lineares** para encontrar a posição final de todos os elementos — é por isso que mudar uma cota "arrasta" o desenho todo
@@ -168,7 +168,7 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
 
 ---
 
-## 5. Malha para Elementos Finitos (FEM)
+## Malha para Elementos Finitos (FEM)
 
 **Ferramentas:** Gmsh / Netgen
 
@@ -182,11 +182,27 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
 
 ---
 
-## 5. Malha FEM — como funciona por dentro
+Discretização Numérica para Simulação (FEM / CAE)
 
-- Parte do **B-rep exato** (OCCT) do modelo e discretiza o volume/superfície em **elementos finitos**: tetraedros, hexaedros (3D) ou triângulos/quadriláteros (2D/casca)
-- Diferente da tesselação de visualização: aqui o objetivo é criar elementos de **qualidade numérica** (razão de aspecto, densidade controlada, refinamento local perto de furos/cantos) para que os solvers convirjam corretamente
-- Gmsh/Netgen leem a geometria B-rep exportada (via OCCT) e geram a malha; o resultado alimenta solvers como **CalculiX** (estrutural) ou **Elmer** (multifísica), que resolvem sistemas de equações diferenciais sobre essa malha
+### Arquitetura C++ e Tipologia do Módulo FEM
+
+- **Classe Core `Fem::FemMesh`:**
+  - Herda de `App::PropertyComplexGeoData`.
+  - Separa a geometria em duas tabelas compactas: `FemNode` (IDs e coordenadas XYZ) e `FemElement` (conectividades e tipo de elemento).
+---
+- **Integração com Gmsh / Netgen:**
+  - Exporta o B-Rep (`TopoDS_Shape`) para os geradores via STEP/BREP.
+  - O malhamento é governado pelos parâmetros de comprimento característico (`CharacteristicLengthMin/Max`) e refinamentos locais (`Fem::ConstraintMeshGroup`).
+---
+- **Hierarquia de Elementos:**
+  - **1D:** `SEGM2`, `SEGM3` (Vigas e Treliças).
+  - **2D:** `TRIA3`, `TRIA6`, `QUAD4`, `QUAD8` (Cascas e Placas).
+  - **3D:** `TET4`, `TET10` (Tetraedros Parabólicos), `HEX8`, `HEX20`.
+---
+- **Pipeline Mapeado B-Rep → Solver (CalculiX / Elmer):**
+  1. Condições de contorno (forças, engastamentos) ancoram-se em faces/arestas B-Rep.
+  2. O exporter gera conjuntos de nós (*Node Sets* `*NSET`) automaticamente no `.inp`.
+  3. A matriz $[K]\{u\} = \{F\}$ é resolvida e renderizada na viewport via VTK.
 
 ---
 
@@ -338,3 +354,6 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
   - Documentar → projeção 2D
   - Capturar dados reais → nuvem de pontos / malha
 - Essa arquitetura em camadas é o que permite ao FreeCAD ser, ao mesmo tempo, **preciso** (graças ao OCCT) e **versátil** (graças às representações derivadas)
+ 
+ 
+ ---
