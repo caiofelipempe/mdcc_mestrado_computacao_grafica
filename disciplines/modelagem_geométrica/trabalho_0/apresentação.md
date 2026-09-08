@@ -249,11 +249,25 @@ Discretização Numérica para Simulação (FEM / CAE)
 ---
 
 ## Tesselação: a ponte entre B-rep e malha
+ 
+O FreeCAD exibe modelos B-rep na tela através de um processo chamado **tesselação** (*tessellation* ou *meshing*), realizado pelo OCCT.
+ 
+A tesselação converte superfícies matemáticas exatas em uma aproximação composta por triângulos, adequada para renderização gráfica, exportação STL e algumas etapas de análise geométrica. O modelo original não é alterado: apenas uma representação discreta é criada para visualização.
 
-- Para exibir na tela ou exportar (STL), o B-rep é **tesselado** em triângulos
-- Classe `BRepMesh_IncrementalMesh` (OCCT)
-- Controlada por **deflexão linear** e **deflexão angular**
-- Apenas para visualização/exportação — o modelo interno continua sendo B-rep exato
+---
+
+```text
+B-Rep
+(Superfícies Exatas)
+↓
+BRepMesh_IncrementalMesh
+↓
+Triangulação
+↓
+Malha Poligonal
+↓
+Renderização / STL
+```
 
 ---
 
