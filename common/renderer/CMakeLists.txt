@@ -12,4 +12,5 @@ target_link_libraries(renderer PUBLIC
     GLEW::GLEW
     glfw
     imgui::imgui
+    geometry
 )

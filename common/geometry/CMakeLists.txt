@@ -1,5 +1,6 @@
 add_library(geometry INTERFACE
     arithmetic.hpp
+    color.hpp
     vector.hpp
     point.hpp
     mesh.hpp

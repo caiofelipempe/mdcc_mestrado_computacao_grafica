@@ -437,9 +437,9 @@ private:
             glBegin(GL_TRIANGLES);
             
             for (const auto& face : faces) {
-                int i0 = face[0];
-                int i1 = face[1];
-                int i2 = face[2];
+                int i0 = face.indices[0];
+                int i1 = face.indices[1];
+                int i2 = face.indices[2];
                 
                 if (i0 < (int)vertices.size() && i1 < (int)vertices.size() && i2 < (int)vertices.size()) {
                     const Point3f& v0 = vertices[i0];
@@ -475,9 +475,9 @@ private:
             glBegin(GL_LINES);
             
             for (const auto& face : faces) {
-                int i0 = face[0];
-                int i1 = face[1];
-                int i2 = face[2];
+                int i0 = face.indices[0];
+                int i1 = face.indices[1];
+                int i2 = face.indices[2];
                 
                 if (i0 < (int)vertices.size() && i1 < (int)vertices.size() && i2 < (int)vertices.size()) {
                     const Point3f& v0 = vertices[i0];

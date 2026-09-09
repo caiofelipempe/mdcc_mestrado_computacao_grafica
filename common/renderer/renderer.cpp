@@ -175,3 +175,219 @@ void Renderer::windowSizeCallback(GLFWwindow* window, int width, int height) {
     if (!self) return;
     self->onWindowResize(width, height);
 }
+
+/* ================= DRAW FUNCTIONS ================= */
+
+void Renderer::drawVertex(
+    const geometry::Point3f& point,
+    const geometry::Color& color,
+    float size)
+{
+    glPointSize(size);
+
+    glColor4f(
+        color.r,
+        color.g,
+        color.b,
+        color.a
+    );
+
+    glBegin(GL_POINTS);
+
+    glVertex3f(
+        point[0],
+        point[1],
+        point[2]
+    );
+
+    glEnd();
+}
+
+void Renderer::drawLine(
+    const geometry::Point3f& a,
+    const geometry::Point3f& b,
+    const geometry::Color& color,
+    float width)
+{
+    glLineWidth(width);
+
+    glColor4f(
+        color.r,
+        color.g,
+        color.b,
+        color.a
+    );
+
+    glBegin(GL_LINES);
+
+    glVertex3f(
+        a[0],
+        a[1],
+        a[2]
+    );
+
+    glVertex3f(
+        b[0],
+        b[1],
+        b[2]
+    );
+
+    glEnd();
+}
+
+void Renderer::drawFace(
+    const geometry::Point3f& a,
+    const geometry::Point3f& b,
+    const geometry::Point3f& c,
+    const geometry::Color& color)
+{
+    glColor4f(
+        color.r,
+        color.g,
+        color.b,
+        color.a
+    );
+
+    glBegin(GL_TRIANGLES);
+
+    glVertex3f(
+        a[0],
+        a[1],
+        a[2]
+    );
+
+    glVertex3f(
+        b[0],
+        b[1],
+        b[2]
+    );
+
+    glVertex3f(
+        c[0],
+        c[1],
+        c[2]
+    );
+
+    glEnd();
+}
+
+void Renderer::drawMesh(
+    const geometry::Mesh3f& mesh,
+    const geometry::Color& color
+)
+{
+    const auto& vertices =
+        mesh.getVertices();
+
+    const auto& edges =
+        mesh.getEdges();
+
+    const auto& faces =
+        mesh.getFaces();
+
+    if (!faces.empty()) {
+
+        glColor4f(
+            color.r,
+            color.g,
+            color.b,
+            color.a
+        );
+
+        glBegin(GL_TRIANGLES);
+
+        for (const auto& face : faces) {
+
+            const auto& v0 =
+                vertices[face.indices[0]];
+
+            const auto& v1 =
+                vertices[face.indices[1]];
+
+            const auto& v2 =
+                vertices[face.indices[2]];
+
+            glVertex3f(
+                v0[0],
+                v0[1],
+                v0[2]
+            );
+
+            glVertex3f(
+                v1[0],
+                v1[1],
+                v1[2]
+            );
+
+            glVertex3f(
+                v2[0],
+                v2[1],
+                v2[2]
+            );
+        }
+
+        glEnd();
+    }
+
+    if (!edges.empty()) {
+
+        glColor4f(
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f
+        );
+
+        glLineWidth(1.0f);
+
+        glBegin(GL_LINES);
+
+        for (const auto& edge : edges) {
+
+            const auto& v0 =
+                vertices[edge.v1];
+
+            const auto& v1 =
+                vertices[edge.v2];
+
+            glVertex3f(
+                v0[0],
+                v0[1],
+                v0[2]
+            );
+
+            glVertex3f(
+                v1[0],
+                v1[1],
+                v1[2]
+            );
+        }
+
+        glEnd();
+    }
+
+    if (!vertices.empty()) {
+
+        glColor4f(
+            1.0f,
+            0.0f,
+            0.0f,
+            1.0f
+        );
+
+        glPointSize(5.0f);
+
+        glBegin(GL_POINTS);
+
+        for (const auto& vertex : vertices) {
+
+            glVertex3f(
+                vertex[0],
+                vertex[1],
+                vertex[2]
+            );
+        }
+
+        glEnd();
+    }
+}
