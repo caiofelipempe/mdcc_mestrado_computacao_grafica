@@ -1,13 +1,16 @@
 {
   "name": "projetos-computacao-grafica",
   "version": "1.0.0",
-  "description": "Trabalhos em C++ usando OpenGL, GLFW e ImGui",
   "dependencies": [
     "glfw3",
     "glew",
     {
       "name": "imgui",
-      "features": [ "glfw-binding", "opengl3-binding" ]
+      "features": [
+        "glfw-binding",
+        "opengl3-binding",
+        "docking-experimental"
+      ]
     },
     "cgal"
   ]

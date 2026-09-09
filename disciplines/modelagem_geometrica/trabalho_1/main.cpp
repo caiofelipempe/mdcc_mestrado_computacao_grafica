@@ -1,108 +1,62 @@
 #include "renderer.hpp"
 
 #include <imgui.h>
-#include <imgui_internal.h>
 
 class Trabalho01 : public Renderer {
 public:
     Trabalho01() = default;
 
 protected:
+    void onInit(int, int, const std::string&) override {
+        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+    }
+
     void onUI() override {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
 
         ImGui::SetNextWindowPos(viewport->Pos);
         ImGui::SetNextWindowSize(viewport->Size);
+        ImGui::SetNextWindowViewport(viewport->ID);
 
         ImGui::Begin(
-            "Main",
+            "DockSpace",
             nullptr,
             ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoScrollbar |
-            ImGuiWindowFlags_NoScrollWithMouse
+            ImGuiWindowFlags_NoBringToFrontOnFocus |
+            ImGuiWindowFlags_NoNavFocus
         );
 
-        float fullHeight = ImGui::GetContentRegionAvail().y;
+        ImGuiID dockspaceId = ImGui::GetID("MainDockSpace");
 
-        drawPanel(fullHeight);
-
-        drawVerticalSplitter(
-            leftPanelWidth,
-            150.0f,
-            200.0f
+        ImGui::DockSpace(
+            dockspaceId,
+            ImVec2(0.0f, 0.0f)
         );
 
-        ImGui::SameLine();
+        ImGui::End();
 
-        drawCanvas(fullHeight);
+        drawCanvas();
+        drawPanel();
+    }
+
+private:
+    void drawCanvas() {
+        ImGui::Begin("Canvas");
+
+        ImGui::Text("Canvas");
 
         ImGui::End();
     }
 
-private:
-    float leftPanelWidth = 300.0f;
-
-private:
-    void drawPanel(float height) {
-        ImGui::BeginChild(
-            "Panel",
-            ImVec2(leftPanelWidth, height),
-            true
-        );
+    void drawPanel() {
+        ImGui::Begin("Panel");
 
         ImGui::Text("Panel");
 
-        ImGui::EndChild();
-    }
-
-    void drawCanvas(float height) {
-        ImGui::BeginChild(
-            "Canvas",
-            ImVec2(0, height),
-            true
-        );
-
-        ImGui::Text("Canvas");
-
-        ImGui::EndChild();
-    }
-
-    void drawVerticalSplitter(
-        float& leftWidth,
-        float minLeft,
-        float minRight)
-    {
-        ImGui::SameLine();
-
-        ImGui::InvisibleButton(
-            "##splitter",
-            ImVec2(6.0f, -1.0f)
-        );
-
-        if (ImGui::IsItemHovered() ||
-            ImGui::IsItemActive())
-        {
-            ImGui::SetMouseCursor(
-                ImGuiMouseCursor_ResizeEW
-            );
-        }
-
-        if (ImGui::IsItemActive()) {
-            leftWidth += ImGui::GetIO().MouseDelta.x;
-        }
-
-        float total =
-            ImGui::GetContentRegionAvail().x +
-            leftWidth;
-
-        leftWidth = ImClamp(
-            leftWidth,
-            minLeft,
-            total - minRight
-        );
+        ImGui::End();
     }
 };
 
