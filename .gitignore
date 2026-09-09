@@ -42,3 +42,6 @@
 # Folders
 /build
 /vcpkg_installed
+
+# IMgui
+imgui.ini

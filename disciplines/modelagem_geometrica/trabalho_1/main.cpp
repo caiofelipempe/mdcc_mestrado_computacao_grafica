@@ -11,50 +11,84 @@ protected:
         ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
     }
 
+    void onUpdate(float) override {
+        renderScene();
+    }
+
     void onUI() override {
+        createDockSpace();
+
+        drawToolsPanel();
+        drawHierarchyPanel();
+        drawPropertiesPanel();
+    }
+
+private:
+    void createDockSpace() {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
 
         ImGui::SetNextWindowPos(viewport->Pos);
         ImGui::SetNextWindowSize(viewport->Size);
         ImGui::SetNextWindowViewport(viewport->ID);
 
-        ImGui::Begin(
-            "DockSpace",
-            nullptr,
+        ImGuiWindowFlags flags =
             ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoCollapse |
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoBringToFrontOnFocus |
-            ImGuiWindowFlags_NoNavFocus
-        );
+            ImGuiWindowFlags_NoNavFocus |
+            ImGuiWindowFlags_NoBackground;
 
-        ImGuiID dockspaceId = ImGui::GetID("MainDockSpace");
+        ImGui::Begin(
+            "MainDockSpace",
+            nullptr,
+            flags
+        );
 
         ImGui::DockSpace(
-            dockspaceId,
-            ImVec2(0.0f, 0.0f)
+            ImGui::GetID("DockSpace")
         );
 
         ImGui::End();
-
-        drawCanvas();
-        drawPanel();
     }
 
-private:
-    void drawCanvas() {
-        ImGui::Begin("Canvas");
+    void renderScene() {
+        /*
+         * O OpenGL desenha diretamente
+         * no fundo da janela inteira.
+         *
+         * Exemplo:
+         *
+         * glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+         * glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+         *
+         * Desenhe sua geometria aqui.
+         */
+    }
 
-        ImGui::Text("Canvas");
+    void drawToolsPanel() {
+        ImGui::Begin("Ferramentas");
+
+        ImGui::Button("Vertice");
+        ImGui::Button("Aresta");
+        ImGui::Button("Face");
 
         ImGui::End();
     }
 
-    void drawPanel() {
-        ImGui::Begin("Panel");
+    void drawHierarchyPanel() {
+        ImGui::Begin("Hierarquia");
 
-        ImGui::Text("Panel");
+        ImGui::Text("Objetos");
+
+        ImGui::End();
+    }
+
+    void drawPropertiesPanel() {
+        ImGui::Begin("Propriedades");
+
+        ImGui::Text("Propriedades do objeto");
 
         ImGui::End();
     }
@@ -64,8 +98,8 @@ int main() {
     Trabalho01 app;
 
     app.run(
-        800,
-        600,
+        1280,
+        720,
         "Modelador Geometrico"
     );
 }
