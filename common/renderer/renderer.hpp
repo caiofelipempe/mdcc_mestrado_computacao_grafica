@@ -1,42 +1,61 @@
 #pragma once
 
 #include <string>
+
 #include "input.h"
+#include "camera.hpp"
 
 #include "color.hpp"
 #include "mesh.hpp"
 
 struct GLFWwindow;
 
-class Renderer {
+class Renderer
+{
 public:
+
     Renderer();
     virtual ~Renderer();
 
-    void run(int w, int h, const std::string& t);
+    void run(
+        int w,
+        int h,
+        const std::string& t
+    );
 
 protected:
-    virtual void onInit(int initialWidth, int initialHeight, const std::string& initialTitle);
+
+    virtual void onInit(
+        int initialWidth,
+        int initialHeight,
+        const std::string& initialTitle
+    );
+
     virtual void onUpdate(float dt);
+
+    virtual void onRender();
+
     virtual void onUI();
+
     virtual void onShutdown();
-    virtual void onWindowResize(int width, int height);
-    
+
+    virtual void onWindowResize(
+        int width,
+        int height
+    );
 
     const InputState& input() const;
 
-private:
-    void initGLFW(int w, int h, const std::string& t);
-    void setCallbacks();
-    void initImGui();
-    void shutdownImGui();
+    Camera& camera()
+    {
+        return m_camera;
+    }
 
-    // Callbacks GLFW
-    static void keyCallback        (GLFWwindow*, int, int, int, int);
-    static void mouseButtonCallback(GLFWwindow*, int, int, int);
-    static void cursorPosCallback  (GLFWwindow*, double, double);
-    static void scrollCallback     (GLFWwindow*, double, double);
-    static void windowSizeCallback (GLFWwindow*, int, int);
+    const Camera& camera() const
+    {
+        return m_camera;
+    }
+
     void drawVertex(
         const geometry::Point3f& point,
         const geometry::Color& color =
@@ -66,6 +85,59 @@ private:
     );
 
 private:
+
+    void initGLFW(
+        int w,
+        int h,
+        const std::string& t
+    );
+
+    void initImGui();
+
+    void shutdownImGui();
+
+    void updateCamera();
+
+    void updateGamepad();
+
+    static void keyCallback(
+        GLFWwindow*,
+        int,
+        int,
+        int,
+        int
+    );
+
+    static void mouseButtonCallback(
+        GLFWwindow*,
+        int,
+        int,
+        int
+    );
+
+    static void cursorPosCallback(
+        GLFWwindow*,
+        double,
+        double
+    );
+
+    static void scrollCallback(
+        GLFWwindow*,
+        double,
+        double
+    );
+
+    static void windowSizeCallback(
+        GLFWwindow*,
+        int,
+        int
+    );
+
+private:
+
     GLFWwindow* m_window{};
-    InputState  m_input{};
+
+    InputState m_input{};
+
+    Camera m_camera;
 };

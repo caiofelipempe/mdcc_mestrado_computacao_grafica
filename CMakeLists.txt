@@ -1,3 +1,6 @@
+option(BUILD_DISCIPLINES "Compilar trabalhos das disciplinas" ON)
+option(BUILD_PROJECT "Compilar projeto de conclusão" OFF)
+
 cmake_minimum_required(VERSION 3.16)
 
 project(
@@ -26,8 +29,6 @@ find_package(CGAL REQUIRED)
 # -----------------------------
 # Pastas de compilações
 # -----------------------------
-option(BUILD_DISCIPLINES "Compilar trabalhos das disciplinas" ON)
-option(BUILD_PROJECT "Compilar projeto de conclusão" ON)
 
 add_subdirectory(common)
 

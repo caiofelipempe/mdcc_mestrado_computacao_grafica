@@ -31,7 +31,10 @@ protected:
         height = h;
     }
 
-    void onUpdate(float dt) override {
+    void onUpdate(float deltaTime) override
+    {
+        dt = deltaTime;
+
         updateInput();
         updateCamera();
         updateButtonClick();
@@ -222,25 +225,25 @@ private:
         if (isOnCanvas(input.mouseX, input.mouseY)) {
             float moveSpeed = 5.0f * dt * (camera.boom * 0.1f + 1.0f);
 
-            if (input.keys[GLFW_KEY_W]) {
+            if (input.pressed('W')) {
                 camera.centerX -= camera.forwardX * moveSpeed;
                 camera.centerY -= camera.forwardY * moveSpeed;
                 camera.centerZ -= camera.forwardZ * moveSpeed;
                 shouldUpdateCamera = true;
             }
-            if (input.keys[GLFW_KEY_S]) {
+            if (input.pressed('S')) {
                 camera.centerX += camera.forwardX * moveSpeed;
                 camera.centerY += camera.forwardY * moveSpeed;
                 camera.centerZ += camera.forwardZ * moveSpeed;
                 shouldUpdateCamera = true;
             }
-            if (input.keys[GLFW_KEY_A]) {
+            if (input.pressed('A')) {
                 camera.centerX -= camera.rightX * moveSpeed;
                 camera.centerY -= camera.rightY * moveSpeed;
                 camera.centerZ -= camera.rightZ * moveSpeed;
                 shouldUpdateCamera = true;
             }
-            if (input.keys[GLFW_KEY_D]) {
+            if (input.pressed('D')) {
                 camera.centerX += camera.rightX * moveSpeed;
                 camera.centerY += camera.rightY * moveSpeed;
                 camera.centerZ += camera.rightZ * moveSpeed;
@@ -253,11 +256,11 @@ private:
                 if (camera.boom < 0.1f) camera.boom = 0.1f;
             }
 
-            holdingOnCanvasMouseBtn0 = input.mouseButtons[0];
-            holdingOnCanvasMouseBtn1 = input.mouseButtons[1];
+            holdingOnCanvasMouseBtn0 = input.leftMouse();
+            holdingOnCanvasMouseBtn1 = input.rightMouse();
         } else {
-            if (!input.mouseButtons[0]) holdingOnCanvasMouseBtn0 = false;
-            if (!input.mouseButtons[1]) holdingOnCanvasMouseBtn1 = false;
+            if (!input.leftMouse()) holdingOnCanvasMouseBtn0 = false;
+            if (!input.rightMouse()) holdingOnCanvasMouseBtn1 = false;
         }
 
         if (holdingOnCanvasMouseBtn0 && (mouseDx != 0 || mouseDy != 0)) {
@@ -275,25 +278,40 @@ private:
         }
     }
 
-    void updateCamera() {
-        if (shouldUpdateCamera) {
-            float cosY = std::cos(camera.angleY);
-            float sinY = std::sin(camera.angleY);
-            float cosX = std::cos(camera.angleX);
-            float sinX = std::sin(camera.angleX);
+    void updateCamera()
+    {
+        float cosY = std::cos(camera.angleY);
+        float sinY = std::sin(camera.angleY);
 
-            camera.forwardX = cosY * sinX;
-            camera.forwardY = sinY;
-            camera.forwardZ = cosY * cosX;
+        float cosX = std::cos(camera.angleX);
+        float sinX = std::sin(camera.angleX);
 
-            camera.upX = -sinY * sinX;
-            camera.upY =  cosY;
-            camera.upZ = -sinY * cosX;
+        camera.forwardX =
+            cosY * sinX;
 
-            camera.rightX = cosX;
-            camera.rightY = 0.0f;
-            camera.rightZ = -sinX;
-        }
+        camera.forwardY =
+            sinY;
+
+        camera.forwardZ =
+            cosY * cosX;
+
+        camera.upX =
+            -sinY * sinX;
+
+        camera.upY =
+            cosY;
+
+        camera.upZ =
+            -sinY * cosX;
+
+        camera.rightX =
+            cosX;
+
+        camera.rightY =
+            0.0;
+
+        camera.rightZ =
+            -sinX;
 
         shouldUpdateCamera = false;
     }
@@ -380,126 +398,85 @@ private:
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    void renderScene(int w, int h) {
-        glPushAttrib(GL_ALL_ATTRIB_BITS);
-        
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-        glViewport(0, 0, w, h);
-        
+    void onRender() override
+    {
+        if (!fbo)
+            return;
+
+        glBindFramebuffer(
+            GL_FRAMEBUFFER,
+            fbo
+        );
+
+        glViewport(
+            0,
+            0,
+            static_cast<GLsizei>(canvasSize.x),
+            static_cast<GLsizei>(canvasSize.y)
+        );
+
         glEnable(GL_DEPTH_TEST);
-        glClearColor(0.15f, 0.15f, 0.15f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glClearColor(
+            0.15f,
+            0.15f,
+            0.15f,
+            1.0f
+        );
+
+        glClear(
+            GL_COLOR_BUFFER_BIT |
+            GL_DEPTH_BUFFER_BIT
+        );
 
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        gluPerspective(45.0, (double)w / (double)h, 0.1, 1000.0);
-        
+
+        gluPerspective(
+            45.0,
+            canvasSize.x / canvasSize.y,
+            0.1,
+            1000.0
+        );
+
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
 
+        const double eyeX =
+            camera.centerX -
+            camera.forwardX * camera.boom;
+
+        const double eyeY =
+            camera.centerY -
+            camera.forwardY * camera.boom;
+
+        const double eyeZ =
+            camera.centerZ -
+            camera.forwardZ * camera.boom;
+
         gluLookAt(
-            camera.centerX + camera.forwardX * camera.boom,
-            camera.centerY + camera.forwardY * camera.boom,
-            camera.centerZ + camera.forwardZ * camera.boom,
+            eyeX,
+            eyeY,
+            eyeZ,
+
             camera.centerX,
             camera.centerY,
             camera.centerZ,
+
             camera.upX,
             camera.upY,
             camera.upZ
         );
 
-        // Renderizar faces
-        const auto& vertices = mesh.getVertices();
-        const auto& faces = mesh.getFaces();
+        drawMesh(
+            mesh,
+            geometry::Color::White()
+        );
 
-        if (faces.size() > 0 && vertices.size() > 0) {
-            glEnable(GL_LIGHTING);
-            glEnable(GL_LIGHT0);
-            
-            GLfloat light_pos[] = {5.0f, 10.0f, 5.0f, 1.0f};
-            GLfloat light_ambient[] = {0.3f, 0.3f, 0.3f, 1.0f};
-            GLfloat light_diffuse[] = {0.8f, 0.8f, 0.8f, 1.0f};
-            GLfloat light_specular[] = {1.0f, 1.0f, 1.0f, 1.0f};
-            
-            glLightfv(GL_LIGHT0, GL_POSITION, light_pos);
-            glLightfv(GL_LIGHT0, GL_AMBIENT, light_ambient);
-            glLightfv(GL_LIGHT0, GL_DIFFUSE, light_diffuse);
-            glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
-            
-            glEnable(GL_COLOR_MATERIAL);
-            glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-            glColor3f(0.3f, 0.6f, 0.9f);
-            
-            glEnable(GL_POLYGON_OFFSET_FILL);
-            glPolygonOffset(1.0f, 1.0f);
-            
-            glBegin(GL_TRIANGLES);
-            
-            for (const auto& face : faces) {
-                int i0 = face.indices[0];
-                int i1 = face.indices[1];
-                int i2 = face.indices[2];
-                
-                if (i0 < (int)vertices.size() && i1 < (int)vertices.size() && i2 < (int)vertices.size()) {
-                    const Point3f& v0 = vertices[i0];
-                    const Point3f& v1 = vertices[i1];
-                    const Point3f& v2 = vertices[i2];
-                    
-                    // Calcular normal usando Vec3f
-                    Vec3f vec0{v0[0], v0[1], v0[2]};
-                    Vec3f vec1{v1[0], v1[1], v1[2]};
-                    Vec3f vec2{v2[0], v2[1], v2[2]};
-                    
-                    Vec3f edge1 = vec1 - vec0;
-                    Vec3f edge2 = vec2 - vec0;
-                    Vec3f normal = edge1.cross(edge2);
-                    normal = normal.normalized();
-                    
-                    glNormal3f(normal[0], normal[1], normal[2]);
-                    glVertex3f(v0[0], v0[1], v0[2]);
-                    glVertex3f(v1[0], v1[1], v1[2]);
-                    glVertex3f(v2[0], v2[1], v2[2]);
-                }
-            }
-            
-            glEnd();
-            
-            glDisable(GL_POLYGON_OFFSET_FILL);
-            
-            // Renderizar arestas
-            glDisable(GL_LIGHTING);
-            glLineWidth(1.5f);
-            glColor3f(0.0f, 0.0f, 0.0f);
-            
-            glBegin(GL_LINES);
-            
-            for (const auto& face : faces) {
-                int i0 = face.indices[0];
-                int i1 = face.indices[1];
-                int i2 = face.indices[2];
-                
-                if (i0 < (int)vertices.size() && i1 < (int)vertices.size() && i2 < (int)vertices.size()) {
-                    const Point3f& v0 = vertices[i0];
-                    const Point3f& v1 = vertices[i1];
-                    const Point3f& v2 = vertices[i2];
-                    
-                    glVertex3f(v0[0], v0[1], v0[2]);
-                    glVertex3f(v1[0], v1[1], v1[2]);
-                    
-                    glVertex3f(v1[0], v1[1], v1[2]);
-                    glVertex3f(v2[0], v2[1], v2[2]);
-                    
-                    glVertex3f(v2[0], v2[1], v2[2]);
-                    glVertex3f(v0[0], v0[1], v0[2]);
-                }
-            }
-            
-            glEnd();
-        }
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glPopAttrib();
+        glBindFramebuffer(
+            GL_FRAMEBUFFER,
+            0
+        );
     }
 
     void drawCanvas() {
@@ -514,8 +491,6 @@ private:
             canvasSize = currentSize;
             setupFBO((int)canvasSize.x, (int)canvasSize.y);
         }
-
-        renderScene((int)canvasSize.x, (int)canvasSize.y);
 
         ImGui::Image(
             (ImTextureID)(intptr_t)fboTexture,

@@ -28,6 +28,7 @@ void Renderer::initGLFW(const int w, const int h, const std::string& t) {
     if (!glfwInit())
         throw std::runtime_error("Erro ao iniciar GLFW");
 
+    
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
@@ -42,6 +43,7 @@ void Renderer::initGLFW(const int w, const int h, const std::string& t) {
     if (glewInit() != GLEW_OK) {
         throw std::runtime_error("Erro ao iniciar GLEW");
     }
+    glEnable(GL_DEPTH_TEST);
 
     glfwSwapInterval(1);
     glViewport(0, 0, w, h);
@@ -72,55 +74,166 @@ void Renderer::shutdownImGui() {
     ImGui::DestroyContext();
 }
 
+void Renderer::updateCamera()
+{
+    if (m_camera.m_projectionDirty)
+    {
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+
+        gluPerspective(
+            m_camera.m_fov,
+            m_camera.m_aspect,
+            m_camera.m_nearPlane,
+            m_camera.m_farPlane
+        );
+
+        m_camera.m_projectionDirty = false;
+    }
+
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    gluLookAt(
+        m_camera.m_position[0],
+        m_camera.m_position[1],
+        m_camera.m_position[2],
+
+        m_camera.m_target[0],
+        m_camera.m_target[1],
+        m_camera.m_target[2],
+
+        m_camera.m_up[0],
+        m_camera.m_up[1],
+        m_camera.m_up[2]
+    );
+
+    m_camera.m_viewDirty = false;
+}
+
+void Renderer::updateGamepad()
+{
+    m_input.m_gamepadConnected =
+        glfwJoystickPresent(
+            GLFW_JOYSTICK_1
+        );
+
+    if (!m_input.m_gamepadConnected)
+    {
+        m_input.m_gamepadButtons.fill(false);
+        m_input.m_gamepadAxes.fill(0.0f);
+        return;
+    }
+
+    GLFWgamepadstate state;
+
+    if (!glfwGetGamepadState(
+            GLFW_JOYSTICK_1,
+            &state))
+    {
+        return;
+    }
+
+    for (int i = 0; i < 15; ++i)
+    {
+        m_input.m_gamepadButtons[i] =
+            state.buttons[i] == GLFW_PRESS;
+    }
+
+    for (int i = 0; i < 6; ++i)
+    {
+        m_input.m_gamepadAxes[i] =
+            state.axes[i];
+    }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Loop principal
 // ─────────────────────────────────────────────────────────────────────────────
-void Renderer::run(const int w, const int h, const std::string& t) {
+void Renderer::run(
+    const int w,
+    const int h,
+    const std::string& t
+)
+{
     initGLFW(w, h, t);
     initImGui();
+
+    m_camera.resize(w, h);
+
     onInit(w, h, t);
 
     using clock = std::chrono::steady_clock;
-    auto lastTime = clock::now();
 
-    while (!glfwWindowShouldClose(m_window)) {
-        // 1. Cálculo do Delta Time (dt)
-        auto currentTime = clock::now();
-        float dt = std::chrono::duration<float>(currentTime - lastTime).count();
+    auto lastTime =
+        clock::now();
+
+    while (!glfwWindowShouldClose(m_window))
+    {
+        auto currentTime =
+            clock::now();
+
+        const float dt =
+            std::chrono::duration<float>(
+                currentTime - lastTime
+            ).count();
+
         lastTime = currentTime;
 
-        // 2. Processamento de Eventos e Input
         glfwPollEvents();
-        //m_input.resetFrameData();
 
-        // 3. Update da lógica da aplicação
+        updateGamepad();
+
         onUpdate(dt);
 
-        // 4. Preparação do Frame de Renderização
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClearColor(
+            0.1f,
+            0.1f,
+            0.1f,
+            1.0f
+        );
 
-        // 5. Renderização da Interface (ImGui)
+        glClear(
+            GL_COLOR_BUFFER_BIT |
+            GL_DEPTH_BUFFER_BIT
+        );
+
+        updateCamera();
+
+        /*
+         * Renderização OpenGL da cena
+         */
+        onRender();
+
+        /*
+         * Renderização ImGui
+         */
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        
-        onUI(); // Aqui dentro você chama o drawCanvas() que desenha sua cena
-        
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        // 6. Troca de buffers (O V-Sync agirá aqui devido ao glfwSwapInterval(1))
+        ImGui::NewFrame();
+
+        onUI();
+
+        ImGui::Render();
+
+        ImGui_ImplOpenGL3_RenderDrawData(
+            ImGui::GetDrawData()
+        );
+
         glfwSwapBuffers(m_window);
 
         m_input.resetFrameData();
     }
 
     onShutdown();
+
     shutdownImGui();
 
     glfwDestroyWindow(m_window);
+
     m_window = nullptr;
+
     glfwTerminate();
 }
 
@@ -134,6 +247,7 @@ const InputState& Renderer::input() const { return m_input; }
 // ─────────────────────────────────────────────────────────────────────────────
 void Renderer::onInit        (int, int, const std::string&) {}
 void Renderer::onUpdate      (float) {}
+void Renderer::onRender      (){}
 void Renderer::onUI          () {}
 void Renderer::onShutdown    () {}
 void Renderer::onWindowResize(int width, int height) {
@@ -143,18 +257,49 @@ void Renderer::onWindowResize(int width, int height) {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Callbacks GLFW (estáticos)
 // ─────────────────────────────────────────────────────────────────────────────
-void Renderer::keyCallback(GLFWwindow* window, int key, int /*scan*/, int action, int /*mods*/) {
-    auto* self = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
-    if (!self) return;
-    if (key >= 0 && key < 512)
-        self->m_input.keys[key] = (action != GLFW_RELEASE);
+void Renderer::keyCallback(
+    GLFWwindow* window,
+    int key,
+    int,
+    int action,
+    int
+)
+{
+    auto* self =
+        static_cast<Renderer*>(
+            glfwGetWindowUserPointer(window)
+        );
+
+    if (!self)
+        return;
+
+    if (key < 0 || key >= 512)
+        return;
+
+    self->m_input.m_keys[key] =
+        (action != GLFW_RELEASE);
 }
 
-void Renderer::mouseButtonCallback(GLFWwindow* window, int button, int action, int /*mods*/) {
-    auto* self = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
-    if (!self) return;
-    if (button >= 0 && button < 8)
-        self->m_input.mouseButtons[button] = (action == GLFW_PRESS);
+void Renderer::mouseButtonCallback(
+    GLFWwindow* window,
+    int button,
+    int action,
+    int
+)
+{
+    auto* self =
+        static_cast<Renderer*>(
+            glfwGetWindowUserPointer(window)
+        );
+
+    if (!self)
+        return;
+
+    if (button < 0 || button >= 8)
+        return;
+
+    self->m_input.m_mouseButtons[button] =
+        (action == GLFW_PRESS);
 }
 
 void Renderer::cursorPosCallback(GLFWwindow* window, double x, double y) {
