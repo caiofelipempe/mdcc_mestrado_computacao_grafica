@@ -5,6 +5,9 @@
 class DrawerOpenGL final : public Drawer
 {
 public:
+    void frameBegin() override;
+    virtual void frameEnd() override;
+
     void drawVertex(
         const geometry::Point3f& point,
         const geometry::Color& color,

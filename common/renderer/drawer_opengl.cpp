@@ -28,6 +28,36 @@ namespace
     }
 }
 
+void DrawerOpenGL::frameBegin()
+{
+    glEnable(GL_DEPTH_TEST);
+
+    glDepthFunc(GL_LESS);
+
+    glDepthMask(GL_TRUE);
+
+    glDisable(GL_BLEND);
+
+    glDisable(GL_CULL_FACE);
+
+    glClearColor(
+        0.1f,
+        0.1f,
+        0.1f,
+        1.0f
+    );
+
+    glClear(
+        GL_COLOR_BUFFER_BIT |
+        GL_DEPTH_BUFFER_BIT
+    );
+}
+
+void DrawerOpenGL::frameEnd()
+{
+    glFlush();
+}
+
 void DrawerOpenGL::drawVertex(
     const geometry::Point3f& point,
     const geometry::Color& color,

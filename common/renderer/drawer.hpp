@@ -9,6 +9,10 @@ class Drawer
 public:
     virtual ~Drawer() = default;
 
+    virtual void frameBegin() = 0;
+
+    virtual void frameEnd() = 0;
+
     virtual void drawVertex(
         const geometry::Point3f& point,
         const geometry::Color& color,
