@@ -1,6 +1,7 @@
 add_library(renderer STATIC
     renderer.cpp
     camera.cpp
+    drawer_opengl.cpp
 )
 
 target_include_directories(renderer PUBLIC

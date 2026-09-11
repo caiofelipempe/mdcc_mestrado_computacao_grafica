@@ -4,6 +4,7 @@
 
 #include "input.h"
 #include "camera.hpp"
+#include "drawer.hpp"
 
 #include "color.hpp"
 #include "mesh.hpp"
@@ -33,7 +34,7 @@ protected:
 
     virtual void onUpdate(float dt);
 
-    virtual void onRender();
+    virtual void onRender(Drawer& drawer);
 
     virtual void onUI();
 
@@ -48,37 +49,9 @@ protected:
 
     Camera& camera() { return m_camera; }
     const Camera& camera() const{ return m_camera; }
-    
+
     void setTargetFPS(int fps) { m_targetFPS = fps; }
     int targetFPS() const { return m_targetFPS; }
-
-    void drawVertex(
-        const geometry::Point3f& point,
-        const geometry::Color& color =
-            geometry::Color::White(),
-        float size = 5.0f
-    );
-
-    void drawLine(
-        const geometry::Point3f& a,
-        const geometry::Point3f& b,
-        const geometry::Color& color =
-            geometry::Color::White(),
-        float width = 1.0f
-    );
-
-    void drawFace(
-        const geometry::Point3f& a,
-        const geometry::Point3f& b,
-        const geometry::Point3f& c,
-        const geometry::Color& color =
-            geometry::Color::White()
-    );
-
-    void drawMesh(
-        const geometry::Mesh3f& mesh,
-        const geometry::Color& color
-    );
 
 private:
 

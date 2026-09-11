@@ -69,14 +69,14 @@ protected:
         drawPropertiesPanel();
     }
     
-    void onRender() override
+    void onRender(Drawer& drawer) override
     {
-        renderScene();
+        renderScene(drawer);
     }
 
 private:
 
-    void renderScene()
+    void renderScene(Drawer& drawer)
     {
         const geometry::Point3f p0{-1.0f, -1.0f, -1.0f};
         const geometry::Point3f p1{ 1.0f, -1.0f, -1.0f};
@@ -96,28 +96,28 @@ private:
         const geometry::Color white {1,1,1,1};
 
         // Frente
-        drawFace(p4, p5, p6, red);
-        drawFace(p4, p6, p7, red);
+        drawer.drawFace(p4, p5, p6, red);
+        drawer.drawFace(p4, p6, p7, red);
 
         // Trás
-        drawFace(p0, p2, p1, green);
-        drawFace(p0, p3, p2, green);
+        drawer.drawFace(p0, p2, p1, green);
+        drawer.drawFace(p0, p3, p2, green);
 
         // Esquerda
-        drawFace(p0, p4, p7, blue);
-        drawFace(p0, p7, p3, blue);
+        drawer.drawFace(p0, p4, p7, blue);
+        drawer.drawFace(p0, p7, p3, blue);
 
         // Direita
-        drawFace(p1, p2, p6, cyan);
-        drawFace(p1, p6, p5, cyan);
+        drawer.drawFace(p1, p2, p6, cyan);
+        drawer.drawFace(p1, p6, p5, cyan);
 
         // Topo
-        drawFace(p3, p7, p6, yellow);
-        drawFace(p3, p6, p2, yellow);
+        drawer.drawFace(p3, p7, p6, yellow);
+        drawer.drawFace(p3, p6, p2, yellow);
 
         // Base
-        drawFace(p0, p1, p5, white);
-        drawFace(p0, p5, p4, white);
+        drawer.drawFace(p0, p1, p5, white);
+        drawer.drawFace(p0, p5, p4, white);
     }
 
     void drawToolsPanel() {

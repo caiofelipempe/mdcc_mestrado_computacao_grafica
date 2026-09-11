@@ -398,7 +398,7 @@ private:
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    void onRender() override
+    void onRender(Drawer& drawer) override
     {
         if (!fbo)
             return;
@@ -468,7 +468,7 @@ private:
             camera.upZ
         );
 
-        drawMesh(
+        drawer.drawMesh(
             mesh,
             geometry::Color::White()
         );

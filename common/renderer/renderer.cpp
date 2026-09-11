@@ -2,6 +2,7 @@
 
 #include "renderer.hpp"
 #include "input.h"
+#include "drawer_opengl.hpp"
 
 #include <GLFW/glfw3.h>
 #include <GL/glu.h>
@@ -159,51 +160,81 @@ void Renderer::run(const int w, const int h, const std::string& t) {
 
     using clock = std::chrono::steady_clock;
     auto lastTime = clock::now();
+    DrawerOpenGL drawer;
 
-    while (!glfwWindowShouldClose(m_window)) {
-        auto currentTime = clock::now();
-        const float dt = std::chrono::duration<float>(currentTime - lastTime).count();
+    while (!glfwWindowShouldClose(m_window))
+    {
+        auto frameBegin =
+            clock::now();
+
+        const float dt =
+            std::chrono::duration<float>(
+                frameBegin - lastTime
+            ).count();
+
+        lastTime = frameBegin;
+
+        glfwPollEvents();
+
+        updateGamepad();
+
+        onUpdate(dt);
+
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+
+        ImGui::NewFrame();
+
+        onUI();
+
+        glClearColor(
+            0.1f,
+            0.1f,
+            0.1f,
+            1.0f
+        );
+
+        glClear(
+            GL_COLOR_BUFFER_BIT |
+            GL_DEPTH_BUFFER_BIT
+        );
+
+        updateCamera();
+
+        onRender(drawer);
+
+        ImGui::Render();
+
+        ImGui_ImplOpenGL3_RenderDrawData(
+            ImGui::GetDrawData()
+        );
+
+        glfwSwapBuffers(
+            m_window
+        );
+
         if (m_targetFPS > 0)
         {
             const auto targetFrameTime =
                 std::chrono::duration<float>(
-                    1.0f / static_cast<float>(
+                    1.0f /
+                    static_cast<float>(
                         m_targetFPS
                     )
                 );
 
             const auto frameDuration =
-                clock::now() - currentTime;
+                clock::now() - frameBegin;
 
             if (frameDuration < targetFrameTime)
             {
                 std::this_thread::sleep_for(
-                    targetFrameTime - frameDuration
+                    targetFrameTime -
+                    frameDuration
                 );
             }
         }
 
-        lastTime = currentTime;
-
-        glfwPollEvents();
-        updateGamepad();
-        onUpdate(dt);
-
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        onUI();
-
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        updateCamera();
-        onRender();
-
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-        glfwSwapBuffers(m_window);
         m_input.resetFrameData();
     }
 }
@@ -218,7 +249,7 @@ const InputState& Renderer::input() const { return m_input; }
 // ─────────────────────────────────────────────────────────────────────────────
 void Renderer::onInit        (int, int, const std::string&) {}
 void Renderer::onUpdate      (float) {}
-void Renderer::onRender      () {}
+void Renderer::onRender      (Drawer&) {}
 void Renderer::onUI          () {}
 void Renderer::onShutdown    () {}
 
@@ -259,83 +290,4 @@ void Renderer::windowSizeCallback(GLFWwindow* window, int width, int height) {
     auto* self = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
     if (!self) return;
     self->onWindowResize(width, height);
-}
-
-/* ================= DRAW FUNCTIONS ================= */
-
-namespace {
-    inline void emitVertex(const geometry::Point3f& p) {
-        glVertex3f(p[0], p[1], p[2]);
-    }
-    inline void setColor(const geometry::Color& c) {
-        glColor4f(c.r, c.g, c.b, c.a);
-    }
-}
-
-void Renderer::drawVertex(const geometry::Point3f& point, const geometry::Color& color, float size) {
-    glPointSize(size);
-    setColor(color);
-
-    glBegin(GL_POINTS);
-    emitVertex(point);
-    glEnd();
-}
-
-void Renderer::drawLine(const geometry::Point3f& a, const geometry::Point3f& b,
-                         const geometry::Color& color, float width) {
-    glLineWidth(width);
-    setColor(color);
-
-    glBegin(GL_LINES);
-    emitVertex(a);
-    emitVertex(b);
-    glEnd();
-}
-
-void Renderer::drawFace(const geometry::Point3f& a, const geometry::Point3f& b,
-                         const geometry::Point3f& c, const geometry::Color& color) {
-    setColor(color);
-
-    glBegin(GL_TRIANGLES);
-    emitVertex(a);
-    emitVertex(b);
-    emitVertex(c);
-    glEnd();
-}
-
-void Renderer::drawMesh(const geometry::Mesh3f& mesh, const geometry::Color& color) {
-    const auto& vertices = mesh.getVertices();
-    const auto& edges    = mesh.getEdges();
-    const auto& faces    = mesh.getFaces();
-
-    if (!faces.empty()) {
-        setColor(color);
-        glBegin(GL_TRIANGLES);
-        for (const auto& face : faces) {
-            emitVertex(vertices[face.indices[0]]);
-            emitVertex(vertices[face.indices[1]]);
-            emitVertex(vertices[face.indices[2]]);
-        }
-        glEnd();
-    }
-
-    if (!edges.empty()) {
-        setColor({0.0f, 0.0f, 0.0f, 1.0f});
-        glLineWidth(1.0f);
-        glBegin(GL_LINES);
-        for (const auto& edge : edges) {
-            emitVertex(vertices[edge.v1]);
-            emitVertex(vertices[edge.v2]);
-        }
-        glEnd();
-    }
-
-    if (!vertices.empty()) {
-        setColor({1.0f, 0.0f, 0.0f, 1.0f});
-        glPointSize(5.0f);
-        glBegin(GL_POINTS);
-        for (const auto& vertex : vertices)
-            emitVertex(vertex);
-        glEnd();
-    }
 }
