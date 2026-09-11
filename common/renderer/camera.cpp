@@ -18,7 +18,8 @@ Camera::Camera()
         3.14159265358979323846f /
         180.0f;
 
-    m_rotation.rotateX(
+    m_rotation.rotateLocal(
+        { 1.0f, 0.0f, 0.0f },
         -25.0f * DEG2RAD
     );
 
@@ -64,12 +65,14 @@ void Camera::orbit(
         3.14159265358979323846f /
         180.0f;
 
-    m_rotation.rotateY(
-        deltaYaw * DEG2RAD
+    m_rotation.rotateWorld(
+        {0,1,0},
+        -deltaYaw * DEG2RAD
     );
 
-    m_rotation.rotateX(
-        deltaPitch * DEG2RAD
+    m_rotation.rotateLocal(
+        {1,0,0},
+        -deltaPitch * DEG2RAD
     );
 
     updatePosition();

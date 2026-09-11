@@ -42,7 +42,7 @@ protected:
         {
             camera().orbit(
                 static_cast<float>(dx) * 0.25f,
-                static_cast<float>(-dy) * 0.25f
+                static_cast<float>(dy) * 0.25f
             );
         }
 

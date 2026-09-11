@@ -81,7 +81,24 @@ public:
         };
     }
 
-    void rotate(
+    void rotateLocal(
+    const Vec3& axis,
+    T angle
+    )
+    {
+        const auto delta =
+            fromAxisAngle(
+                axis,
+                angle
+            );
+
+        m_rotation =
+            m_rotation
+                .hamilton(delta)
+                .normalized();
+    }
+
+    void rotateWorld(
         const Vec3& axis,
         T angle
     )
@@ -94,40 +111,8 @@ public:
 
         m_rotation =
             delta
-                .hamilton(
-                    m_rotation
-                )
+                .hamilton(m_rotation)
                 .normalized();
-    }
-
-    void rotateX(
-        T angle
-    )
-    {
-        rotate(
-            { T{1}, T{0}, T{0} },
-            angle
-        );
-    }
-
-    void rotateY(
-        T angle
-    )
-    {
-        rotate(
-            { T{0}, T{1}, T{0} },
-            angle
-        );
-    }
-
-    void rotateZ(
-        T angle
-    )
-    {
-        rotate(
-            { T{0}, T{0}, T{1} },
-            angle
-        );
     }
 
     [[nodiscard]]
