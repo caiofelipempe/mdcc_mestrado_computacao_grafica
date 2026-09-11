@@ -2,7 +2,7 @@
 
 #include "drawer.hpp"
 
-class DrawerOpenGL final : public Drawer
+class DrawerOpengl final : public Drawer
 {
 public:
     void frameBegin() override;

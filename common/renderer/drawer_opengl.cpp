@@ -28,7 +28,7 @@ namespace
     }
 }
 
-void DrawerOpenGL::frameBegin()
+void DrawerOpengl::frameBegin()
 {
     glEnable(GL_DEPTH_TEST);
 
@@ -53,12 +53,12 @@ void DrawerOpenGL::frameBegin()
     );
 }
 
-void DrawerOpenGL::frameEnd()
+void DrawerOpengl::frameEnd()
 {
     glFlush();
 }
 
-void DrawerOpenGL::drawVertex(
+void DrawerOpengl::drawVertex(
     const geometry::Point3f& point,
     const geometry::Color& color,
     float size
@@ -75,7 +75,7 @@ void DrawerOpenGL::drawVertex(
     glEnd();
 }
 
-void DrawerOpenGL::drawLine(
+void DrawerOpengl::drawLine(
     const geometry::Point3f& a,
     const geometry::Point3f& b,
     const geometry::Color& color,
@@ -94,7 +94,7 @@ void DrawerOpenGL::drawLine(
     glEnd();
 }
 
-void DrawerOpenGL::drawFace(
+void DrawerOpengl::drawFace(
     const geometry::Point3f& a,
     const geometry::Point3f& b,
     const geometry::Point3f& c,
@@ -112,7 +112,7 @@ void DrawerOpenGL::drawFace(
     glEnd();
 }
 
-void DrawerOpenGL::drawMesh(
+void DrawerOpengl::drawMesh(
     const geometry::Mesh3f& mesh,
     const geometry::Color& color
 )

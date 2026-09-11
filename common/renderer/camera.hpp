@@ -2,11 +2,11 @@
 
 #include "vector.hpp"
 
-class Renderer;
+class RendererGlfwOpengl;
 
 class Camera
 {
-    friend class Renderer;
+    friend class RendererGlfwOpengl;
 
 public:
 

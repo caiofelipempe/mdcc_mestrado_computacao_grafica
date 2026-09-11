@@ -1,5 +1,5 @@
 add_library(renderer STATIC
-    renderer.cpp
+    renderer_glfw_opengl.cpp
     camera.cpp
     drawer_opengl.cpp
 )

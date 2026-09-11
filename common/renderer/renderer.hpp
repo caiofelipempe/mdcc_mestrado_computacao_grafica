@@ -2,112 +2,47 @@
 
 #include <string>
 
-#include "input.h"
-#include "camera.hpp"
-#include "drawer.hpp"
-
-#include "color.hpp"
-#include "mesh.hpp"
-
-struct GLFWwindow;
+class Drawer;
 
 class Renderer
 {
 public:
+    Renderer() = default;
 
-    Renderer();
-    virtual ~Renderer();
+    virtual ~Renderer() = default;
 
-    void run(
-        int w,
-        int h,
-        const std::string& t
-    );
+    virtual void run(
+        int width,
+        int height,
+        const std::string& title
+    ) = 0;
 
 protected:
-
     virtual void onInit(
         int initialWidth,
         int initialHeight,
         const std::string& initialTitle
-    );
+    ) = 0;
 
-    virtual bool shouldRender() { return true; }
+    virtual void onUpdate(
+        float dt
+    ) = 0;
 
-    virtual int targetFPS() { return 0; }
-    
-    virtual void onUpdate(float dt);
+    virtual void onRender(
+        Drawer& drawer
+    ) = 0;
 
-    virtual void onRender(Drawer& drawer);
+    virtual void onUI() = 0;
 
-    virtual void onUI();
+    virtual void onShutdown() = 0;
 
-    virtual void onShutdown();
+    virtual bool shouldRender()
+    {
+        return true;
+    }
 
-    virtual void onWindowResize(
-        int width,
-        int height
-    );
-
-    const InputState& input() const;
-
-    Camera& camera() { return m_camera; }
-    const Camera& camera() const{ return m_camera; }
-
-private:
-
-    void initGLFW(
-        int w,
-        int h,
-        const std::string& t
-    );
-
-    void initImGui();
-
-    void shutdownImGui();
-
-    void updateCamera();
-
-    void updateGamepad();
-
-    static void keyCallback(
-        GLFWwindow*,
-        int,
-        int,
-        int,
-        int
-    );
-
-    static void mouseButtonCallback(
-        GLFWwindow*,
-        int,
-        int,
-        int
-    );
-
-    static void cursorPosCallback(
-        GLFWwindow*,
-        double,
-        double
-    );
-
-    static void scrollCallback(
-        GLFWwindow*,
-        double,
-        double
-    );
-
-    static void windowSizeCallback(
-        GLFWwindow*,
-        int,
-        int
-    );
-
-private:
-
-    GLFWwindow* m_window{};
-
-    InputState m_input{};
-
-    Camera m_camera;
+    virtual int targetFPS()
+    {
+        return 0;
+    }
 };

@@ -1,8 +1,8 @@
-#include "renderer.hpp"
+#include "renderer_glfw_opengl.hpp"
 
 #include <imgui.h>
 
-class Trabalho01 : public Renderer {
+class Trabalho01 : public RendererGlfwOpengl {
 public:
     Trabalho01() = default;
 

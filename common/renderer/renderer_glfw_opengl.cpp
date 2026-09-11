@@ -1,6 +1,6 @@
 #include <GL/glew.h>
 
-#include "renderer.hpp"
+#include "renderer_glfw_opengl.hpp"
 #include "input.h"
 #include "drawer_opengl.hpp"
 
@@ -19,13 +19,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  Ctor / Dtor
 // ─────────────────────────────────────────────────────────────────────────────
-Renderer::Renderer()  = default;
-Renderer::~Renderer() = default;
+RendererGlfwOpengl::RendererGlfwOpengl()  = default;
+RendererGlfwOpengl::~RendererGlfwOpengl() = default;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  GLFW
 // ─────────────────────────────────────────────────────────────────────────────
-void Renderer::initGLFW(const int w, const int h, const std::string& t) {
+void RendererGlfwOpengl::initGLFW(const int w, const int h, const std::string& t) {
     if (!glfwInit())
         throw std::runtime_error("Erro ao iniciar GLFW");
 
@@ -69,7 +69,7 @@ void Renderer::initGLFW(const int w, const int h, const std::string& t) {
 // ─────────────────────────────────────────────────────────────────────────────
 //  ImGui
 // ─────────────────────────────────────────────────────────────────────────────
-void Renderer::initImGui() {
+void RendererGlfwOpengl::initImGui() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
@@ -78,13 +78,13 @@ void Renderer::initImGui() {
     ImGui_ImplOpenGL3_Init("#version 330");
 }
 
-void Renderer::shutdownImGui() {
+void RendererGlfwOpengl::shutdownImGui() {
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 }
 
-void Renderer::updateCamera() {
+void RendererGlfwOpengl::updateCamera() {
     if (m_camera.m_projectionDirty) {
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
@@ -114,7 +114,7 @@ void Renderer::updateCamera() {
     // (removida a linha redundante que zerava m_viewDirty de novo fora do if)
 }
 
-void Renderer::updateGamepad() {
+void RendererGlfwOpengl::updateGamepad() {
     m_input.m_gamepadConnected = glfwJoystickPresent(GLFW_JOYSTICK_1);
 
     if (!m_input.m_gamepadConnected) {
@@ -137,13 +137,13 @@ void Renderer::updateGamepad() {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Loop principal
 // ─────────────────────────────────────────────────────────────────────────────
-void Renderer::run(const int w, const int h, const std::string& t) {
+void RendererGlfwOpengl::run(const int w, const int h, const std::string& t) {
     initGLFW(w, h, t);
     initImGui();
 
     // Garante shutdown correto mesmo se onInit/onUpdate/onRender lançarem.
     struct ShutdownGuard {
-        Renderer* self;
+        RendererGlfwOpengl* self;
         ~ShutdownGuard() {
             self->onShutdown();
             self->shutdownImGui();
@@ -160,7 +160,7 @@ void Renderer::run(const int w, const int h, const std::string& t) {
 
     using clock = std::chrono::steady_clock;
     auto lastTime = clock::now();
-    DrawerOpenGL drawer;
+    DrawerOpengl drawer;
 
     while (!glfwWindowShouldClose(m_window))
     {
@@ -237,18 +237,13 @@ void Renderer::run(const int w, const int h, const std::string& t) {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Accessors
 // ─────────────────────────────────────────────────────────────────────────────
-const InputState& Renderer::input() const { return m_input; }
+const InputState& RendererGlfwOpengl::input() const { return m_input; }
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Virtuais com implementação vazia (base)
 // ─────────────────────────────────────────────────────────────────────────────
-void Renderer::onInit        (int, int, const std::string&) {}
-void Renderer::onUpdate      (float) {}
-void Renderer::onRender      (Drawer&) {}
-void Renderer::onUI          () {}
-void Renderer::onShutdown    () {}
 
-void Renderer::onWindowResize(int width, int height) {
+void RendererGlfwOpengl::onWindowResize(int width, int height) {
     glViewport(0, 0, width, height);
     m_camera.resize(width, height);
 }
@@ -256,33 +251,33 @@ void Renderer::onWindowResize(int width, int height) {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Callbacks GLFW (estáticos)
 // ─────────────────────────────────────────────────────────────────────────────
-void Renderer::keyCallback(GLFWwindow* window, int key, int, int action, int) {
-    auto* self = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
+void RendererGlfwOpengl::keyCallback(GLFWwindow* window, int key, int, int action, int) {
+    auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
     if (!self || key < 0 || key >= 512) return;
     self->m_input.m_keys[key] = (action != GLFW_RELEASE);
 }
 
-void Renderer::mouseButtonCallback(GLFWwindow* window, int button, int action, int) {
-    auto* self = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
+void RendererGlfwOpengl::mouseButtonCallback(GLFWwindow* window, int button, int action, int) {
+    auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
     if (!self || button < 0 || button >= 8) return;
     self->m_input.m_mouseButtons[button] = (action == GLFW_PRESS);
 }
 
-void Renderer::cursorPosCallback(GLFWwindow* window, double x, double y) {
-    auto* self = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
+void RendererGlfwOpengl::cursorPosCallback(GLFWwindow* window, double x, double y) {
+    auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
     if (!self) return;
     self->m_input.mouseX = x;
     self->m_input.mouseY = y;
 }
 
-void Renderer::scrollCallback(GLFWwindow* window, double /*dx*/, double dy) {
-    auto* self = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
+void RendererGlfwOpengl::scrollCallback(GLFWwindow* window, double /*dx*/, double dy) {
+    auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
     if (!self) return;
     self->m_input.scrollOffset = dy;
 }
 
-void Renderer::windowSizeCallback(GLFWwindow* window, int width, int height) {
-    auto* self = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
+void RendererGlfwOpengl::windowSizeCallback(GLFWwindow* window, int width, int height) {
+    auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
     if (!self) return;
     self->onWindowResize(width, height);
 }

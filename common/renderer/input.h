@@ -192,5 +192,5 @@ public:
 
 private:
 
-    friend class Renderer;
+    friend class RendererGlfwOpengl;
 };

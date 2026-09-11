@@ -1,4 +1,4 @@
-#include "renderer.hpp"
+#include "renderer_glfw_opengl.hpp"
 #include "input.h"
 #include "utils.hpp"
 
@@ -894,7 +894,7 @@ private:
 // ============================================================
 // CLASSE PRINCIPAL - GERENCIA AS ATIVIDADES
 // ============================================================
-class AlgebraLinear : public Renderer {
+class AlgebraLinear : public RendererGlfwOpengl {
 public:
     AlgebraLinear() {
         activities.push_back(std::make_unique<TotalPivotActivity>());

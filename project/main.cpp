@@ -1,4 +1,4 @@
-#include "renderer.hpp"
+#include "renderer_glfw_opengl.hpp"
 #include "input.h"
 #include "vector.hpp"
 #include "point.hpp"
@@ -16,7 +16,7 @@
 
 using namespace geometry;
 
-class Trabalho01 : public Renderer {
+class Trabalho01 : public RendererGlfwOpengl {
 public:
     Trabalho01() = default;
 
