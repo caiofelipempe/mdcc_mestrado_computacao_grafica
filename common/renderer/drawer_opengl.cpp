@@ -41,9 +41,9 @@ void DrawerOpenGL::frameBegin()
     glDisable(GL_CULL_FACE);
 
     glClearColor(
-        0.1f,
-        0.1f,
-        0.1f,
+        0.0f,
+        0.0f,
+        0.0f,
         1.0f
     );
 

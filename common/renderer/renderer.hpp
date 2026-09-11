@@ -32,6 +32,10 @@ protected:
         const std::string& initialTitle
     );
 
+    virtual bool shouldRender() { return true; }
+
+    virtual int targetFPS() { return 0; }
+    
     virtual void onUpdate(float dt);
 
     virtual void onRender(Drawer& drawer);
@@ -49,9 +53,6 @@ protected:
 
     Camera& camera() { return m_camera; }
     const Camera& camera() const{ return m_camera; }
-
-    void setTargetFPS(int fps) { m_targetFPS = fps; }
-    int targetFPS() const { return m_targetFPS; }
 
 private:
 
@@ -109,6 +110,4 @@ private:
     InputState m_input{};
 
     Camera m_camera;
-
-    int m_targetFPS = 60;
 };

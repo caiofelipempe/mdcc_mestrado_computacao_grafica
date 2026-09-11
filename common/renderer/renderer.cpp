@@ -180,44 +180,41 @@ void Renderer::run(const int w, const int h, const std::string& t) {
 
         onUpdate(dt);
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
+        if(shouldRender()) {
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
 
-        ImGui::NewFrame();
+            ImGui::NewFrame();
 
-        onUI();
+            onUI();
+            
+            drawer.frameBegin();
 
-        glClearColor(
-            0.1f,
-            0.1f,
-            0.1f,
-            1.0f
-        );
+            updateCamera();
+            onRender(drawer);
 
-        drawer.frameBegin();
+            drawer.frameEnd();
 
-        updateCamera();
-        onRender(drawer);
 
-        drawer.frameEnd();
+            ImGui::Render();
 
-        ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(
+                ImGui::GetDrawData()
+            );
 
-        ImGui_ImplOpenGL3_RenderDrawData(
-            ImGui::GetDrawData()
-        );
+            glfwSwapBuffers(
+                m_window
+            );
+        }
 
-        glfwSwapBuffers(
-            m_window
-        );
-
-        if (m_targetFPS > 0)
+        auto fpsTarg = targetFPS();
+        if (fpsTarg > 0)
         {
             const auto targetFrameTime =
                 std::chrono::duration<float>(
                     1.0f /
                     static_cast<float>(
-                        m_targetFPS
+                        fpsTarg
                     )
                 );
 
