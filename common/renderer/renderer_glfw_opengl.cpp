@@ -110,15 +110,16 @@ void RendererGlfwOpengl::updateCamera() {
 
         m_camera.m_viewDirty = false;
     }
-    // (removida a linha redundante que zerava m_viewDirty de novo fora do if)
 }
 
 void RendererGlfwOpengl::updateGamepad() {
-    inputMutable().m_gamepadConnected = glfwJoystickPresent(GLFW_JOYSTICK_1);
+    auto& in = inputMutable();
 
-    if (!inputMutable().m_gamepadConnected) {
-        inputMutable().m_gamepadButtons.fill(false);
-        inputMutable().m_gamepadAxes.fill(0.0f);
+    in.m_gamepadConnected = glfwJoystickPresent(GLFW_JOYSTICK_1);
+
+    if (!in.m_gamepadConnected) {
+        in.m_gamepadButtons.fill(false);
+        in.m_gamepadAxes.fill(0.0f);
         return;
     }
 
@@ -127,10 +128,10 @@ void RendererGlfwOpengl::updateGamepad() {
         return;
 
     for (int i = 0; i < 15; ++i)
-        inputMutable().m_gamepadButtons[i] = state.buttons[i] == GLFW_PRESS;
+        in.m_gamepadButtons[i] = state.buttons[i] == GLFW_PRESS;
 
     for (int i = 0; i < 6; ++i)
-        inputMutable().m_gamepadAxes[i] = state.axes[i];
+        in.m_gamepadAxes[i] = state.axes[i];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -161,85 +162,47 @@ void RendererGlfwOpengl::run(const int w, const int h, const std::string& t) {
     auto lastTime = clock::now();
     DrawerOpengl drawer;
 
-    while (!glfwWindowShouldClose(m_window))
-    {
-        auto frameBegin =
-            clock::now();
-
-        const float dt =
-            std::chrono::duration<float>(
-                frameBegin - lastTime
-            ).count();
-
+    while (!glfwWindowShouldClose(m_window)) {
+        const auto frameBegin = clock::now();
+        const float dt = std::chrono::duration<float>(frameBegin - lastTime).count();
         lastTime = frameBegin;
 
         glfwPollEvents();
-
         updateGamepad();
-
         onUpdate(dt);
 
-        if(shouldRender()) {
+        if (shouldRender()) {
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
-
             ImGui::NewFrame();
-
             onUI();
-            
-            drawer.frameBegin();
 
+            drawer.frameBegin();
             updateCamera();
             onRender(drawer);
-
             drawer.frameEnd();
 
-
             ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-            ImGui_ImplOpenGL3_RenderDrawData(
-                ImGui::GetDrawData()
-            );
-
-            glfwSwapBuffers(
-                m_window
-            );
+            glfwSwapBuffers(m_window);
         }
 
-        auto fpsTarg = targetFPS();
-        if (fpsTarg > 0)
-        {
-            const auto targetFrameTime =
-                std::chrono::duration<float>(
-                    1.0f /
-                    static_cast<float>(
-                        fpsTarg
-                    )
-                );
-
-            const auto frameDuration =
-                clock::now() - frameBegin;
+        // Nota: com glfwSwapInterval(1) ativo, o swap já trava na taxa do
+        // monitor. Esse sleep só tem efeito quando targetFPS() < taxa do
+        // monitor; acima disso quem manda é o vsync, não o cap manual.
+        const int fpsTarg = targetFPS();
+        if (fpsTarg > 0) {
+            const auto targetFrameTime = std::chrono::duration<float>(1.0f / static_cast<float>(fpsTarg));
+            const auto frameDuration = clock::now() - frameBegin;
 
             if (frameDuration < targetFrameTime)
-            {
-                std::this_thread::sleep_for(
-                    targetFrameTime -
-                    frameDuration
-                );
-            }
+                std::this_thread::sleep_for(targetFrameTime - frameDuration);
         }
 
         inputMutable().resetFrameData();
     }
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Accessors
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Virtuais com implementação vazia (base)
-// ─────────────────────────────────────────────────────────────────────────────
 
 void RendererGlfwOpengl::onWindowResize(int width, int height) {
     glViewport(0, 0, width, height);
