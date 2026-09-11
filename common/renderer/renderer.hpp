@@ -46,15 +46,11 @@ protected:
 
     const InputState& input() const;
 
-    Camera& camera()
-    {
-        return m_camera;
-    }
-
-    const Camera& camera() const
-    {
-        return m_camera;
-    }
+    Camera& camera() { return m_camera; }
+    const Camera& camera() const{ return m_camera; }
+    
+    void setTargetFPS(int fps) { m_targetFPS = fps; }
+    int targetFPS() const { return m_targetFPS; }
 
     void drawVertex(
         const geometry::Point3f& point,
@@ -140,4 +136,6 @@ private:
     InputState m_input{};
 
     Camera m_camera;
+
+    int m_targetFPS = 60;
 };

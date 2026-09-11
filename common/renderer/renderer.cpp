@@ -13,6 +13,7 @@
 #include <chrono>
 #include <iostream>
 #include <stdexcept>
+#include <thread>
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Ctor / Dtor
@@ -162,6 +163,26 @@ void Renderer::run(const int w, const int h, const std::string& t) {
     while (!glfwWindowShouldClose(m_window)) {
         auto currentTime = clock::now();
         const float dt = std::chrono::duration<float>(currentTime - lastTime).count();
+        if (m_targetFPS > 0)
+        {
+            const auto targetFrameTime =
+                std::chrono::duration<float>(
+                    1.0f / static_cast<float>(
+                        m_targetFPS
+                    )
+                );
+
+            const auto frameDuration =
+                clock::now() - currentTime;
+
+            if (frameDuration < targetFrameTime)
+            {
+                std::this_thread::sleep_for(
+                    targetFrameTime - frameDuration
+                );
+            }
+        }
+
         lastTime = currentTime;
 
         glfwPollEvents();
