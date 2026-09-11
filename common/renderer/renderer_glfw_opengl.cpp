@@ -1,7 +1,6 @@
 #include <GL/glew.h>
 
 #include "renderer_glfw_opengl.hpp"
-#include "input.h"
 #include "drawer_opengl.hpp"
 
 #include <GLFW/glfw3.h>
@@ -115,11 +114,11 @@ void RendererGlfwOpengl::updateCamera() {
 }
 
 void RendererGlfwOpengl::updateGamepad() {
-    m_input.m_gamepadConnected = glfwJoystickPresent(GLFW_JOYSTICK_1);
+    inputMutable().m_gamepadConnected = glfwJoystickPresent(GLFW_JOYSTICK_1);
 
-    if (!m_input.m_gamepadConnected) {
-        m_input.m_gamepadButtons.fill(false);
-        m_input.m_gamepadAxes.fill(0.0f);
+    if (!inputMutable().m_gamepadConnected) {
+        inputMutable().m_gamepadButtons.fill(false);
+        inputMutable().m_gamepadAxes.fill(0.0f);
         return;
     }
 
@@ -128,10 +127,10 @@ void RendererGlfwOpengl::updateGamepad() {
         return;
 
     for (int i = 0; i < 15; ++i)
-        m_input.m_gamepadButtons[i] = state.buttons[i] == GLFW_PRESS;
+        inputMutable().m_gamepadButtons[i] = state.buttons[i] == GLFW_PRESS;
 
     for (int i = 0; i < 6; ++i)
-        m_input.m_gamepadAxes[i] = state.axes[i];
+        inputMutable().m_gamepadAxes[i] = state.axes[i];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -230,14 +229,13 @@ void RendererGlfwOpengl::run(const int w, const int h, const std::string& t) {
             }
         }
 
-        m_input.resetFrameData();
+        inputMutable().resetFrameData();
     }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Accessors
 // ─────────────────────────────────────────────────────────────────────────────
-const InputState& RendererGlfwOpengl::input() const { return m_input; }
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Virtuais com implementação vazia (base)
@@ -254,26 +252,26 @@ void RendererGlfwOpengl::onWindowResize(int width, int height) {
 void RendererGlfwOpengl::keyCallback(GLFWwindow* window, int key, int, int action, int) {
     auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
     if (!self || key < 0 || key >= 512) return;
-    self->m_input.m_keys[key] = (action != GLFW_RELEASE);
+    self->inputMutable().m_keys[key] = (action != GLFW_RELEASE);
 }
 
 void RendererGlfwOpengl::mouseButtonCallback(GLFWwindow* window, int button, int action, int) {
     auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
     if (!self || button < 0 || button >= 8) return;
-    self->m_input.m_mouseButtons[button] = (action == GLFW_PRESS);
+    self->inputMutable().m_mouseButtons[button] = (action == GLFW_PRESS);
 }
 
 void RendererGlfwOpengl::cursorPosCallback(GLFWwindow* window, double x, double y) {
     auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
     if (!self) return;
-    self->m_input.mouseX = x;
-    self->m_input.mouseY = y;
+    self->inputMutable().m_mouseX = x;
+    self->inputMutable().m_mouseY = y;
 }
 
 void RendererGlfwOpengl::scrollCallback(GLFWwindow* window, double /*dx*/, double dy) {
     auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
     if (!self) return;
-    self->m_input.scrollOffset = dy;
+    self->inputMutable().m_scrollOffset = dy;
 }
 
 void RendererGlfwOpengl::windowSizeCallback(GLFWwindow* window, int width, int height) {

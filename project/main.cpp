@@ -217,12 +217,12 @@ private:
         auto& input = this->input();
         this->dt = dt;
 
-        mouseDx = input.mouseX - mouseX;
-        mouseDy = input.mouseY - mouseY;
-        mouseX = input.mouseX;
-        mouseY = input.mouseY;
+        mouseDx = input.m_mouseX - mouseX;
+        mouseDy = input.m_mouseY - mouseY;
+        mouseX = input.m_mouseX;
+        mouseY = input.m_mouseY;
 
-        if (isOnCanvas(input.mouseX, input.mouseY)) {
+        if (isOnCanvas(input.m_mouseX, input.m_mouseY)) {
             float moveSpeed = 5.0f * dt * (camera.boom * 0.1f + 1.0f);
 
             if (input.pressed('W')) {
@@ -250,9 +250,9 @@ private:
                 shouldUpdateCamera = true;
             }
 
-            if (input.scrollOffset != 0) {
+            if (input.m_scrollOffset != 0) {
                 shouldUpdateCamera = true;
-                camera.boom -= input.scrollOffset * (camera.boom * 0.1f + 0.2f);
+                camera.boom -= input.m_scrollOffset * (camera.boom * 0.1f + 0.2f);
                 if (camera.boom < 0.1f) camera.boom = 0.1f;
             }
 

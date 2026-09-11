@@ -26,17 +26,17 @@ protected:
 
     void onUpdate(float) override
     {
-        static double lastX = input().mouseX;
-        static double lastY = input().mouseY;
+        static double lastX = input().m_mouseX;
+        static double lastY = input().m_mouseY;
 
         const double dx =
-            input().mouseX - lastX;
+            input().m_mouseX - lastX;
 
         const double dy =
-            input().mouseY - lastY;
+            input().m_mouseY - lastY;
 
-        lastX = input().mouseX;
-        lastY = input().mouseY;
+        lastX = input().m_mouseX;
+        lastY = input().m_mouseY;
 
         if (input().rightMouse())
         {
@@ -46,11 +46,11 @@ protected:
             );
         }
 
-        if (input().scrollOffset != 0.0)
+        if (input().m_scrollOffset != 0.0)
         {
             camera().zoom(
                 static_cast<float>(
-                    input().scrollOffset
+                    input().m_scrollOffset
                 )
             );
         }

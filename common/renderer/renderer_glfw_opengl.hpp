@@ -4,9 +4,7 @@
 
 #include "renderer.hpp"
 
-#include "camera.hpp"
 #include "drawer_opengl.hpp"
-#include "input.h"
 
 struct GLFWwindow;
 
@@ -46,18 +44,6 @@ protected:
         int width,
         int height
     );
-
-    const InputState& input() const;
-
-    Camera& camera()
-    {
-        return m_camera;
-    }
-
-    const Camera& camera() const
-    {
-        return m_camera;
-    }
 
 private:
     void initGLFW(
@@ -109,8 +95,4 @@ private:
 
 private:
     GLFWwindow* m_window{};
-
-    InputState m_input{};
-
-    Camera m_camera{};
 };

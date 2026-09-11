@@ -1,5 +1,8 @@
 #pragma once
 
+#include "input.h"
+#include "camera.hpp"
+
 #include <string>
 
 class Drawer;
@@ -16,6 +19,18 @@ public:
         int height,
         const std::string& title
     ) = 0;
+
+    const InputState& input() const { return m_input; }
+
+    Camera& camera()
+    {
+        return m_camera;
+    }
+
+    const Camera& camera() const
+    {
+        return m_camera;
+    }
 
 protected:
     virtual void onInit(
@@ -45,4 +60,10 @@ protected:
     {
         return 0;
     }
+
+    InputState& inputMutable() { return m_input; }
+
+    InputState m_input;
+
+    Camera m_camera{};
 };

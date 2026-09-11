@@ -99,23 +99,6 @@ enum class GamepadAxis : std::uint8_t
 
 struct InputState
 {
-private:
-
-    std::array<bool, 512> m_keys{};
-    std::array<bool, 8>   m_mouseButtons{};
-
-    std::array<bool, 16>  m_gamepadButtons{};
-    std::array<float, 6>  m_gamepadAxes{};
-
-    bool m_gamepadConnected{false};
-
-public:
-
-    double mouseX{0.0};
-    double mouseY{0.0};
-
-    double scrollOffset{0.0};
-
 public:
 
     [[nodiscard]]
@@ -185,12 +168,41 @@ public:
         return m_gamepadConnected;
     }
 
-    void resetFrameData()
+    [[nodiscard]]
+    double mouseX() const
     {
-        scrollOffset = 0.0;
+        return m_mouseX;
     }
 
-private:
+    [[nodiscard]]
+    double mouseY() const
+    {
+        return m_mouseY;
+    }
 
-    friend class RendererGlfwOpengl;
+    [[nodiscard]]
+    double scrollOffset() const
+    {
+        return m_scrollOffset;
+    }
+
+    void resetFrameData()
+    {
+        m_scrollOffset = 0.0;
+    }
+
+public:
+
+    std::array<bool, 512> m_keys{};
+    std::array<bool, 8>   m_mouseButtons{};
+
+    std::array<bool, 16>  m_gamepadButtons{};
+    std::array<float, 6>  m_gamepadAxes{};
+
+    bool m_gamepadConnected{false};
+
+    double m_mouseX{0.0};
+    double m_mouseY{0.0};
+
+    double m_scrollOffset{0.0};
 };
