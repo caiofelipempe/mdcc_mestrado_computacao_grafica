@@ -11,49 +11,39 @@ Camera::Camera()
     , m_nearPlane(0.1f)
     , m_farPlane(1000.0f)
     , m_distance(10.0f)
-    , m_yaw(0.0f)
-    , m_pitch(25.0f)
     , m_viewDirty(true)
     , m_projectionDirty(true)
 {
+    constexpr float DEG2RAD =
+        3.14159265358979323846f /
+        180.0f;
+
+    m_rotation.rotateX(
+        -25.0f * DEG2RAD
+    );
+
     updatePosition();
-}
-
-const geometry::Vec3f&
-Camera::position() const
-{
-    return m_position;
-}
-
-const geometry::Vec3f&
-Camera::target() const
-{
-    return m_target;
-}
-
-const geometry::Vec3f&
-Camera::up() const
-{
-    return m_up;
 }
 
 void Camera::setPerspective(
     float fov,
     float aspect,
     float nearPlane,
-    float farPlane)
+    float farPlane
+)
 {
-    m_fov = fov;
-    m_aspect = aspect;
-    m_nearPlane = nearPlane;
-    m_farPlane = farPlane;
+    m_fov        = fov;
+    m_aspect     = aspect;
+    m_nearPlane  = nearPlane;
+    m_farPlane   = farPlane;
 
     m_projectionDirty = true;
 }
 
 void Camera::resize(
     int width,
-    int height)
+    int height
+)
 {
     if (height <= 0)
         height = 1;
@@ -67,23 +57,29 @@ void Camera::resize(
 
 void Camera::orbit(
     float deltaYaw,
-    float deltaPitch)
+    float deltaPitch
+)
 {
-    m_yaw += deltaYaw;
-    m_pitch += deltaPitch;
+    constexpr float DEG2RAD =
+        3.14159265358979323846f /
+        180.0f;
 
-    if (m_pitch > 89.0f)
-        m_pitch = 89.0f;
+    m_rotation.rotateY(
+        deltaYaw * DEG2RAD
+    );
 
-    if (m_pitch < -89.0f)
-        m_pitch = -89.0f;
+    m_rotation.rotateX(
+        deltaPitch * DEG2RAD
+    );
 
     updatePosition();
 
     m_viewDirty = true;
 }
 
-void Camera::zoom(float amount)
+void Camera::zoom(
+    float amount
+)
 {
     m_distance -= amount;
 
@@ -97,10 +93,55 @@ void Camera::zoom(float amount)
 
 void Camera::pan(
     float dx,
-    float dy)
+    float dy
+)
 {
-    m_target[0] += dx;
-    m_target[1] += dy;
+    const auto right =
+        m_rotation.right();
+
+    const auto up =
+        m_rotation.up();
+
+    m_target +=
+        right * dx +
+        up    * dy;
+
+    updatePosition();
+
+    m_viewDirty = true;
+}
+
+void Camera::setDistance(
+    float value
+)
+{
+    m_distance =
+        std::max(
+            value,
+            0.1f
+        );
+
+    updatePosition();
+
+    m_viewDirty = true;
+}
+
+void Camera::setTarget(
+    const geometry::Vec3f& target
+)
+{
+    m_target = target;
+
+    updatePosition();
+
+    m_viewDirty = true;
+}
+
+void Camera::setRotation(
+    const geometry::Rot3f& rotation
+)
+{
+    m_rotation = rotation;
 
     updatePosition();
 
@@ -109,30 +150,13 @@ void Camera::pan(
 
 void Camera::updatePosition()
 {
-    constexpr float DEG2RAD =
-        3.14159265358979323846f /
-        180.0f;
+    const auto forward =
+        m_rotation.forward();
 
-    const float yawRad =
-        m_yaw * DEG2RAD;
+    m_position =
+        m_target -
+        forward * m_distance;
 
-    const float pitchRad =
-        m_pitch * DEG2RAD;
-
-    m_position[0] =
-        m_target[0] +
-        m_distance *
-        std::cos(pitchRad) *
-        std::sin(yawRad);
-
-    m_position[1] =
-        m_target[1] +
-        m_distance *
-        std::sin(pitchRad);
-
-    m_position[2] =
-        m_target[2] +
-        m_distance *
-        std::cos(pitchRad) *
-        std::cos(yawRad);
+    m_up =
+        m_rotation.up();
 }

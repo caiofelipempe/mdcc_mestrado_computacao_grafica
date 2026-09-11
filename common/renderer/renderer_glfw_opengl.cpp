@@ -83,32 +83,44 @@ void RendererGlfwOpengl::shutdownImGui() {
     ImGui::DestroyContext();
 }
 
-void RendererGlfwOpengl::updateCamera() {
-    if (m_camera.m_projectionDirty) {
+void RendererGlfwOpengl::updateCamera()
+{
+    if (m_camera.projectionDirty())
+    {
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
 
         gluPerspective(
-            m_camera.m_fov,
-            m_camera.m_aspect,
-            m_camera.m_nearPlane,
-            m_camera.m_farPlane
+            m_camera.fov(),
+            m_camera.aspect(),
+            m_camera.nearPlane(),
+            m_camera.farPlane()
         );
 
-        m_camera.m_projectionDirty = false;
+        m_camera.clearProjectionDirty();
     }
 
-    if (m_camera.m_viewDirty) {
+    if (m_camera.viewDirty())
+    {
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
 
+        const auto& position =
+            m_camera.position();
+
+        const auto& target =
+            m_camera.target();
+
+        const auto& up =
+            m_camera.up();
+
         gluLookAt(
-            m_camera.m_position[0], m_camera.m_position[1], m_camera.m_position[2],
-            m_camera.m_target[0],   m_camera.m_target[1],   m_camera.m_target[2],
-            m_camera.m_up[0],       m_camera.m_up[1],       m_camera.m_up[2]
+            position[0], position[1], position[2],
+            target[0],   target[1],   target[2],
+            up[0],       up[1],       up[2]
         );
 
-        m_camera.m_viewDirty = false;
+        m_camera.clearViewDirty();
     }
 }
 
