@@ -1,5 +1,5 @@
 #pragma once
-#pragma GCC optimize("Ofast,unroll-loops")
+// #pragma GCC optimize("Ofast,unroll-loops")
 #pragma GCC target("avx,avx2,fma")
 
 #include <array>
@@ -11,6 +11,8 @@
 #include <concepts>
 #include <immintrin.h>
 #include <memory>
+#include <cstdlib>
+#include <new>
 
 namespace geometry {
 
@@ -156,17 +158,25 @@ struct AlignedAllocator {
 
     [[nodiscard]]
     T* allocate(std::size_t n) {
-
         void* ptr = nullptr;
 
+    #if defined(_MSC_VER)
+        ptr = _aligned_malloc(n * sizeof(T), Align);
+        if (!ptr) throw std::bad_alloc();
+    #else
         if (posix_memalign(&ptr, Align, n * sizeof(T)) != 0)
             throw std::bad_alloc();
+    #endif
 
         return static_cast<T*>(ptr);
     }
 
     void deallocate(T* p, std::size_t) noexcept {
+    #if defined(_MSC_VER)
+        _aligned_free(p);
+    #else
         free(p);
+    #endif
     }
 };
 
@@ -529,49 +539,9 @@ auto normalize(
         throw std::runtime_error("Zero length");
 
     if constexpr (std::is_same_v<T,float>) {
-
-        float r;
-
-        const __m128 s_sql =
-            _mm_set_ss(sql);
-
-        const __m128 s_rsqrt =
-            _mm_rsqrt_ss(s_sql);
-
-        const __m128 h =
-            _mm_set_ss(0.5f);
-
-        const __m128 th =
-            _mm_set_ss(1.5f);
-
-        const __m128 res =
-            _mm_mul_ss(
-                s_rsqrt,
-                _mm_sub_ss(
-                    th,
-                    _mm_mul_ss(
-                        h,
-                        _mm_mul_ss(
-                            s_sql,
-                            _mm_mul_ss(
-                                s_rsqrt,
-                                s_rsqrt
-                            )
-                        )
-                    )
-                )
-            );
-
-        _mm_store_ss(&r, res);
-
-        return mul<T,N>(v, r);
-
-    } else {
-
-        return mul<T,N>(
-            v,
-            T{1} / std::sqrt(sql)
-        );
+    return mul<T,N>(v, T{1} / std::sqrt(sql));
+} else {
+    return mul<T,N>(v, T{1} / std::sqrt(sql));
     }
 }
 
