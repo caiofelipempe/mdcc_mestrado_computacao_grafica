@@ -1,4 +1,4 @@
-#include <GL/glew.h> 
+#include <GL/glew.h>
 
 #include "renderer.hpp"
 #include "input.h"
@@ -13,7 +13,6 @@
 #include <chrono>
 #include <iostream>
 #include <stdexcept>
-#include <thread>
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Ctor / Dtor
@@ -28,22 +27,31 @@ void Renderer::initGLFW(const int w, const int h, const std::string& t) {
     if (!glfwInit())
         throw std::runtime_error("Erro ao iniciar GLFW");
 
-    
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
 
     m_window = glfwCreateWindow(w, h, t.c_str(), nullptr, nullptr);
-    if (!m_window)
+    if (!m_window) {
+        glfwTerminate();
         throw std::runtime_error("Erro ao criar janela");
+    }
 
     glfwMakeContextCurrent(m_window);
 
-    glewExperimental = GL_TRUE; 
+    glewExperimental = GL_TRUE;
     if (glewInit() != GLEW_OK) {
+        glfwDestroyWindow(m_window);
+        m_window = nullptr;
+        glfwTerminate();
         throw std::runtime_error("Erro ao iniciar GLEW");
     }
+
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glClearDepth(1.0);
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
 
     glfwSwapInterval(1);
     glViewport(0, 0, w, h);
@@ -74,10 +82,8 @@ void Renderer::shutdownImGui() {
     ImGui::DestroyContext();
 }
 
-void Renderer::updateCamera()
-{
-    if (m_camera.m_projectionDirty)
-    {
+void Renderer::updateCamera() {
+    if (m_camera.m_projectionDirty) {
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
 
@@ -91,150 +97,94 @@ void Renderer::updateCamera()
         m_camera.m_projectionDirty = false;
     }
 
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
+    if (m_camera.m_viewDirty) {
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
 
-    gluLookAt(
-        m_camera.m_position[0],
-        m_camera.m_position[1],
-        m_camera.m_position[2],
-
-        m_camera.m_target[0],
-        m_camera.m_target[1],
-        m_camera.m_target[2],
-
-        m_camera.m_up[0],
-        m_camera.m_up[1],
-        m_camera.m_up[2]
-    );
-
-    m_camera.m_viewDirty = false;
-}
-
-void Renderer::updateGamepad()
-{
-    m_input.m_gamepadConnected =
-        glfwJoystickPresent(
-            GLFW_JOYSTICK_1
+        gluLookAt(
+            m_camera.m_position[0], m_camera.m_position[1], m_camera.m_position[2],
+            m_camera.m_target[0],   m_camera.m_target[1],   m_camera.m_target[2],
+            m_camera.m_up[0],       m_camera.m_up[1],       m_camera.m_up[2]
         );
 
-    if (!m_input.m_gamepadConnected)
-    {
+        m_camera.m_viewDirty = false;
+    }
+    // (removida a linha redundante que zerava m_viewDirty de novo fora do if)
+}
+
+void Renderer::updateGamepad() {
+    m_input.m_gamepadConnected = glfwJoystickPresent(GLFW_JOYSTICK_1);
+
+    if (!m_input.m_gamepadConnected) {
         m_input.m_gamepadButtons.fill(false);
         m_input.m_gamepadAxes.fill(0.0f);
         return;
     }
 
     GLFWgamepadstate state;
-
-    if (!glfwGetGamepadState(
-            GLFW_JOYSTICK_1,
-            &state))
-    {
+    if (!glfwGetGamepadState(GLFW_JOYSTICK_1, &state))
         return;
-    }
 
     for (int i = 0; i < 15; ++i)
-    {
-        m_input.m_gamepadButtons[i] =
-            state.buttons[i] == GLFW_PRESS;
-    }
+        m_input.m_gamepadButtons[i] = state.buttons[i] == GLFW_PRESS;
 
     for (int i = 0; i < 6; ++i)
-    {
-        m_input.m_gamepadAxes[i] =
-            state.axes[i];
-    }
+        m_input.m_gamepadAxes[i] = state.axes[i];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Loop principal
 // ─────────────────────────────────────────────────────────────────────────────
-void Renderer::run(
-    const int w,
-    const int h,
-    const std::string& t
-)
-{
+void Renderer::run(const int w, const int h, const std::string& t) {
     initGLFW(w, h, t);
     initImGui();
 
-    m_camera.resize(w, h);
+    // Garante shutdown correto mesmo se onInit/onUpdate/onRender lançarem.
+    struct ShutdownGuard {
+        Renderer* self;
+        ~ShutdownGuard() {
+            self->onShutdown();
+            self->shutdownImGui();
+            if (self->m_window) {
+                glfwDestroyWindow(self->m_window);
+                self->m_window = nullptr;
+            }
+            glfwTerminate();
+        }
+    } guard{this};
 
+    m_camera.resize(w, h);
     onInit(w, h, t);
 
     using clock = std::chrono::steady_clock;
+    auto lastTime = clock::now();
 
-    auto lastTime =
-        clock::now();
-
-    while (!glfwWindowShouldClose(m_window))
-    {
-        auto currentTime =
-            clock::now();
-
-        const float dt =
-            std::chrono::duration<float>(
-                currentTime - lastTime
-            ).count();
-
+    while (!glfwWindowShouldClose(m_window)) {
+        auto currentTime = clock::now();
+        const float dt = std::chrono::duration<float>(currentTime - lastTime).count();
         lastTime = currentTime;
 
         glfwPollEvents();
-
         updateGamepad();
-
         onUpdate(dt);
 
-        glClearColor(
-            0.1f,
-            0.1f,
-            0.1f,
-            1.0f
-        );
-
-        glClear(
-            GL_COLOR_BUFFER_BIT |
-            GL_DEPTH_BUFFER_BIT
-        );
-
-        updateCamera();
-
-        /*
-         * Renderização OpenGL da cena
-         */
-        onRender();
-
-        /*
-         * Renderização ImGui
-         */
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
-
         ImGui::NewFrame();
-
         onUI();
 
-        ImGui::Render();
+        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        ImGui_ImplOpenGL3_RenderDrawData(
-            ImGui::GetDrawData()
-        );
+        updateCamera();
+        onRender();
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         glfwSwapBuffers(m_window);
-
         m_input.resetFrameData();
     }
-
-    onShutdown();
-
-    shutdownImGui();
-
-    glfwDestroyWindow(m_window);
-
-    m_window = nullptr;
-
-    glfwTerminate();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -247,59 +197,28 @@ const InputState& Renderer::input() const { return m_input; }
 // ─────────────────────────────────────────────────────────────────────────────
 void Renderer::onInit        (int, int, const std::string&) {}
 void Renderer::onUpdate      (float) {}
-void Renderer::onRender      (){}
+void Renderer::onRender      () {}
 void Renderer::onUI          () {}
 void Renderer::onShutdown    () {}
+
 void Renderer::onWindowResize(int width, int height) {
-    (void)width; (void)height; // suprime warning no build OpenGL
+    glViewport(0, 0, width, height);
+    m_camera.resize(width, height);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Callbacks GLFW (estáticos)
 // ─────────────────────────────────────────────────────────────────────────────
-void Renderer::keyCallback(
-    GLFWwindow* window,
-    int key,
-    int,
-    int action,
-    int
-)
-{
-    auto* self =
-        static_cast<Renderer*>(
-            glfwGetWindowUserPointer(window)
-        );
-
-    if (!self)
-        return;
-
-    if (key < 0 || key >= 512)
-        return;
-
-    self->m_input.m_keys[key] =
-        (action != GLFW_RELEASE);
+void Renderer::keyCallback(GLFWwindow* window, int key, int, int action, int) {
+    auto* self = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
+    if (!self || key < 0 || key >= 512) return;
+    self->m_input.m_keys[key] = (action != GLFW_RELEASE);
 }
 
-void Renderer::mouseButtonCallback(
-    GLFWwindow* window,
-    int button,
-    int action,
-    int
-)
-{
-    auto* self =
-        static_cast<Renderer*>(
-            glfwGetWindowUserPointer(window)
-        );
-
-    if (!self)
-        return;
-
-    if (button < 0 || button >= 8)
-        return;
-
-    self->m_input.m_mouseButtons[button] =
-        (action == GLFW_PRESS);
+void Renderer::mouseButtonCallback(GLFWwindow* window, int button, int action, int) {
+    auto* self = static_cast<Renderer*>(glfwGetWindowUserPointer(window));
+    if (!self || button < 0 || button >= 8) return;
+    self->m_input.m_mouseButtons[button] = (action == GLFW_PRESS);
 }
 
 void Renderer::cursorPosCallback(GLFWwindow* window, double x, double y) {
@@ -323,216 +242,79 @@ void Renderer::windowSizeCallback(GLFWwindow* window, int width, int height) {
 
 /* ================= DRAW FUNCTIONS ================= */
 
-void Renderer::drawVertex(
-    const geometry::Point3f& point,
-    const geometry::Color& color,
-    float size)
-{
-    glPointSize(size);
+namespace {
+    inline void emitVertex(const geometry::Point3f& p) {
+        glVertex3f(p[0], p[1], p[2]);
+    }
+    inline void setColor(const geometry::Color& c) {
+        glColor4f(c.r, c.g, c.b, c.a);
+    }
+}
 
-    glColor4f(
-        color.r,
-        color.g,
-        color.b,
-        color.a
-    );
+void Renderer::drawVertex(const geometry::Point3f& point, const geometry::Color& color, float size) {
+    glPointSize(size);
+    setColor(color);
 
     glBegin(GL_POINTS);
-
-    glVertex3f(
-        point[0],
-        point[1],
-        point[2]
-    );
-
+    emitVertex(point);
     glEnd();
 }
 
-void Renderer::drawLine(
-    const geometry::Point3f& a,
-    const geometry::Point3f& b,
-    const geometry::Color& color,
-    float width)
-{
+void Renderer::drawLine(const geometry::Point3f& a, const geometry::Point3f& b,
+                         const geometry::Color& color, float width) {
     glLineWidth(width);
-
-    glColor4f(
-        color.r,
-        color.g,
-        color.b,
-        color.a
-    );
+    setColor(color);
 
     glBegin(GL_LINES);
-
-    glVertex3f(
-        a[0],
-        a[1],
-        a[2]
-    );
-
-    glVertex3f(
-        b[0],
-        b[1],
-        b[2]
-    );
-
+    emitVertex(a);
+    emitVertex(b);
     glEnd();
 }
 
-void Renderer::drawFace(
-    const geometry::Point3f& a,
-    const geometry::Point3f& b,
-    const geometry::Point3f& c,
-    const geometry::Color& color)
-{
-    glColor4f(
-        color.r,
-        color.g,
-        color.b,
-        color.a
-    );
+void Renderer::drawFace(const geometry::Point3f& a, const geometry::Point3f& b,
+                         const geometry::Point3f& c, const geometry::Color& color) {
+    setColor(color);
 
     glBegin(GL_TRIANGLES);
-
-    glVertex3f(
-        a[0],
-        a[1],
-        a[2]
-    );
-
-    glVertex3f(
-        b[0],
-        b[1],
-        b[2]
-    );
-
-    glVertex3f(
-        c[0],
-        c[1],
-        c[2]
-    );
-
+    emitVertex(a);
+    emitVertex(b);
+    emitVertex(c);
     glEnd();
 }
 
-void Renderer::drawMesh(
-    const geometry::Mesh3f& mesh,
-    const geometry::Color& color
-)
-{
-    const auto& vertices =
-        mesh.getVertices();
-
-    const auto& edges =
-        mesh.getEdges();
-
-    const auto& faces =
-        mesh.getFaces();
+void Renderer::drawMesh(const geometry::Mesh3f& mesh, const geometry::Color& color) {
+    const auto& vertices = mesh.getVertices();
+    const auto& edges    = mesh.getEdges();
+    const auto& faces    = mesh.getFaces();
 
     if (!faces.empty()) {
-
-        glColor4f(
-            color.r,
-            color.g,
-            color.b,
-            color.a
-        );
-
+        setColor(color);
         glBegin(GL_TRIANGLES);
-
         for (const auto& face : faces) {
-
-            const auto& v0 =
-                vertices[face.indices[0]];
-
-            const auto& v1 =
-                vertices[face.indices[1]];
-
-            const auto& v2 =
-                vertices[face.indices[2]];
-
-            glVertex3f(
-                v0[0],
-                v0[1],
-                v0[2]
-            );
-
-            glVertex3f(
-                v1[0],
-                v1[1],
-                v1[2]
-            );
-
-            glVertex3f(
-                v2[0],
-                v2[1],
-                v2[2]
-            );
+            emitVertex(vertices[face.indices[0]]);
+            emitVertex(vertices[face.indices[1]]);
+            emitVertex(vertices[face.indices[2]]);
         }
-
         glEnd();
     }
 
     if (!edges.empty()) {
-
-        glColor4f(
-            0.0f,
-            0.0f,
-            0.0f,
-            1.0f
-        );
-
+        setColor({0.0f, 0.0f, 0.0f, 1.0f});
         glLineWidth(1.0f);
-
         glBegin(GL_LINES);
-
         for (const auto& edge : edges) {
-
-            const auto& v0 =
-                vertices[edge.v1];
-
-            const auto& v1 =
-                vertices[edge.v2];
-
-            glVertex3f(
-                v0[0],
-                v0[1],
-                v0[2]
-            );
-
-            glVertex3f(
-                v1[0],
-                v1[1],
-                v1[2]
-            );
+            emitVertex(vertices[edge.v1]);
+            emitVertex(vertices[edge.v2]);
         }
-
         glEnd();
     }
 
     if (!vertices.empty()) {
-
-        glColor4f(
-            1.0f,
-            0.0f,
-            0.0f,
-            1.0f
-        );
-
+        setColor({1.0f, 0.0f, 0.0f, 1.0f});
         glPointSize(5.0f);
-
         glBegin(GL_POINTS);
-
-        for (const auto& vertex : vertices) {
-
-            glVertex3f(
-                vertex[0],
-                vertex[1],
-                vertex[2]
-            );
-        }
-
+        for (const auto& vertex : vertices)
+            emitVertex(vertex);
         glEnd();
     }
 }
