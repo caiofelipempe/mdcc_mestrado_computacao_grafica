@@ -1,6 +1,9 @@
 #include "drawer_opengl.hpp"
 
+#include "color.hpp"
 #include <GL/glew.h>
+
+using namespace geometry;
 
 namespace
 {
@@ -16,7 +19,7 @@ namespace
     }
 
     inline void setColor(
-        const geometry::Color& color
+        const Color& color
     )
     {
         glColor4f(
@@ -59,8 +62,8 @@ void DrawerOpengl::frameEnd()
 }
 
 void DrawerOpengl::drawVertex(
-    const geometry::Point3f& point,
-    const geometry::Color& color,
+    const Point3f& point,
+    const Color& color,
     float size
 )
 {
@@ -78,7 +81,7 @@ void DrawerOpengl::drawVertex(
 void DrawerOpengl::drawLine(
     const geometry::Point3f& a,
     const geometry::Point3f& b,
-    const geometry::Color& color,
+    const Color& color,
     float width
 )
 {
@@ -98,7 +101,7 @@ void DrawerOpengl::drawFace(
     const geometry::Point3f& a,
     const geometry::Point3f& b,
     const geometry::Point3f& c,
-    const geometry::Color& color
+    const Color& color
 )
 {
     setColor(color);
@@ -114,7 +117,7 @@ void DrawerOpengl::drawFace(
 
 void DrawerOpengl::drawMesh(
     const geometry::Mesh3f& mesh,
-    const geometry::Color& color
+    const Color& color
 )
 {
     const auto& vertices =

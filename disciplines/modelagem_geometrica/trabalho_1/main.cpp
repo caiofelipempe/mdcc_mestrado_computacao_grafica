@@ -6,16 +6,20 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
+#include "shape.hpp"
+
 using namespace geometry;
 
-namespace {
+namespace
+{
     constexpr float kOrbitSensitivity = 0.25f;
     constexpr float kFovDegrees = 45.0f;
     constexpr float kNearPlane = 0.1f;
     constexpr float kFarPlane = 1000.0f;
 }
 
-class Trabalho01 : public RendererGlfwOpengl {
+class Trabalho01 : public RendererGlfwOpengl
+{
 
 public:
     Trabalho01() = default;
@@ -24,8 +28,7 @@ protected:
     void onInit(
         int width,
         int height,
-        const std::string&
-    ) override
+        const std::string &) override
     {
         initImGui();
 
@@ -36,8 +39,7 @@ protected:
             kFovDegrees,
             static_cast<float>(width) / height,
             kNearPlane,
-            kFarPlane
-        );
+            kFarPlane);
     }
 
     void onShutdown() override
@@ -57,29 +59,25 @@ protected:
         {
             camera().orbit(
                 static_cast<float>(dx) * kOrbitSensitivity,
-                static_cast<float>(dy) * kOrbitSensitivity
-            );
+                static_cast<float>(dy) * kOrbitSensitivity);
         }
 
         if (input().m_scrollOffset != 0.0)
         {
             camera().zoom(
                 static_cast<float>(
-                    input().m_scrollOffset
-                )
-            );
+                    input().m_scrollOffset));
         }
     }
 
-    void onRender(Drawer& drawer) override
+    void onRender(Drawer &drawer) override
     {
         imguiStartRender();
-        renderScene(drawer);
+        drawScene(drawer);
         imguiEndRender();
     }
 
 private:
-
     // Estado do mouse do frame anterior. Antes eram `static` locais dentro
     // de onUpdate — movidos para membros para não depender de estado
     // escondido em função e para poderem ser reiniciados em onInit se
@@ -92,8 +90,7 @@ private:
         ImGui::DockSpaceOverViewport(
             0,
             ImGui::GetMainViewport(),
-            ImGuiDockNodeFlags_PassthruCentralNode
-        );
+            ImGuiDockNodeFlags_PassthruCentralNode);
 
         drawToolsPanel();
         drawHierarchyPanel();
@@ -105,47 +102,35 @@ private:
     // comentário explicando por quê). Substituído por uma tabela de faces
     // com convenção única (a,b,c)+(a,c,d), então toda face segue a mesma
     // regra e o outward winding fica implícito na ordem dos índices.
-    void renderScene(Drawer& drawer)
+    void drawScene(Drawer &drawer)
     {
-        static const std::array<Point3f, 8> kVertices{{
-            {-1.0f, -1.0f, -1.0f}, // 0
-            { 1.0f, -1.0f, -1.0f}, // 1
-            { 1.0f,  1.0f, -1.0f}, // 2
-            {-1.0f,  1.0f, -1.0f}, // 3
-            {-1.0f, -1.0f,  1.0f}, // 4
-            { 1.0f, -1.0f,  1.0f}, // 5
-            { 1.0f,  1.0f,  1.0f}, // 6
-            {-1.0f,  1.0f,  1.0f}, // 7
-        }};
+        using namespace geometry;
 
-        struct Face {
-            int a, b, c, d;
-            Color color;
-        };
+        drawer.drawMesh(
+            Block(2.0f, 2.0f, 2.0f).toMesh({-10.0f, 0.0f, 0.0f}),
+            Color::Red());
 
-        static const std::array<Face, 6> kFaces{{
-            {4, 5, 6, 7, Color::Red()},    // Frente
-            {0, 3, 2, 1, Color::Green()},  // Trás
-            {0, 4, 7, 3, Color::Blue()},   // Esquerda
-            {1, 2, 6, 5, Color::Cyan()},   // Direita
-            {3, 7, 6, 2, Color::Yellow()}, // Topo
-            {0, 1, 5, 4, Color::White()},  // Base
-        }};
+        drawer.drawMesh(
+            HalfBlock(2.0f, 2.0f, 2.0f).toMesh({-6.0f, 0.0f, 0.0f}),
+            Color::Green());
 
-        for (const auto& face : kFaces)
-        {
-            drawer.drawFace(
-                kVertices[face.a], kVertices[face.b], kVertices[face.c],
-                face.color
-            );
-            drawer.drawFace(
-                kVertices[face.a], kVertices[face.c], kVertices[face.d],
-                face.color
-            );
-        }
+        drawer.drawMesh(
+            Sphere(1.5f).toMesh(
+                32,
+                {3.0f, 0.0f, 0.0f}),
+            Color::Yellow());
+
+        drawer.drawMesh(
+            Cylinder(1.0f, 3.0f).toMesh(32, {8.0f, 0.0f, 0.0f}),
+            Color::Cyan());
+
+        drawer.drawMesh(
+            Cone(1.0f, 3.0f).toMesh(32, {13.0f, 0.0f, 0.0f}),
+            Color::White());
     }
 
-    void drawToolsPanel() {
+    void drawToolsPanel()
+    {
         ImGui::Begin("Ferramentas");
 
         ImGui::Button("Vertice");
@@ -155,7 +140,8 @@ private:
         ImGui::End();
     }
 
-    void drawHierarchyPanel() {
+    void drawHierarchyPanel()
+    {
         ImGui::Begin("Hierarquia");
 
         ImGui::Text("Objetos");
@@ -163,7 +149,8 @@ private:
         ImGui::End();
     }
 
-    void drawPropertiesPanel() {
+    void drawPropertiesPanel()
+    {
         ImGui::Begin("Propriedades");
 
         ImGui::Text("Propriedades do objeto");
@@ -171,7 +158,8 @@ private:
         ImGui::End();
     }
 
-    void initImGui() {
+    void initImGui()
+    {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGui::StyleColorsDark();
@@ -180,31 +168,34 @@ private:
         ImGui_ImplOpenGL3_Init("#version 330");
     }
 
-    void imguiStartRender() {
+    void imguiStartRender()
+    {
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         renderUI();
     }
 
-    void imguiEndRender() {
+    void imguiEndRender()
+    {
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     }
 
-    void shutdownImGui() {
+    void shutdownImGui()
+    {
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
     }
 };
 
-int main() {
+int main()
+{
     Trabalho01 app;
 
     app.run(
         1280,
         720,
-        "Modelador Geometrico"
-    );
+        "Modelador Geometrico");
 }

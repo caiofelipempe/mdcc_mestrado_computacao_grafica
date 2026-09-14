@@ -6,55 +6,49 @@
 class Camera
 {
 public:
-
     Camera();
 
     void setPerspective(
         float fov,
         float aspect,
         float nearPlane,
-        float farPlane
-    );
+        float farPlane);
 
     void resize(
         int width,
-        int height
-    );
+        int height);
 
     void orbit(
         float deltaYaw,
-        float deltaPitch
-    );
+        float deltaPitch);
 
     void pan(
         float dx,
-        float dy
-    );
+        float dy);
 
     void zoom(
-        float amount
-    );
+        float amount);
 
     [[nodiscard]]
-    const geometry::Vec3f& position() const
+    const geometry::Vec3f &position() const
     {
         return m_position;
     }
 
     [[nodiscard]]
-    const geometry::Vec3f& target() const
+    const geometry::Vec3f &target() const
     {
         return m_target;
     }
 
     [[nodiscard]]
-    const geometry::Vec3f& up() const
+    const geometry::Vec3f &up() const
     {
         return m_up;
     }
 
     [[nodiscard]]
-    const geometry::Rot3f& rotation() const
+    const geometry::Rot3f &rotation() const
     {
         return m_rotation;
     }
@@ -112,37 +106,30 @@ public:
     }
 
     void setViewDirty(
-        bool value = true
-    )
+        bool value = true)
     {
         m_viewDirty = value;
     }
 
     void setProjectionDirty(
-        bool value = true
-    )
+        bool value = true)
     {
         m_projectionDirty = value;
     }
 
     void setDistance(
-        float value
-    );
+        float value);
 
     void setTarget(
-        const geometry::Vec3f& target
-    );
+        const geometry::Vec3f &target);
 
     void setRotation(
-        const geometry::Rot3f& rotation
-    );
+        const geometry::Rot3f &rotation);
 
 private:
-
     void updatePosition();
 
 private:
-
     geometry::Vec3f m_position;
     geometry::Vec3f m_target;
     geometry::Vec3f m_up;

@@ -1,9 +1,9 @@
 add_library(geometry INTERFACE
     arithmetic.hpp
-    color.hpp
     vector.hpp
     point.hpp
     mesh.hpp
+    shape.hpp
 )
 
 target_include_directories(geometry INTERFACE

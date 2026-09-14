@@ -2,8 +2,6 @@
 
 #pragma once
 
-namespace geometry {
-
 struct Color {
     float r;
     float g;
@@ -64,5 +62,3 @@ struct Color {
 
     static constexpr Color Transparent() { return {0.f, 0.f, 0.f, 0.f}; }
 };
-
-} // namespace geometry

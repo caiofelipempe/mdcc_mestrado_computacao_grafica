@@ -3,25 +3,15 @@
 #include <cmath>
 
 Camera::Camera()
-    : m_position({0.0f, 0.0f, 10.0f})
-    , m_target({0.0f, 0.0f, 0.0f})
-    , m_up({0.0f, 1.0f, 0.0f})
-    , m_fov(45.0f)
-    , m_aspect(1.0f)
-    , m_nearPlane(0.1f)
-    , m_farPlane(1000.0f)
-    , m_distance(10.0f)
-    , m_viewDirty(true)
-    , m_projectionDirty(true)
+    : m_position({0.0f, 0.0f, 10.0f}), m_target({0.0f, 0.0f, 0.0f}), m_up({0.0f, 1.0f, 0.0f}), m_fov(45.0f), m_aspect(1.0f), m_nearPlane(0.1f), m_farPlane(1000.0f), m_distance(10.0f), m_viewDirty(true), m_projectionDirty(true)
 {
     constexpr float DEG2RAD =
         3.14159265358979323846f /
         180.0f;
 
     m_rotation.rotateLocal(
-        { 1.0f, 0.0f, 0.0f },
-        -25.0f * DEG2RAD
-    );
+        {1.0f, 0.0f, 0.0f},
+        -25.0f * DEG2RAD);
 
     updatePosition();
 }
@@ -30,21 +20,19 @@ void Camera::setPerspective(
     float fov,
     float aspect,
     float nearPlane,
-    float farPlane
-)
+    float farPlane)
 {
-    m_fov        = fov;
-    m_aspect     = aspect;
-    m_nearPlane  = nearPlane;
-    m_farPlane   = farPlane;
+    m_fov = fov;
+    m_aspect = aspect;
+    m_nearPlane = nearPlane;
+    m_farPlane = farPlane;
 
     m_projectionDirty = true;
 }
 
 void Camera::resize(
     int width,
-    int height
-)
+    int height)
 {
     if (height <= 0)
         height = 1;
@@ -58,22 +46,19 @@ void Camera::resize(
 
 void Camera::orbit(
     float deltaYaw,
-    float deltaPitch
-)
+    float deltaPitch)
 {
     constexpr float DEG2RAD =
         3.14159265358979323846f /
         180.0f;
 
     m_rotation.rotateWorld(
-        {0,1,0},
-        -deltaYaw * DEG2RAD
-    );
+        {0, 1, 0},
+        -deltaYaw * DEG2RAD);
 
     m_rotation.rotateLocal(
-        {1,0,0},
-        -deltaPitch * DEG2RAD
-    );
+        {1, 0, 0},
+        -deltaPitch * DEG2RAD);
 
     updatePosition();
 
@@ -81,8 +66,7 @@ void Camera::orbit(
 }
 
 void Camera::zoom(
-    float amount
-)
+    float amount)
 {
     m_distance -= amount;
 
@@ -96,8 +80,7 @@ void Camera::zoom(
 
 void Camera::pan(
     float dx,
-    float dy
-)
+    float dy)
 {
     const auto right =
         m_rotation.right();
@@ -107,7 +90,7 @@ void Camera::pan(
 
     m_target +=
         right * dx +
-        up    * dy;
+        up * dy;
 
     updatePosition();
 
@@ -115,14 +98,12 @@ void Camera::pan(
 }
 
 void Camera::setDistance(
-    float value
-)
+    float value)
 {
     m_distance =
         std::max(
             value,
-            0.1f
-        );
+            0.1f);
 
     updatePosition();
 
@@ -130,8 +111,7 @@ void Camera::setDistance(
 }
 
 void Camera::setTarget(
-    const geometry::Vec3f& target
-)
+    const geometry::Vec3f &target)
 {
     m_target = target;
 
@@ -141,8 +121,7 @@ void Camera::setTarget(
 }
 
 void Camera::setRotation(
-    const geometry::Rot3f& rotation
-)
+    const geometry::Rot3f &rotation)
 {
     m_rotation = rotation;
 

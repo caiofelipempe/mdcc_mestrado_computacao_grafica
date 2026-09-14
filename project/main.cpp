@@ -472,7 +472,7 @@ private:
 
         drawer.drawMesh(
             mesh,
-            geometry::Color::White()
+            Color::White()
         );
 
         glBindFramebuffer(
