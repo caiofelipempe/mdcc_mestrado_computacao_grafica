@@ -111,10 +111,6 @@ private:
             Color::Red());
 
         drawer.drawMesh(
-            HalfBlock(2.0f, 2.0f, 2.0f).toMesh({-6.0f, 0.0f, 0.0f}),
-            Color::Green());
-
-        drawer.drawMesh(
             Sphere(1.5f).toMesh(
                 32,
                 {3.0f, 0.0f, 0.0f}),
