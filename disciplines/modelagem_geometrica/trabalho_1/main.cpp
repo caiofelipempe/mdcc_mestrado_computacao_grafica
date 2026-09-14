@@ -1,8 +1,19 @@
 #include "renderer_glfw_opengl.hpp"
 
+#include <array>
+
 #include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
 
 using namespace geometry;
+
+namespace {
+    constexpr float kOrbitSensitivity = 0.25f;
+    constexpr float kFovDegrees = 45.0f;
+    constexpr float kNearPlane = 0.1f;
+    constexpr float kFarPlane = 1000.0f;
+}
 
 class Trabalho01 : public RendererGlfwOpengl {
 
@@ -11,41 +22,42 @@ public:
 
 protected:
     void onInit(
-    int width,
-    int height,
-    const std::string&
+        int width,
+        int height,
+        const std::string&
     ) override
     {
+        initImGui();
+
         ImGui::GetIO().ConfigFlags |=
             ImGuiConfigFlags_DockingEnable;
 
         camera().setPerspective(
-            45.0f,
+            kFovDegrees,
             static_cast<float>(width) / height,
-            0.1f,
-            1000.0f
+            kNearPlane,
+            kFarPlane
         );
+    }
+
+    void onShutdown() override
+    {
+        shutdownImGui();
     }
 
     void onUpdate(float) override
     {
-        static double lastX = input().m_mouseX;
-        static double lastY = input().m_mouseY;
+        const double dx = input().m_mouseX - m_lastMouseX;
+        const double dy = input().m_mouseY - m_lastMouseY;
 
-        const double dx =
-            input().m_mouseX - lastX;
-
-        const double dy =
-            input().m_mouseY - lastY;
-
-        lastX = input().m_mouseX;
-        lastY = input().m_mouseY;
+        m_lastMouseX = input().m_mouseX;
+        m_lastMouseY = input().m_mouseY;
 
         if (input().rightMouse())
         {
             camera().orbit(
-                static_cast<float>(dx) * 0.25f,
-                static_cast<float>(dy) * 0.25f
+                static_cast<float>(dx) * kOrbitSensitivity,
+                static_cast<float>(dy) * kOrbitSensitivity
             );
         }
 
@@ -59,7 +71,29 @@ protected:
         }
     }
 
-    void onUI() override
+    void onRender(Drawer& drawer) override
+    {
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        renderUI();
+
+        renderScene(drawer);
+
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    }
+
+private:
+
+    // Estado do mouse do frame anterior. Antes eram `static` locais dentro
+    // de onUpdate — movidos para membros para não depender de estado
+    // escondido em função e para poderem ser reiniciados em onInit se
+    // necessário no futuro (ex.: ao trocar de câmera).
+    double m_lastMouseX = 0.0;
+    double m_lastMouseY = 0.0;
+
+    void renderUI()
     {
         ImGui::DockSpaceOverViewport(
             0,
@@ -71,56 +105,50 @@ protected:
         drawHierarchyPanel();
         drawPropertiesPanel();
     }
-    
-    void onRender(Drawer& drawer) override
-    {
-        renderScene(drawer);
-    }
 
-private:
-
+    // Antes eram 12 chamadas manuais a drawFace, uma por triângulo, com o
+    // winding da face "Trás" escrito na ordem contrária às demais (sem
+    // comentário explicando por quê). Substituído por uma tabela de faces
+    // com convenção única (a,b,c)+(a,c,d), então toda face segue a mesma
+    // regra e o outward winding fica implícito na ordem dos índices.
     void renderScene(Drawer& drawer)
     {
-        const Color red   {1,0,0,1};
-        const Color green {0,1,0,1};
-        const Color blue  {0,0,1,1};
-        const Color cyan  {0,1,1,1};
-        const Color yellow{1,1,0,1};
-        const Color white {1,1,1,1};
+        static const std::array<Point3f, 8> kVertices{{
+            {-1.0f, -1.0f, -1.0f}, // 0
+            { 1.0f, -1.0f, -1.0f}, // 1
+            { 1.0f,  1.0f, -1.0f}, // 2
+            {-1.0f,  1.0f, -1.0f}, // 3
+            {-1.0f, -1.0f,  1.0f}, // 4
+            { 1.0f, -1.0f,  1.0f}, // 5
+            { 1.0f,  1.0f,  1.0f}, // 6
+            {-1.0f,  1.0f,  1.0f}, // 7
+        }};
 
-        const Point3f p0{-1.0f, -1.0f, -1.0f};
-        const Point3f p1{ 1.0f, -1.0f, -1.0f};
-        const Point3f p2{ 1.0f,  1.0f, -1.0f};
-        const Point3f p3{-1.0f,  1.0f, -1.0f};
+        struct Face {
+            int a, b, c, d;
+            Color color;
+        };
 
-        const Point3f p4{-1.0f, -1.0f,  1.0f};
-        const Point3f p5{ 1.0f, -1.0f,  1.0f};
-        const Point3f p6{ 1.0f,  1.0f,  1.0f};
-        const Point3f p7{-1.0f,  1.0f,  1.0f};
+        static const std::array<Face, 6> kFaces{{
+            {4, 5, 6, 7, Color::Red()},    // Frente
+            {0, 3, 2, 1, Color::Green()},  // Trás
+            {0, 4, 7, 3, Color::Blue()},   // Esquerda
+            {1, 2, 6, 5, Color::Cyan()},   // Direita
+            {3, 7, 6, 2, Color::Yellow()}, // Topo
+            {0, 1, 5, 4, Color::White()},  // Base
+        }};
 
-        // Frente
-        drawer.drawFace(p4, p5, p6, red);
-        drawer.drawFace(p4, p6, p7, red);
-
-        // Trás
-        drawer.drawFace(p0, p2, p1, green);
-        drawer.drawFace(p0, p3, p2, green);
-
-        // Esquerda
-        drawer.drawFace(p0, p4, p7, blue);
-        drawer.drawFace(p0, p7, p3, blue);
-
-        // Direita
-        drawer.drawFace(p1, p2, p6, cyan);
-        drawer.drawFace(p1, p6, p5, cyan);
-
-        // Topo
-        drawer.drawFace(p3, p7, p6, yellow);
-        drawer.drawFace(p3, p6, p2, yellow);
-
-        // Base
-        drawer.drawFace(p0, p1, p5, white);
-        drawer.drawFace(p0, p5, p4, white);
+        for (const auto& face : kFaces)
+        {
+            drawer.drawFace(
+                kVertices[face.a], kVertices[face.b], kVertices[face.c],
+                face.color
+            );
+            drawer.drawFace(
+                kVertices[face.a], kVertices[face.c], kVertices[face.d],
+                face.color
+            );
+        }
     }
 
     void drawToolsPanel() {
@@ -147,6 +175,21 @@ private:
         ImGui::Text("Propriedades do objeto");
 
         ImGui::End();
+    }
+
+    void initImGui() {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGui::StyleColorsDark();
+
+        ImGui_ImplGlfw_InitForOpenGL(window(), true);
+        ImGui_ImplOpenGL3_Init("#version 330");
+    }
+
+    void shutdownImGui() {
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
     }
 };
 

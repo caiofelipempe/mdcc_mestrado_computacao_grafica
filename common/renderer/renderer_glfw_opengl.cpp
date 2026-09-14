@@ -6,10 +6,6 @@
 #include <GLFW/glfw3.h>
 #include <GL/glu.h>
 
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
-
 #include <chrono>
 #include <iostream>
 #include <stdexcept>
@@ -63,24 +59,6 @@ void RendererGlfwOpengl::initGLFW(const int w, const int h, const std::string& t
     glfwSetCursorPosCallback   (m_window, cursorPosCallback);
     glfwSetScrollCallback      (m_window, scrollCallback);
     glfwSetWindowSizeCallback  (m_window, windowSizeCallback);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  ImGui
-// ─────────────────────────────────────────────────────────────────────────────
-void RendererGlfwOpengl::initImGui() {
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui::StyleColorsDark();
-
-    ImGui_ImplGlfw_InitForOpenGL(m_window, true);
-    ImGui_ImplOpenGL3_Init("#version 330");
-}
-
-void RendererGlfwOpengl::shutdownImGui() {
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
 }
 
 void RendererGlfwOpengl::updateCamera()
@@ -151,14 +129,12 @@ void RendererGlfwOpengl::updateGamepad() {
 // ─────────────────────────────────────────────────────────────────────────────
 void RendererGlfwOpengl::run(const int w, const int h, const std::string& t) {
     initGLFW(w, h, t);
-    initImGui();
 
     // Garante shutdown correto mesmo se onInit/onUpdate/onRender lançarem.
     struct ShutdownGuard {
         RendererGlfwOpengl* self;
         ~ShutdownGuard() {
             self->onShutdown();
-            self->shutdownImGui();
             if (self->m_window) {
                 glfwDestroyWindow(self->m_window);
                 self->m_window = nullptr;
@@ -184,18 +160,11 @@ void RendererGlfwOpengl::run(const int w, const int h, const std::string& t) {
         onUpdate(dt);
 
         if (shouldRender()) {
-            ImGui_ImplOpenGL3_NewFrame();
-            ImGui_ImplGlfw_NewFrame();
-            ImGui::NewFrame();
-            onUI();
 
             drawer.frameBegin();
             updateCamera();
             onRender(drawer);
             drawer.frameEnd();
-
-            ImGui::Render();
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
             glfwSwapBuffers(m_window);
         }

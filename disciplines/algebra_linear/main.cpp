@@ -3,6 +3,9 @@
 #include "utils.hpp"
 
 #include <imgui.h>
+#include <imgui_impl_glfw.h>
+#include <imgui_impl_opengl3.h>
+
 #include <GLFW/glfw3.h>
 #include <GL/glu.h>
 
@@ -894,62 +897,197 @@ private:
 // ============================================================
 // CLASSE PRINCIPAL - GERENCIA AS ATIVIDADES
 // ============================================================
-class AlgebraLinear : public RendererGlfwOpengl {
+class AlgebraLinear : public RendererGlfwOpengl
+{
 public:
-    AlgebraLinear() {
-        activities.push_back(std::make_unique<TotalPivotActivity>());
-        activities.push_back(std::make_unique<PartialPivotActivity>());
-        activities.push_back(std::make_unique<GaussJordanActivity>());
+
+    AlgebraLinear()
+    {
+        activities.emplace_back(
+            std::make_unique<TotalPivotActivity>()
+        );
+
+        activities.emplace_back(
+            std::make_unique<PartialPivotActivity>()
+        );
+
+        activities.emplace_back(
+            std::make_unique<GaussJordanActivity>()
+        );
     }
 
 protected:
-    void onInit(int w, int h, const std::string&) override {
-        std::srand(static_cast<unsigned int>(std::time(nullptr)));
-        
+
+    void onInit(
+        int,
+        int,
+        const std::string&
+    ) override
+    {
+        initImGui();
+
+        std::srand(
+            static_cast<unsigned>(
+                std::time(nullptr)
+            )
+        );
+
         activityNames.clear();
-        for (const auto& activity : activities) {
-            activityNames.push_back(activity->getTitle());
+
+        for (const auto& activity : activities)
+        {
+            activityNames.push_back(
+                activity->getTitle()
+            );
         }
     }
-    
-    void onWindowResize(int, int) override {}
-    void onUpdate(float) override {}
 
-    void onUI() override {
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(viewport->Pos);
-        ImGui::SetNextWindowSize(viewport->Size);
+    void onShutdown() override
+    {
+        shutdownImGui();
+    }
 
-        ImGui::Begin("Calculadora de Sistemas Lineares", nullptr,
+    void onWindowResize(
+        int,
+        int
+    ) override
+    {
+    }
+
+    void onUpdate(
+        float
+    ) override
+    {
+    }
+
+    void onRender(
+        Drawer&
+    ) override
+    {
+        beginImGui();
+
+        drawMainWindow();
+
+        endImGui();
+    }
+
+private:
+
+    void drawMainWindow()
+    {
+        ImGuiViewport* viewport =
+            ImGui::GetMainViewport();
+
+        ImGui::SetNextWindowPos(
+            viewport->Pos
+        );
+
+        ImGui::SetNextWindowSize(
+            viewport->Size
+        );
+
+        ImGui::Begin(
+            "Calculadora de Sistemas Lineares",
+            nullptr,
             ImGuiWindowFlags_NoTitleBar |
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoCollapse
         );
 
-        ImGui::BeginChild("ScrollGeral", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
-        
-        ImGui::Text("Selecione a Atividade:");
-        
-        ImGui::SetNextItemWidth(500.0f);
-        ImGui::Combo("##SeletorAtividade", &selectedActivity, 
-            activityNames.data(), static_cast<int>(activityNames.size()));
-        
+        ImGui::Text(
+            "Selecione a Atividade:"
+        );
+
+        ImGui::SetNextItemWidth(
+            500.0f
+        );
+
+        if (!activityNames.empty())
+        {
+            ImGui::Combo(
+                "##SeletorAtividade",
+                &selectedActivity,
+                activityNames.data(),
+                static_cast<int>(
+                    activityNames.size()
+                )
+            );
+        }
+
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
-        
-        if (selectedActivity >= 0 && selectedActivity < activities.size()) {
-            activities[selectedActivity]->render();
+
+        if (
+            selectedActivity >= 0 &&
+            selectedActivity <
+            static_cast<int>(
+                activities.size()
+            )
+        )
+        {
+            activities[
+                selectedActivity
+            ]->render();
         }
-        
-        ImGui::EndChild();
+
         ImGui::End();
     }
 
+    void initImGui()
+    {
+        IMGUI_CHECKVERSION();
+
+        ImGui::CreateContext();
+
+        ImGui::StyleColorsDark();
+
+        ImGui_ImplGlfw_InitForOpenGL(
+            window(),
+            true
+        );
+
+        ImGui_ImplOpenGL3_Init(
+            "#version 330"
+        );
+    }
+
+    void shutdownImGui()
+    {
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+    }
+
+    void beginImGui()
+    {
+        ImGui_ImplOpenGL3_NewFrame();
+
+        ImGui_ImplGlfw_NewFrame();
+
+        ImGui::NewFrame();
+    }
+
+    void endImGui()
+    {
+        ImGui::Render();
+
+        ImGui_ImplOpenGL3_RenderDrawData(
+            ImGui::GetDrawData()
+        );
+    }
+
 private:
-    std::vector<std::unique_ptr<Activity>> activities;
-    std::vector<const char*> activityNames;
+
+    std::vector<
+        std::unique_ptr<Activity>
+    > activities;
+
+    std::vector<
+        const char*
+    > activityNames;
+
     int selectedActivity = 0;
 };
 

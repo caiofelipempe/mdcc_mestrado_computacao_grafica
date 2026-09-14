@@ -63,10 +63,6 @@ struct Color {
     static constexpr Color DarkGreen()   { return {0.f, 0.39f, 0.f, 1.f}; }
 
     static constexpr Color Transparent() { return {0.f, 0.f, 0.f, 0.f}; }
-
-    static constexpr Color AxisX()       { return Red();   }
-    static constexpr Color AxisY()       { return Green(); }
-    static constexpr Color AxisZ()       { return Blue();  }
 };
 
 } // namespace geometry

@@ -40,7 +40,7 @@ protected:
         updateButtonClick();
     }
 
-    void onUI() override {
+    void onRender(Drawer& drawer) override {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(viewport->Pos);
         ImGui::SetNextWindowSize(viewport->Size);
@@ -77,6 +77,8 @@ protected:
         ImGui::EndChild();
 
         ImGui::End();
+
+        draw(drawer);
     }
 
 private:
@@ -398,7 +400,7 @@ private:
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
-    void onRender(Drawer& drawer) override
+    void draw(Drawer& drawer)
     {
         if (!fbo)
             return;

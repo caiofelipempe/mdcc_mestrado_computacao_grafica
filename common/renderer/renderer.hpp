@@ -47,8 +47,6 @@ protected:
         Drawer& drawer
     ) = 0;
 
-    virtual void onUI() = 0;
-
     virtual void onShutdown() = 0;
 
     virtual bool shouldRender()

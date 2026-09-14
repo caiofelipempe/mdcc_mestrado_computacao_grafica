@@ -36,8 +36,6 @@ protected:
         Drawer& drawer
     ) override {};
 
-    virtual void onUI() override {};
-
     virtual void onShutdown() override {};
 
     virtual void onWindowResize(
@@ -51,10 +49,6 @@ private:
         int height,
         const std::string& title
     );
-
-    void initImGui();
-
-    void shutdownImGui();
 
     void updateCamera();
 
@@ -95,4 +89,9 @@ private:
 
 private:
     GLFWwindow* m_window{};
+
+protected:
+    GLFWwindow* const window() {
+        return m_window;
+    }
 };
