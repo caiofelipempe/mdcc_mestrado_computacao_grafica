@@ -2,7 +2,10 @@
 
 #include <imgui.h>
 
+using namespace geometry;
+
 class Trabalho01 : public RendererGlfwOpengl {
+
 public:
     Trabalho01() = default;
 
@@ -78,22 +81,22 @@ private:
 
     void renderScene(Drawer& drawer)
     {
-        const geometry::Point3f p0{-1.0f, -1.0f, -1.0f};
-        const geometry::Point3f p1{ 1.0f, -1.0f, -1.0f};
-        const geometry::Point3f p2{ 1.0f,  1.0f, -1.0f};
-        const geometry::Point3f p3{-1.0f,  1.0f, -1.0f};
+        const Color red   {1,0,0,1};
+        const Color green {0,1,0,1};
+        const Color blue  {0,0,1,1};
+        const Color cyan  {0,1,1,1};
+        const Color yellow{1,1,0,1};
+        const Color white {1,1,1,1};
 
-        const geometry::Point3f p4{-1.0f, -1.0f,  1.0f};
-        const geometry::Point3f p5{ 1.0f, -1.0f,  1.0f};
-        const geometry::Point3f p6{ 1.0f,  1.0f,  1.0f};
-        const geometry::Point3f p7{-1.0f,  1.0f,  1.0f};
+        const Point3f p0{-1.0f, -1.0f, -1.0f};
+        const Point3f p1{ 1.0f, -1.0f, -1.0f};
+        const Point3f p2{ 1.0f,  1.0f, -1.0f};
+        const Point3f p3{-1.0f,  1.0f, -1.0f};
 
-        const geometry::Color red   {1,0,0,1};
-        const geometry::Color green {0,1,0,1};
-        const geometry::Color blue  {0,0,1,1};
-        const geometry::Color cyan  {0,1,1,1};
-        const geometry::Color yellow{1,1,0,1};
-        const geometry::Color white {1,1,1,1};
+        const Point3f p4{-1.0f, -1.0f,  1.0f};
+        const Point3f p5{ 1.0f, -1.0f,  1.0f};
+        const Point3f p6{ 1.0f,  1.0f,  1.0f};
+        const Point3f p7{-1.0f,  1.0f,  1.0f};
 
         // Frente
         drawer.drawFace(p4, p5, p6, red);
