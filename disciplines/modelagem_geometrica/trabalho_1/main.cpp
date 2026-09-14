@@ -73,15 +73,9 @@ protected:
 
     void onRender(Drawer& drawer) override
     {
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-        renderUI();
-
+        imguiStartRender();
         renderScene(drawer);
-
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        imguiEndRender();
     }
 
 private:
@@ -184,6 +178,18 @@ private:
 
         ImGui_ImplGlfw_InitForOpenGL(window(), true);
         ImGui_ImplOpenGL3_Init("#version 330");
+    }
+
+    void imguiStartRender() {
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+        renderUI();
+    }
+
+    void imguiEndRender() {
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     }
 
     void shutdownImGui() {
