@@ -95,8 +95,6 @@ style: |
   }
 ---
 
-
-
 # Modelos de Representação Geométrica no FreeCAD
 ### Modelagem Geométrica
 
