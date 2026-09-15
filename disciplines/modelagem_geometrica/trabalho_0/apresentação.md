@@ -1,99 +1,276 @@
 ---
 marp: true
-theme: default
 paginate: true
-#header: 'Modelagem Geométrica'
-#footer: 'Trabalho 0'
+
 style: |
   section {
-    background-color: #fdf6e2;
-    color: #432818;
+    background-color: #e5f8e7;
+    color: #5C4033;
     font-family: 'Georgia', serif;
     padding: 50px;
   }
+
   h1 {
-    color: #bb3e03;
-    border-bottom: 3px solid #ee9b00;
+    color: #A63D40;
+    border-bottom: 4px solid #D4A017;
+    padding-bottom: 8px;
   }
-  h2, h3 {
-    color: #9b2226; 
+
+  h2 {
+    color: #556B2F;
   }
+
+  h3 {
+    color: #7A4E2D;
+  }
+
+  strong {
+    color: #A63D40;
+  }
+
+  ul li::marker {
+    color: #D4A017;
+  }
+
   footer {
     font-size: 0.5em;
-    color: #7f5539;
+    color: #556B2F;
   }
+
+  blockquote {
+    background: #F3E7CF;
+    border-left: 6px solid #A63D40;
+    padding: 10px 20px;
+    border-radius: 10px;
+  }
+
   .alerta {
-    background-color: #ffe8d6;
-    border-left: 6px solid #ca6702;
+    background-color: #FBE5D6;
+    border-left: 6px solid #A63D40;
     padding: 20px;
-    margin-top: 20px;
-    border-radius: 8px;
+    border-radius: 10px;
+  }
+
+  code {
+    background: #EFE2C1;
+    color: #5C4033;
+    border-radius: 4px;
+    padding: 2px 6px;
+  }
+
+  pre {
+    background: #EFE2C1;
+    border-left: 6px solid #556B2F;
+    border-radius: 10px;
+    padding: 15px;
+  }
+
+  table {
+    border-collapse: collapse;
+  }
+
+  th {
+    background-color: #556B2F;
+    color: white;
+  }
+
+  td {
+    background-color: #FDF8F0;
+  }
+
+  th, td {
+    border: 1px solid #D9C4A5;
+    padding: 8px;
+  }
+
+  img {
+    display: block;
+    margin: auto;
+  }
+
+  .cols {
+    display: flex;
+    gap: 30px;
+    align-items: center;
   }
 ---
+
+
 
 # Modelos de Representação Geométrica no FreeCAD
 ### Modelagem Geométrica
 
 ---
 
-## O que é o FreeCAD?
+## FreeCAD: um software, vários modelos
 
-- Software livre e paramétrico de modelagem 3D, com foco em **engenharia mecânica** e **design de produtos**
-- Usado para: peças mecânicas, montagens, arquitetura (BIM), simulação estrutural, geração de desenhos técnicos e fabricação (CNC/3D printing)
-- Arquitetura em **workbenches** (bancadas): cada uma especializada em um tipo de tarefa — e, por consequência, em um tipo de **representação geométrica**
+- Software livre e **paramétrico** de modelagem 3D (engenharia mecânica, design, BIM, simulação, CAM)
+- Arquitetura em **workbenches**: cada bancada é especializada numa tarefa e, por consequência, numa **representação geométrica**
+- Nenhuma representação serve para tudo: precisão exata (B-rep) ≠ visualização rápida (malha) ≠ simulação (FEM) ≠ fabricação (toolpath)
 
 <div class="alerta">
-Ideia central: não existe "um único modelo geométrico" no FreeCAD. A representação usada depende da <b>etapa do fluxo de trabalho</b> — projetar, simular, documentar ou fabricar.
+Ideia central: o FreeCAD mantém um <b>modelo mestre</b> (B-rep) e <b>deriva</b> dele as demais representações, conforme a etapa do fluxo de trabalho.
 </div>
 
 ---
 
-## Por que o FreeCAD usa múltiplos modelos?
+## OCCT: o coração geométrico
 
-- Nenhuma representação é ideal para **todas** as tarefas
-- Precisão exata (B-rep) ≠ Visualização rápida (malha) ≠ Simulação numérica (FEM) ≠ Fabricação (toolpath)
-- O FreeCAD combina representações **derivadas** a partir de um "modelo mestre" central
+**Open CASCADE Technology** — biblioteca C++ usada como *kernel* do FreeCAD.
 
----
-
-## OCCT: o coração geométrico do FreeCAD
-
-**Open CASCADE Technology (OCCT)** é a biblioteca C++ de modelagem geométrica que o FreeCAD usa como *kernel*.
-
-- Fornece as estruturas de dados de **B-rep** (TopoDS_Shape, faces, arestas, vértices)
-- Fornece os algoritmos: booleanos, fillets, chamfers, varreduras (sweep), extrusão, revolução
-- Fornece a **tesselação** (BRepMesh) que gera a malha de visualização
-- É a base sobre a qual **quase todas** as outras representações do FreeCAD são construídas ou derivadas
+- Estruturas de dados de **B-rep**: `TopoDS_Shape`, faces, arestas, vértices
+- Algoritmos: booleanos, fillets, chamfers, sweep, extrusão, revolução
+- **Tesselação** (`BRepMesh`) que gera a malha de visualização
 
 <div class="alerta">
-Praticamente toda representação geométrica no FreeCAD tem uma relação direta ou indireta com o OCCT: ou é gerada por ele (B-rep, malha de visualização), ou é convertida a partir dele (FEM, TechDraw, Path), ou alimenta ele como entrada (Sketcher).
+Quase toda representação do FreeCAD se relaciona com o OCCT: é <b>gerada</b> por ele (B-rep, malha), <b>convertida</b> a partir dele (FEM, TechDraw, Path) ou o <b>alimenta</b> como entrada (Sketcher).
 </div>
 
 ---
 
-## 1. B-rep (Boundary Representation)
+## B-rep (Boundary Representation)
 
-**Kernel:** OpenCASCADE Technology (OCCT)
+**Workbenches:** Part, Part Design, Surface
 
-- Representação **central** de sólidos e superfícies
-- Topologia exata: vértices, arestas e faces
-- Geometria definida **analiticamente** (planos, cilindros, NURBS)
-
-**Quando é usado:**
-- Workbenches Part, Part Design, Surface
-- Operações booleanas (união, corte, interseção)
-- Fillets/chamfers paramétricos
-- Histórico de features (parametric modeling)
+- Topologia hierárquica: **Compound → Solid → Shell → Face → Wire → Edge → Vertex**
+- Cada `Face` referencia uma **superfície matemática** (plano, cilindro, NURBS), delimitada por `Wires`
+- Cada `Edge` referencia uma **curva** (reta, círculo, spline) — não pontos discretos
+- Booleanos recalculam a topologia **exatamente**, recortando curvas e superfícies analiticamente (sem perda de precisão, ao contrário de um boolean em malha)
+- Cada feature (Pad, Pocket, Fillet) gera um novo `TopoDS_Shape`, formando a **árvore paramétrica**
 
 ---
 
-## B-rep — como funciona por dentro
+## Booleanos sobre B-rep — os sólidos de partida
 
-- Estrutura hierárquica de topologia OCCT: **Compound → Solid → Shell → Face → Wire → Edge → Vertex**
-- Cada `Face` referencia uma **superfície matemática** (plano, cilindro, esfera, NURBS) e é delimitada por `Wires` (contornos de arestas)
-- Cada `Edge` referencia uma **curva matemática** subjacente (reta, círculo, spline), não pontos discretos
-- Operações booleanas (union/cut/common) recalculam a topologia **exatamente**, recortando curvas e superfícies analiticamente — sem perda de precisão, ao contrário de um boolean em malha
-- No Part Design, cada feature (Pad, Pocket, Fillet) gera um novo `TopoDS_Shape`, mantendo uma **árvore de histórico** paramétrico
+![height:330px](images/cubo_e_cilindro.png)
+
+Dois primitivos exatos: cubo e cilindro.
+
+---
+
+## União
+
+<div class="cols">
+
+![height:280px](images/cubo_e_cilindro_uniao.png)
+
+</div>
+
+Cubo ∪ Cilindro &nbsp;&nbsp;
+
+---
+
+## Interseção
+
+<div class="cols">
+
+![height:280px](images/cubo_e_cilindro_intersecao.png)
+
+</div>
+
+&nbsp;&nbsp; Cubo ∩ Cilindro
+
+---
+
+## Diferença
+
+<div class="cols">
+
+![height:280px](images/cubo_e_cilindro_diferenca.png)
+
+</div>
+
+Cubo − Cilindro &nbsp;&nbsp;
+
+---
+
+## Diferença
+
+<div class="cols">
+
+![height:280px](images/cubo_e_cilindro_diferenca_2.png)
+
+</div>
+
+&nbsp;&nbsp; Cilindro − Cubo
+
+---
+
+## Geração de sólidos: revolução
+
+<div class="cols">
+
+![height:280px](images/circulo.png)
+
+---
+
+## Geração de sólidos: revolução
+
+<div class="cols">
+
+![height:280px](images/circulo_rotacionado.png)
+
+</div>
+
+Um perfil 2D exato varrido em torno de um eixo gera um sólido B-rep — as superfícies resultantes continuam **analíticas**.
+
+---
+
+## Geração de sólidos: loft
+
+<div class="cols">
+
+![height:280px](images/circulo_e_ponto.png)
+
+---
+
+## Geração de sólidos: loft
+
+<div class="cols">
+
+![height:280px](images/circulo_e_ponto_loft.png)
+
+</div>
+
+Círculo + ponto → cone. O loft interpola superfícies entre seções, gerando faces NURBS.
+
+---
+
+## Geometria com restrições (Sketcher)
+
+**Motor:** planeGCS — não é B-rep nem malha, é um **sistema de equações**
+
+- Cada elemento (linha, arco, círculo) é uma **variável simbólica**; cada restrição (coincidência, paralelismo, tangência, cota) vira uma **equação**
+- O solver resolve o sistema não linear: por isso mudar uma cota "arrasta" o desenho todo
+- O resultado é convertido em **curvas e arestas OCCT** quando o esboço vira geometria 3D
+
+![height:250px](images/aeronave_sketch.png)
+
+---
+
+## Do esboço ao sólido
+
+![height:330px](images/aeronave_solido.png)
+
+O esboço restrito alimenta operações B-rep (extrusão, loft, revolução) — e permanece **editável**: alterar uma cota reconstrói o sólido.
+
+---
+
+## Tesselação: a ponte entre B-rep e malha
+
+A exibição na tela converte superfícies exatas em triângulos. O modelo original **não é alterado**.
+
+```text
+B-Rep (superfícies exatas)
+        ↓
+BRepMesh_IncrementalMesh
+        ↓
+   Triangulação
+        ↓
+  Malha poligonal
+        ↓
+Renderização / STL
+```
 
 ---
 
@@ -101,29 +278,14 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
 
 **Workbench:** Mesh
 
-- Conjunto de vértices, arestas e faces **poligonais** (aproximação)
-- Sem histórico paramétrico
+- Lista de **vértices** + lista de **facetas** (triângulos), sem histórico paramétrico
+- Não existe superfície matemática subjacente: a curvatura é uma ilusão dada pela densidade de triângulos
+- Usada para STL/OBJ, scanners 3D e prototipagem rápida
+- Conversão Mesh → B-rep é possível (*shape from mesh*), mas **aproximada**
 
-**Quando é usado:**
-- Importação/exportação de STL, OBJ
-- Dados vindos de scanners 3D
-- Prototipagem rápida sem exigência de precisão exata
-- Conversão Mesh → B-rep é possível, mas aproximada
-
----
-
-## Malha — como funciona por dentro
-
-- Estrutura simples: lista de **vértices** (coordenadas) + lista de **facetas** (geralmente triângulos) que conectam esses vértices
-- Não existe superfície matemática subjacente — a "curvatura" é apenas uma ilusão dada pela quantidade de triângulos
-- Relação com OCCT: a **mesma malha de visualização** do B-rep (gerada via `BRepMesh_IncrementalMesh`) pode ser exportada como Mesh; e uma Mesh pode ser convertida para B-rep aproximado via *shape from mesh*, mas sem garantia de superfícies analíticas exatas
-- Operações (suavização, redução de triângulos, reparo de furos) atuam diretamente sobre a malha, sem recorrer a nenhuma equação de superfície
-
----
-
-## Malha — Modelagem
-
-É possível trabalhar com malhas (meshes) no FreeCAD, mas com uma ressalva importante: o FreeCAD é um software de modelagem sólida paramétrica (CAD). Isso significa que ele não foi feito para esculpir ou modelar malhas do zero como o Blender ou o Maya fazem.
+<div class="alerta">
+Ressalva: o FreeCAD é um CAD paramétrico, não um escultor de malhas — não substitui Blender ou Maya na modelagem direta de meshes.
+</div>
 
 ---
 
@@ -131,243 +293,69 @@ Praticamente toda representação geométrica no FreeCAD tem uma relação diret
 
 **Workbench:** Points
 
-- Conjunto bruto de pontos no espaço 3D, sem conectividade
+- Representação **mais primitiva**: apenas coordenadas (x, y, z), às vezes com cor/normal, **sem conectividade**
+- Sem relação direta com o OCCT enquanto permanece nuvem; a ligação vem depois, na reconstrução
+- Papel de **matéria-prima**:
 
-**Quando é usado:**
-- Dados brutos de scanner 3D / LiDAR
-- Etapa **anterior** à reconstrução de superfícies ou malhas
-
----
-
-## Nuvem de pontos — como funciona por dentro
-
-- É a representação **mais primitiva**: apenas coordenadas (x, y, z) — às vezes com cor/normal associada — sem nenhuma relação de vizinhança entre os pontos
-- Não tem relação direta com o OCCT enquanto permanece nuvem de pontos; a ligação acontece **depois**, quando algoritmos de reconstrução de superfície (ex.: triangulação, ajuste de superfícies) geram uma Mesh ou, em casos mais elaborados, superfícies B-rep aproximadas
-- Serve como **matéria-prima**: scanner → nuvem de pontos → (reconstrução) → malha ou B-rep → modelo utilizável
-
----
-
-## Geometria com restrições (Constraint-Based 2D)
-
-**Motor:** planeGCS (solver de restrições geométricas)
-
-- Não é B-rep nem malha — é um sistema de equações
-- Resolve posições de linhas/arcos/círculos a partir de restrições (paralelismo, coincidência, dimensões)
-
-**Quando é usado:**
-- Workbench Sketcher
-- Só vira B-rep quando o esboço é extrudado, revolucionado etc.
-
----
-
-## Restrições 2D — como funciona por dentro
-
-- Cada elemento do esboço (linha, arco, círculo) é uma **variável simbólica**; cada restrição (coincidência, paralelismo, tangência, cota) vira uma **equação**
-- O planeGCS resolve esse **sistema de equações não lineares** para encontrar a posição final de todos os elementos — é por isso que mudar uma cota "arrasta" o desenho todo
-- Relação com OCCT: o resultado do solver (posições finais de pontos/curvas) é convertido em **curvas e arestas OCCT** (`Geom2d_Curve`/`TopoDS_Edge`) assim que o esboço precisa virar geometria 3D (extrusão, revolução) — o Sketcher é, portanto, uma "geometria de entrada" que alimenta o B-rep
+```text
+scanner / LiDAR → nuvem de pontos → reconstrução → malha ou B-rep
+```
 
 ---
 
 ## Malha para Elementos Finitos (FEM)
 
-**Ferramentas:** Gmsh / Netgen
+**Ferramentas:** Gmsh / Netgen · **Solvers:** CalculiX, Elmer
 
-- Malha numérica gerada a partir do B-rep, específica para análise
-- Diferente da malha de visualização
-
-**Quando é usado:**
-- Workbench FEM
-- Simulações estruturais, térmicas, etc.
-- Solvers: CalculiX, Elmer
+- `Fem::FemMesh` (herda de `App::PropertyComplexGeoData`) separa a geometria em `FemNode` (IDs e coordenadas) e `FemElement` (conectividades e tipo)
+- O B-rep é exportado via STEP/BREP; o malhamento é governado por `CharacteristicLengthMin/Max` e refinamentos locais
+- Elementos: **1D** `SEGM2/3` · **2D** `TRIA3/6`, `QUAD4/8` · **3D** `TET4/10`, `HEX8/20`
+- Pipeline: condições de contorno ancoradas em faces/arestas B-rep → *node sets* no `.inp` → resolução de $[K]\{u\} = \{F\}$ → renderização via VTK
 
 ---
 
-Discretização Numérica para Simulação (FEM / CAE)
-
-### Arquitetura C++ e Tipologia do Módulo FEM
-
-- **Classe Core `Fem::FemMesh`:**
-  - Herda de `App::PropertyComplexGeoData`.
-  - Separa a geometria em duas tabelas compactas: `FemNode` (IDs e coordenadas XYZ) e `FemElement` (conectividades e tipo de elemento).
----
-- **Integração com Gmsh / Netgen:**
-  - Exporta o B-Rep (`TopoDS_Shape`) para os geradores via STEP/BREP.
-  - O malhamento é governado pelos parâmetros de comprimento característico (`CharacteristicLengthMin/Max`) e refinamentos locais (`Fem::ConstraintMeshGroup`).
----
-- **Hierarquia de Elementos:**
-  - **1D:** `SEGM2`, `SEGM3` (Vigas e Treliças).
-  - **2D:** `TRIA3`, `TRIA6`, `QUAD4`, `QUAD8` (Cascas e Placas).
-  - **3D:** `TET4`, `TET10` (Tetraedros Parabólicos), `HEX8`, `HEX20`.
----
-- **Pipeline Mapeado B-Rep → Solver (CalculiX / Elmer):**
-  1. Condições de contorno (forças, engastamentos) ancoram-se em faces/arestas B-Rep.
-  2. O exporter gera conjuntos de nós (*Node Sets* `*NSET`) automaticamente no `.inp`.
-  3. A matriz $[K]\{u\} = \{F\}$ é resolvida e renderizada na viewport via VTK.
-
----
-
-## 6. Trajetórias de ferramenta (Toolpaths)
+## Trajetórias de ferramenta (Toolpaths)
 
 **Workbench:** Path (CAM)
 
-- Curvas/segmentos representando o percurso da fresa
-- Representação própria em coordenadas (G-code)
-
-**Quando é usado:**
-- Geração de programas CNC
-- Derivada da geometria B-rep do modelo final
+- Analisa **faces e arestas B-rep** (face de topo, contorno de um bolso) para calcular o percurso da fresa
+- Gera uma sequência ordenada de `Path.Command` (retas e arcos com avanço, rotação, profundidade)
+- Um **pós-processador** traduz a sequência para **G-code**
+- Offsets, interseção de contornos e detecção de colisão usam os mesmos algoritmos OCCT
 
 ---
 
-## 6. Toolpaths — como funciona por dentro
+## Projeções vetoriais 2D (TechDraw)
 
-- O workbench Path analisa as **faces e arestas B-rep** do modelo (ex.: face de topo, contorno de um bolso) para calcular por onde a ferramenta de corte deve passar
-- O resultado é uma sequência ordenada de **comandos de movimento** (retas e arcos com coordenadas e parâmetros de corte: avanço, rotação, profundidade), armazenados como objetos `Path.Command`
-- Essa sequência é depois traduzida por um **pós-processador** para **G-code**, o padrão que máquinas CNC interpretam
-- Relação com OCCT: os cálculos geométricos de offset, interseção de contornos e detecção de colisão usam os mesmos algoritmos B-rep do OCCT sobre o modelo original
-
----
-
-## 7. Projeções vetoriais 2D
-
-**Workbench:** TechDraw
-
-- Geometria 2D vetorial (vistas, cortes, dimensões)
-- Projetada a partir do modelo 3D B-rep
-
-**Quando é usado:**
-- Geração de desenhos técnicos para documentação/fabricação
+- Aplica ao `TopoDS_Shape` uma **projeção geométrica** (ortográfica, isométrica, em corte) via `HLRBRep` (*Hidden Line Removal*)
+- Produz **arestas e curvas 2D exatas** — não pixels nem malha — prontas para cotas, anotações e hachuras
+- Por derivar do B-rep, alterações paramétricas no 3D **atualizam automaticamente** as vistas técnicas
 
 ---
 
-## 7. Projeções 2D — como funciona por dentro
-
-- O TechDraw pega o `TopoDS_Shape` (B-rep) do modelo 3D e aplica uma **projeção geométrica** (ortográfica, isométrica, em corte) usando algoritmos do próprio OCCT (`HLRBRep` — Hidden Line Removal)
-- O resultado são **arestas e curvas 2D exatas** (não pixels nem malha) representando contornos visíveis e ocultos, prontas para receber cotas, anotações e hachuras
-- Por ser derivado diretamente do B-rep, qualquer alteração paramétrica no modelo 3D **atualiza automaticamente** as vistas técnicas — vantagem direta de manter tudo ancorado no mesmo kernel OCCT
-
----
-
-## Tesselação: a ponte entre B-rep e malha
- 
-O FreeCAD exibe modelos B-rep na tela através de um processo chamado **tesselação** (*tessellation* ou *meshing*), realizado pelo OCCT.
- 
-A tesselação converte superfícies matemáticas exatas em uma aproximação composta por triângulos, adequada para renderização gráfica, exportação STL e algumas etapas de análise geométrica. O modelo original não é alterado: apenas uma representação discreta é criada para visualização.
-
----
-
-```text
-B-Rep
-(Superfícies Exatas)
-↓
-BRepMesh_IncrementalMesh
-↓
-Triangulação
-↓
-Malha Poligonal
-↓
-Renderização / STL
-```
-
----
-
-## Resumo — Modelo mestre e derivações
+## Resumo — modelo mestre e derivações
 
 | Representação | Onde é usada | Papel | Relação com OCCT |
 |---|---|---|---|
 | B-rep | Part, Part Design, Surface | Modelo mestre (exato) | É o próprio kernel |
-| Malha (Mesh) | Mesh, visualização, STL | Aproximação poligonal | Gerada por tesselação do B-rep |
+| Malha | Mesh, visualização, STL | Aproximação poligonal | Tesselação do B-rep |
 | Nuvem de pontos | Points | Dado bruto de captura | Sem relação direta (entrada) |
-| Restrições 2D | Sketcher | Base paramétrica 2D | Convertida em curvas/arestas OCCT |
-
+| Restrições 2D | Sketcher | Base paramétrica 2D | Convertida em curvas/arestas |
 ---
 
-## Resumo — Modelo mestre e derivações
+## Resumo — modelo mestre e derivações
 
 | Representação | Onde é usada | Papel | Relação com OCCT |
 |---|---|---|---|
-| Malha FEM | FEM | Simulação numérica | Discretiza o B-rep via Gmsh/Netgen |
-| Toolpath | Path (CAM) | Fabricação (CNC) | Calculada sobre faces/arestas B-rep |
+| Malha FEM | FEM | Simulação numérica | Discretiza via Gmsh/Netgen |
+| Toolpath | Path (CAM) | Fabricação CNC | Calculada sobre faces/arestas |
 | Projeção 2D | TechDraw | Documentação técnica | Projeção HLR do B-rep |
-
----
-
-## Cubo e Cilindro
-
-![height:350px](images/cubo_e_cilindro.png)
-
----
-
-## Cubo ∪ Cilindro
-
-![height:350px](images/cubo_e_cilindro_uniao.png)
-
----
-
-## Cubo ∩ Cilindro
-
-![height:350px](images/cubo_e_cilindro_intersecao.png)
-
----
-
-## Cubo - Cilindro
-
-![height:350px](images/cubo_e_cilindro_diferenca.png)
-
----
-
-## Cilindro - Cubo
-
-![height:350px](images/cubo_e_cilindro_diferenca_2.png)
-
----
-
-## Revolução do círculo
-
-![height:350px](images/circulo.png)
-
----
-
-## Revolução do círculo
-
-![height:350px](images/circulo_rotacionado.png)
-
----
-
-## Cone a partir de um cículo e um ponto(Loft)
-
-![height:350px](images/circulo_e_ponto.png)
-
----
-
-## Cone a partir de um cículo e um ponto(Loft)
-
-![height:350px](images/circulo_e_ponto_loft.png)
-
----
-
-## Aeronave Sketch
-
-![height:350px](images/aeronave_sketch.png)
-
----
-
-## Aeronave Sólido
-
-![height:350px](images/aeronave_solido.png)
 
 ---
 
 ## Conclusão
 
-- O **B-rep (via OCCT) é o núcleo** do FreeCAD: preciso, exato, paramétrico
+- O **B-rep (via OCCT) é o núcleo**: preciso, exato, paramétrico
 - As demais representações são **derivadas** conforme a finalidade:
-  - Visualizar → malha (tesselação)
-  - Simular → malha FEM
-  - Fabricar → toolpath
-  - Documentar → projeção 2D
-  - Capturar dados reais → nuvem de pontos / malha
-- Essa arquitetura em camadas é o que permite ao FreeCAD ser, ao mesmo tempo, **preciso** (graças ao OCCT) e **versátil** (graças às representações derivadas)
- 
- 
- ---
+  visualizar → malha · simular → malha FEM · fabricar → toolpath · documentar → projeção 2D · capturar → nuvem de pontos
+- Essa arquitetura em camadas é o que permite ao FreeCAD ser, ao mesmo tempo, **preciso** (OCCT) e **versátil** (representações derivadas)
