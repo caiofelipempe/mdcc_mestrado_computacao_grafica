@@ -277,7 +277,6 @@ Renderização / STL
 **Workbench:** Mesh
 
 - Lista de **vértices** + lista de **facetas** (triângulos), sem histórico paramétrico
-- Não existe superfície matemática subjacente: a curvatura é uma ilusão dada pela densidade de triângulos
 - Usada para STL/OBJ, scanners 3D e prototipagem rápida
 - Conversão Mesh → B-rep é possível (*shape from mesh*), mas **aproximada**
 
