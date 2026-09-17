@@ -5,16 +5,13 @@
 
 #include <array>
 #include <memory>
-#include <vector>
+#include <string>
+#include <string_view>
 #include <stdexcept>
 #include <algorithm>
 
 namespace geometry
 {
-    //==========================================================================
-    // OctreeNodeType
-    //==========================================================================
-
     enum class OctreeNodeType
     {
         Empty,
@@ -22,405 +19,117 @@ namespace geometry
         Branch
     };
 
-    //==========================================================================
-    // OctreeNode
-    //==========================================================================
-
-    class OctreeNode
+    struct OctreeNode
     {
-    public:
-        using Children =
-            std::array<
-                std::unique_ptr<OctreeNode>,
-                8>;
+        OctreeNodeType type =
+            OctreeNodeType::Empty;
+
+        std::array<
+            std::unique_ptr<OctreeNode>,
+            8> children;
 
         OctreeNode() = default;
 
         explicit OctreeNode(
-            OctreeNodeType type)
-            : m_type(type)
+            OctreeNodeType t)
+            : type(t)
         {
-        }
-
-        [[nodiscard]]
-        OctreeNodeType type() const
-        {
-            return m_type;
         }
 
         [[nodiscard]]
         bool isEmpty() const
         {
-            return m_type ==
+            return type ==
                    OctreeNodeType::Empty;
         }
 
         [[nodiscard]]
         bool isFilled() const
         {
-            return m_type ==
+            return type ==
                    OctreeNodeType::Filled;
         }
 
         [[nodiscard]]
         bool isBranch() const
         {
-            return m_type ==
+            return type ==
                    OctreeNodeType::Branch;
         }
 
-        [[nodiscard]]
-        bool isLeaf() const
-        {
-            return !isBranch();
-        }
-
-        void setEmpty()
-        {
-            m_type =
-                OctreeNodeType::Empty;
-
-            m_children = {};
-        }
-
-        void setFilled()
-        {
-            m_type =
-                OctreeNodeType::Filled;
-
-            m_children = {};
-        }
-
-        void subdivide()
+        void makeBranch()
         {
             if (isBranch())
             {
                 return;
             }
 
-            m_type =
+            type =
                 OctreeNodeType::Branch;
 
-            for (auto &child : m_children)
+            for (auto& child : children)
             {
                 child =
                     std::make_unique<
                         OctreeNode>(
-                        OctreeNodeType::Empty);
+                            OctreeNodeType::Empty);
             }
         }
-
-        [[nodiscard]]
-        OctreeNode *child(
-            std::size_t index)
-        {
-            return m_children.at(index).get();
-        }
-
-        [[nodiscard]]
-        const OctreeNode *child(
-            std::size_t index) const
-        {
-            return m_children.at(index).get();
-        }
-
-        [[nodiscard]]
-        bool canCollapse() const
-        {
-            if (!isBranch())
-            {
-                return false;
-            }
-
-            bool allEmpty = true;
-            bool allFilled = true;
-
-            for (const auto &child : m_children)
-            {
-                allEmpty &= child->isEmpty();
-                allFilled &= child->isFilled();
-            }
-
-            return allEmpty || allFilled;
-        }
-
-        void collapse()
-        {
-            if (!isBranch())
-            {
-                return;
-            }
-
-            for (auto &child : m_children)
-            {
-                child->collapse();
-            }
-
-            if (!canCollapse())
-            {
-                return;
-            }
-
-            bool allEmpty = true;
-
-            for (const auto &child : m_children)
-            {
-                allEmpty &= child->isEmpty();
-            }
-
-            if (allEmpty)
-            {
-                setEmpty();
-            }
-            else
-            {
-                setFilled();
-            }
-        }
-
-    private:
-        OctreeNodeType m_type =
-            OctreeNodeType::Empty;
-
-        Children m_children;
     };
-
-    //==========================================================================
-    // Octree
-    //==========================================================================
 
     class Octree
     {
     public:
-        using Path =
-            std::vector<std::uint8_t>;
-
-        void fill(
-            std::initializer_list<std::uint8_t> path)
-        {
-            fill(
-                Path(path));
-        }
-
-        void clear(
-            std::initializer_list<std::uint8_t> path)
-        {
-            clear(
-                Path(path));
-        }
-
-        void subdivide(
-            std::initializer_list<std::uint8_t> path)
-        {
-            subdivide(
-                Path(path));
-        }
-
-        OctreeNode *create(
-            std::initializer_list<std::uint8_t> path)
-        {
-            return create(
-                Path(path));
-        }
-
-        OctreeNode *node(
-            std::initializer_list<std::uint8_t> path)
-        {
-            return node(
-                Path(path));
-        }
-
-        const OctreeNode *node(
-            std::initializer_list<std::uint8_t> path) const
-        {
-            return node(
-                Path(path));
-        }
-
-        std::pair<Point3f, Point3f>
-        bounds(
-            std::initializer_list<std::uint8_t> path) const
-        {
-            return bounds(
-                Path(path));
-        }
 
         Octree(
-            const Point3f &minimum,
-            const Point3f &maximum)
+            const Point3f& minimum,
+            const Point3f& maximum)
             : m_minimum(minimum),
               m_maximum(maximum)
         {
         }
 
-        [[nodiscard]]
-        OctreeNode &root()
+        Octree(
+            const Point3f& minimum,
+            const Point3f& maximum,
+            std::string_view text)
+            : m_minimum(minimum),
+              m_maximum(maximum)
         {
-            return m_root;
+            parse(text);
         }
 
-        [[nodiscard]]
-        const OctreeNode &root() const
+        void parse(
+            std::string_view text)
         {
-            return m_root;
-        }
+            std::size_t cursor = 0;
 
-        //======================================================================
-        // Navegação
-        //======================================================================
+            auto root =
+                parseNode(
+                    text,
+                    cursor);
 
-        [[nodiscard]]
-        OctreeNode *node(
-            const Path &path)
-        {
-            OctreeNode *current =
-                &m_root;
-
-            for (const auto index : path)
+            if (cursor != text.size())
             {
-                if (!current->isBranch())
-                {
-                    return nullptr;
-                }
-
-                current =
-                    current->child(index);
+                throw std::runtime_error(
+                    "Unexpected characters");
             }
 
-            return current;
+            m_root =
+                std::move(*root);
         }
 
         [[nodiscard]]
-        const OctreeNode *node(
-            const Path &path) const
+        std::string serialize() const
         {
-            const OctreeNode *current =
-                &m_root;
+            std::string text;
 
-            for (const auto index : path)
-            {
-                if (!current->isBranch())
-                {
-                    return nullptr;
-                }
+            serializeNode(
+                m_root,
+                text);
 
-                current =
-                    current->child(index);
-            }
-
-            return current;
+            return text;
         }
-
-        //======================================================================
-        // Criação automática
-        //======================================================================
-
-        [[nodiscard]]
-        OctreeNode *create(
-            const Path &path)
-        {
-            OctreeNode *current =
-                &m_root;
-
-            for (const auto index : path)
-            {
-                if (!current->isBranch())
-                {
-                    current->subdivide();
-                }
-
-                current =
-                    current->child(index);
-            }
-
-            return current;
-        }
-
-        //======================================================================
-        // Operações
-        //======================================================================
-
-        void fill(
-            const Path &path)
-        {
-            create(path)->setFilled();
-        }
-
-        void clear(
-            const Path &path)
-        {
-            create(path)->setEmpty();
-        }
-
-        void subdivide(
-            const Path &path)
-        {
-            create(path)->subdivide();
-        }
-
-        void collapse()
-        {
-            m_root.collapse();
-        }
-
-        //======================================================================
-        // Estatísticas
-        //======================================================================
-
-        [[nodiscard]]
-        std::size_t nodeCount() const
-        {
-            return countNodes(
-                m_root);
-        }
-
-        [[nodiscard]]
-        std::size_t leafCount() const
-        {
-            return countLeaves(
-                m_root);
-        }
-
-        [[nodiscard]]
-        std::size_t depth() const
-        {
-            return depthRecursive(
-                m_root);
-        }
-
-        //======================================================================
-        // Bounds
-        //======================================================================
-
-        [[nodiscard]]
-        std::pair<Point3f, Point3f>
-        bounds(
-            const Path &path) const
-        {
-            Point3f min =
-                m_minimum;
-
-            Point3f max =
-                m_maximum;
-
-            for (const auto index : path)
-            {
-                splitBounds(
-                    min,
-                    max,
-                    index,
-                    min,
-                    max);
-            }
-
-            return {
-                min,
-                max};
-        }
-
-        //======================================================================
-        // Mesh
-        //======================================================================
 
         [[nodiscard]]
         Mesh3f toMesh() const
@@ -437,74 +146,106 @@ namespace geometry
         }
 
     private:
-        static std::size_t countNodes(
-            const OctreeNode &node)
+
+        static std::unique_ptr<OctreeNode>
+        parseNode(
+            std::string_view text,
+            std::size_t& cursor)
         {
-            std::size_t total = 1;
-
-            if (!node.isBranch())
+            if (cursor >= text.size())
             {
-                return total;
+                throw std::runtime_error(
+                    "Unexpected end");
             }
 
-            for (std::size_t i = 0; i < 8; ++i)
+            const char c =
+                text[cursor++];
+
+            if (c == '0')
             {
-                total +=
-                    countNodes(
-                        *node.child(i));
+                return std::make_unique<
+                    OctreeNode>(
+                        OctreeNodeType::Empty);
             }
 
-            return total;
+            if (c == '1')
+            {
+                return std::make_unique<
+                    OctreeNode>(
+                        OctreeNodeType::Filled);
+            }
+
+            if (c == '{')
+            {
+                auto node =
+                    std::make_unique<
+                        OctreeNode>();
+
+                node->makeBranch();
+
+                for (std::size_t i = 0; i < 8; ++i)
+                {
+                    node->children[i] =
+                        parseNode(
+                            text,
+                            cursor);
+                }
+
+                if (cursor >= text.size())
+                {
+                    throw std::runtime_error(
+                        "Missing }");
+                }
+
+                if (text[cursor] != '}')
+                {
+                    throw std::runtime_error(
+                        "Missing }");
+                }
+
+                ++cursor;
+
+                return node;
+            }
+
+            throw std::runtime_error(
+                "Invalid character");
         }
 
-        static std::size_t countLeaves(
-            const OctreeNode &node)
+        static void serializeNode(
+            const OctreeNode& node,
+            std::string& text)
         {
-            if (!node.isBranch())
+            if (node.isEmpty())
             {
-                return 1;
+                text.push_back('0');
+                return;
             }
 
-            std::size_t total = 0;
+            if (node.isFilled())
+            {
+                text.push_back('1');
+                return;
+            }
+
+            text.push_back('{');
 
             for (std::size_t i = 0; i < 8; ++i)
             {
-                total +=
-                    countLeaves(
-                        *node.child(i));
+                serializeNode(
+                    *node.children[i],
+                    text);
             }
 
-            return total;
-        }
-
-        static std::size_t depthRecursive(
-            const OctreeNode &node)
-        {
-            if (!node.isBranch())
-            {
-                return 0;
-            }
-
-            std::size_t maxDepth = 0;
-
-            for (std::size_t i = 0; i < 8; ++i)
-            {
-                maxDepth =
-                    std::max(
-                        maxDepth,
-                        depthRecursive(
-                            *node.child(i)));
-            }
-
-            return maxDepth + 1;
+            text.push_back('}');
         }
 
         static void splitBounds(
-            const Point3f &min,
-            const Point3f &max,
+            const Point3f& min,
+            const Point3f& max,
             std::size_t index,
-            Point3f &childMin,
-            Point3f &childMax)
+            Point3f& childMin,
+            Point3f& childMax)
         {
             const auto center =
                 min.midpoint(max);
@@ -541,19 +282,20 @@ namespace geometry
         }
 
         static void appendMesh(
-            Mesh3f &dst,
-            const Mesh3f &src)
+            Mesh3f& dst,
+            const Mesh3f& src)
         {
             const auto offset =
                 dst.vertexCount();
 
-            for (const auto &vertex :
+            for (const auto& vertex :
                  src.getVertices())
             {
-                (void)dst.addVertex(vertex);
+                (void)dst.addVertex(
+                    vertex);
             }
 
-            for (const auto &edge :
+            for (const auto& edge :
                  src.getEdges())
             {
                 dst.addEdge(
@@ -561,7 +303,7 @@ namespace geometry
                     edge.v2 + offset);
             }
 
-            for (const auto &face :
+            for (const auto& face :
                  src.getFaces())
             {
                 dst.addFace(
@@ -572,10 +314,10 @@ namespace geometry
         }
 
         static void buildMesh(
-            Mesh3f &mesh,
-            const OctreeNode &node,
-            const Point3f &min,
-            const Point3f &max)
+            Mesh3f& mesh,
+            const OctreeNode& node,
+            const Point3f& min,
+            const Point3f& max)
         {
             if (node.isEmpty())
             {
@@ -618,13 +360,14 @@ namespace geometry
 
                 buildMesh(
                     mesh,
-                    *node.child(i),
+                    *node.children[i],
                     childMin,
                     childMax);
             }
         }
 
     private:
+
         Point3f m_minimum;
         Point3f m_maximum;
 

@@ -109,15 +109,8 @@ private:
 
         Octree tree(
             {-8.f, -8.f, -8.f},
-            {8.f, 8.f, 8.f});
-
-        tree.subdivide({});
-
-        tree.fill({7});
-        tree.fill({3, 0});
-        tree.fill({3, 6});
-
-        tree.collapse();
+            {8.f, 8.f, 8.f},
+            "{0010{00011010}110}");
 
         drawer.drawMesh(
             tree.toMesh(),
