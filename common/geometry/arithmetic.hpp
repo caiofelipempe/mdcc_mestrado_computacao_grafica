@@ -1,6 +1,7 @@
 #pragma once
-// #pragma GCC optimize("Ofast,unroll-loops")
-#pragma GCC target("avx,avx2,fma")
+
+// ATENÇÃO: As diretivas #pragma GCC target foram removidas daqui
+// e devem ser configuradas via CMake (ex: -mavx2 -mfma).
 
 #include <array>
 #include <vector>

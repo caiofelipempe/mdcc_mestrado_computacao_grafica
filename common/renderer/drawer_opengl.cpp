@@ -1,59 +1,33 @@
 #include "drawer_opengl.hpp"
-
 #include "color.hpp"
+
 #include <GL/glew.h>
 
 using namespace geometry;
 
 namespace
 {
-    inline void emitVertex(
-        const geometry::Point3f& point
-    )
+    inline void emitVertex(const Point3f& point)
     {
-        glVertex3f(
-            point[0],
-            point[1],
-            point[2]
-        );
+        glVertex3fv(point.data_ptr());
     }
 
-    inline void setColor(
-        const Color& color
-    )
+    inline void setColor(const Color& color)
     {
-        glColor4f(
-            color.r,
-            color.g,
-            color.b,
-            color.a
-        );
+        glColor4f(color.r, color.g, color.b, color.a);
     }
 }
 
 void DrawerOpengl::frameBegin()
 {
     glEnable(GL_DEPTH_TEST);
-
     glDepthFunc(GL_LESS);
-
     glDepthMask(GL_TRUE);
-
     glDisable(GL_BLEND);
-
     glDisable(GL_CULL_FACE);
 
-    glClearColor(
-        0.0f,
-        0.0f,
-        0.0f,
-        1.0f
-    );
-
-    glClear(
-        GL_COLOR_BUFFER_BIT |
-        GL_DEPTH_BUFFER_BIT
-    );
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void DrawerOpengl::frameEnd()
@@ -61,153 +35,114 @@ void DrawerOpengl::frameEnd()
     glFlush();
 }
 
-void DrawerOpengl::drawVertex(
-    const Point3f& point,
+void DrawerOpengl::drawVertices(
+    const Point3f* points,
+    std::size_t count,
     const Color& color,
-    float size
-)
+    float size)
 {
-    glPointSize(size);
+    if (!points || count == 0) return;
 
+    glPointSize(size);
     setColor(color);
 
     glBegin(GL_POINTS);
-
-    emitVertex(point);
-
+    for (std::size_t i = 0; i < count; ++i)
+    {
+        emitVertex(points[i]);
+    }
     glEnd();
 }
 
-void DrawerOpengl::drawLine(
-    const geometry::Point3f& a,
-    const geometry::Point3f& b,
+void DrawerOpengl::drawLines(
+    const Point3f* points,
+    std::size_t count,
     const Color& color,
-    float width
-)
+    float width)
 {
-    glLineWidth(width);
+    if (!points || count == 0) return;
 
+    glLineWidth(width);
     setColor(color);
 
     glBegin(GL_LINES);
-
-    emitVertex(a);
-    emitVertex(b);
-
+    const std::size_t totalPoints = count * 2;
+    for (std::size_t i = 0; i < totalPoints; ++i)
+    {
+        emitVertex(points[i]);
+    }
     glEnd();
 }
 
-void DrawerOpengl::drawFace(
-    const geometry::Point3f& a,
-    const geometry::Point3f& b,
-    const geometry::Point3f& c,
-    const Color& color
-)
+void DrawerOpengl::drawFaces(
+    const Point3f* points,
+    std::size_t count,
+    const Color& color)
 {
+    if (!points || count == 0) return;
+
     setColor(color);
 
     glBegin(GL_TRIANGLES);
-
-    emitVertex(a);
-    emitVertex(b);
-    emitVertex(c);
-
+    const std::size_t totalPoints = count * 3;
+    for (std::size_t i = 0; i < totalPoints; ++i)
+    {
+        emitVertex(points[i]);
+    }
     glEnd();
 }
 
-void DrawerOpengl::drawMesh(
-    const geometry::Mesh3f& mesh,
-    const Color& color
-)
+void DrawerOpengl::drawMeshes(
+    const Mesh3f* meshes,
+    std::size_t count,
+    const Color& color)
 {
-    const auto& vertices =
-        mesh.getVertices();
+    if (!meshes || count == 0) return;
 
-    const auto& edges =
-        mesh.getEdges();
+    std::vector<Point3f> faceVertices;
+    std::vector<Point3f> lineVertices;
 
-    const auto& faces =
-        mesh.getFaces();
-
-    if (!faces.empty())
+    for (std::size_t m = 0; m < count; ++m)
     {
-        setColor(color);
+        const auto& mesh = meshes[m];
+        const auto& vertices = mesh.getVertices();
+        const auto& edges = mesh.getEdges();
+        const auto& faces = mesh.getFaces();
 
-        glBegin(GL_TRIANGLES);
+        if (vertices.empty()) continue;
 
-        for (const auto& face : faces)
+        // 1. Faces da malha
+        if (!faces.empty())
         {
-            emitVertex(
-                vertices[
-                    face.indices[0]
-                ]
-            );
+            faceVertices.clear();
+            faceVertices.reserve(faces.size() * 3);
 
-            emitVertex(
-                vertices[
-                    face.indices[1]
-                ]
-            );
+            for (const auto& face : faces)
+            {
+                faceVertices.push_back(vertices[face.indices[0]]);
+                faceVertices.push_back(vertices[face.indices[1]]);
+                faceVertices.push_back(vertices[face.indices[2]]);
+            }
 
-            emitVertex(
-                vertices[
-                    face.indices[2]
-                ]
-            );
+            drawFaces(faceVertices, color);
         }
 
-        glEnd();
-    }
-
-    if (!edges.empty())
-    {
-        setColor({
-            0.0f,
-            0.0f,
-            0.0f,
-            1.0f
-        });
-
-        glLineWidth(1.0f);
-
-        glBegin(GL_LINES);
-
-        for (const auto& edge : edges)
+        // 2. Arestas da malha (wireframe)
+        if (!edges.empty())
         {
-            emitVertex(
-                vertices[
-                    edge.v1
-                ]
-            );
+            lineVertices.clear();
+            lineVertices.reserve(edges.size() * 2);
 
-            emitVertex(
-                vertices[
-                    edge.v2
-                ]
-            );
+            for (const auto& edge : edges)
+            {
+                lineVertices.push_back(vertices[edge.v1]);
+                lineVertices.push_back(vertices[edge.v2]);
+            }
+
+            drawLines(lineVertices, Color{0.0f, 0.0f, 0.0f, 1.0f}, 1.0f);
         }
 
-        glEnd();
-    }
-
-    if (!vertices.empty())
-    {
-        setColor({
-            1.0f,
-            0.0f,
-            0.0f,
-            1.0f
-        });
-
-        glPointSize(5.0f);
-
-        glBegin(GL_POINTS);
-
-        for (const auto& vertex : vertices)
-        {
-            emitVertex(vertex);
-        }
-
-        glEnd();
+        // 3. Vértices da malha
+        drawVertices(vertices, Color{1.0f, 0.0f, 0.0f, 1.0f}, 5.0f);
     }
 }

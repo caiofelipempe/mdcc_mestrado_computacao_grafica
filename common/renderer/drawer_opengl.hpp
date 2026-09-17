@@ -5,31 +5,36 @@
 class DrawerOpengl final : public Drawer
 {
 public:
+    ~DrawerOpengl() override = default;
+
+    // Traz as sobrecargas do std::vector e std::array da classe base para o escopo
+    using Drawer::drawVertices;
+    using Drawer::drawLines;
+    using Drawer::drawFaces;
+    using Drawer::drawMeshes;
+
     void frameBegin() override;
-    virtual void frameEnd() override;
+    void frameEnd() override;
 
-    void drawVertex(
-        const geometry::Point3f& point,
+    void drawVertices(
+        const geometry::Point3f* points,
+        std::size_t count,
         const Color& color,
-        float size = 5.0f
-    ) override;
+        float size = 5.0f) override;
 
-    void drawLine(
-        const geometry::Point3f& a,
-        const geometry::Point3f& b,
+    void drawLines(
+        const geometry::Point3f* points,
+        std::size_t count,
         const Color& color,
-        float width = 1.0f
-    ) override;
+        float width = 1.0f) override;
 
-    void drawFace(
-        const geometry::Point3f& a,
-        const geometry::Point3f& b,
-        const geometry::Point3f& c,
-        const Color& color
-    ) override;
+    void drawFaces(
+        const geometry::Point3f* points,
+        std::size_t count,
+        const Color& color) override;
 
-    void drawMesh(
-        const geometry::Mesh3f& mesh,
-        const Color& color
-    ) override;
+    void drawMeshes(
+        const geometry::Mesh3f* meshes,
+        std::size_t count,
+        const Color& color) override;
 };
