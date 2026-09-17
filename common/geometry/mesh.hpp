@@ -10,6 +10,7 @@
 
 #include "point.hpp"
 #include "vector.hpp"
+#include "rotator3.hpp"
 
 namespace geometry
 {
@@ -154,6 +155,96 @@ namespace geometry
                << ", F: " << mesh.m_faces.size()
                << " }";
             return os;
+        }
+
+        //==========================================================================
+        // Translate
+        //==========================================================================
+
+        void translate(
+            const VectorType &offset)
+        {
+            for (auto &vertex : m_vertices)
+            {
+                vertex += offset;
+            }
+        }
+
+        [[nodiscard]]
+        Mesh translated(
+            const VectorType &offset) const
+        {
+            Mesh result = *this;
+
+            result.translate(offset);
+
+            return result;
+        }
+
+        //==========================================================================
+        // Rotate (3D only)
+        //==========================================================================
+
+        template <std::size_t M = N>
+            requires(M == 3)
+        void rotate(
+            const Rotator3<T> &rotation)
+        {
+            for (auto &vertex : m_vertices)
+            {
+                vertex =
+                    PointType(
+                        rotation.rotateVector(
+                            vertex.to_vector()));
+            }
+        }
+
+        template <std::size_t M = N>
+            requires(M == 3)
+        [[nodiscard]]
+        Mesh rotated(
+            const Rotator3<T> &rotation) const
+        {
+            Mesh result = *this;
+
+            result.rotate(rotation);
+
+            return result;
+        }
+
+        //==========================================================================
+        // Transform (3D only)
+        //==========================================================================
+
+        template <std::size_t M = N>
+            requires(M == 3)
+        void transform(
+            const PointType &origin,
+            const Rotator3<T> &rotation)
+        {
+            for (auto &vertex : m_vertices)
+            {
+                vertex =
+                    origin +
+                    rotation.rotateVector(
+                        vertex.to_vector());
+            }
+        }
+
+        template <std::size_t M = N>
+            requires(M == 3)
+        [[nodiscard]]
+        Mesh transformed(
+            const PointType &origin,
+            const Rotator3<T> &rotation) const
+        {
+            Mesh result = *this;
+
+            result.transform(
+                origin,
+                rotation);
+
+            return result;
         }
     };
 

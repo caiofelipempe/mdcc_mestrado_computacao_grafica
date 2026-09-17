@@ -32,21 +32,7 @@ namespace geometry
         virtual AABBShape aabbLimits() const = 0;
 
         [[nodiscard]]
-        virtual Mesh3f toMesh(
-            const Point3f &origin = {},
-            const Rot3f &rotation = {}) const = 0;
-
-    protected:
-        [[nodiscard]]
-        static Point3f transformPoint(
-            const Point3f &point,
-            const Point3f &origin,
-            const Rot3f &rotation)
-        {
-            return origin +
-                   rotation.rotateVector(
-                       point.to_vector());
-        }
+        virtual Mesh3f toMesh() const = 0;
     };
 
     // ============================================================================
@@ -59,21 +45,13 @@ namespace geometry
         static constexpr int DefaultSegments = 32;
 
         [[nodiscard]]
-        Mesh3f toMesh(
-            const Point3f &origin = {},
-            const Rot3f &rotation = {}) const final
+        Mesh3f toMesh() const final
         {
-            return toMesh(
-                DefaultSegments,
-                origin,
-                rotation);
+            return toMesh(DefaultSegments);
         }
 
         [[nodiscard]]
-        virtual Mesh3f toMesh(
-            int segments,
-            const Point3f &origin = {},
-            const Rot3f &rotation = {}) const = 0;
+        virtual Mesh3f toMesh(int segments) const = 0;
 
     protected:
         // Anel em torno do eixo Y, com theta crescente (sentido -Y visto de cima).
@@ -81,9 +59,7 @@ namespace geometry
             Mesh3f &mesh,
             float radius,
             float y,
-            int segments,
-            const Point3f &origin,
-            const Rot3f &rotation)
+            int segments)
         {
             std::vector<std::size_t> ring;
             ring.reserve(static_cast<std::size_t>(segments));
@@ -97,13 +73,7 @@ namespace geometry
                     static_cast<float>(segments);
 
                 ring.push_back(
-                    mesh.addVertex(
-                        Shape::transformPoint(
-                            {radius * std::cos(angle),
-                             y,
-                             radius * std::sin(angle)},
-                            origin,
-                            rotation)));
+                    mesh.addVertex({radius * std::cos(angle), y, radius * std::sin(angle)}));
             }
 
             return ring;
@@ -248,21 +218,19 @@ namespace geometry
 
         // Única implementação de caixa do arquivo: Cube e Block delegam aqui.
         [[nodiscard]]
-        Mesh3f toMesh(
-            const Point3f &origin = {},
-            const Rot3f &rotation = {}) const override
+        Mesh3f toMesh() const override
         {
             Mesh3f mesh;
 
-            const auto v0 = mesh.addVertex(transformPoint({m_min[0], m_min[1], m_min[2]}, origin, rotation));
-            const auto v1 = mesh.addVertex(transformPoint({m_max[0], m_min[1], m_min[2]}, origin, rotation));
-            const auto v2 = mesh.addVertex(transformPoint({m_max[0], m_max[1], m_min[2]}, origin, rotation));
-            const auto v3 = mesh.addVertex(transformPoint({m_min[0], m_max[1], m_min[2]}, origin, rotation));
+            const auto v0 = mesh.addVertex({m_min[0], m_min[1], m_min[2]});
+            const auto v1 = mesh.addVertex({m_max[0], m_min[1], m_min[2]});
+            const auto v2 = mesh.addVertex({m_max[0], m_max[1], m_min[2]});
+            const auto v3 = mesh.addVertex({m_min[0], m_max[1], m_min[2]});
 
-            const auto v4 = mesh.addVertex(transformPoint({m_min[0], m_min[1], m_max[2]}, origin, rotation));
-            const auto v5 = mesh.addVertex(transformPoint({m_max[0], m_min[1], m_max[2]}, origin, rotation));
-            const auto v6 = mesh.addVertex(transformPoint({m_max[0], m_max[1], m_max[2]}, origin, rotation));
-            const auto v7 = mesh.addVertex(transformPoint({m_min[0], m_max[1], m_max[2]}, origin, rotation));
+            const auto v4 = mesh.addVertex({m_min[0], m_min[1], m_max[2]});
+            const auto v5 = mesh.addVertex({m_max[0], m_min[1], m_max[2]});
+            const auto v6 = mesh.addVertex({m_max[0], m_max[1], m_max[2]});
+            const auto v7 = mesh.addVertex({m_min[0], m_max[1], m_max[2]});
 
             // Arestas
 
@@ -350,11 +318,9 @@ namespace geometry
         }
 
         [[nodiscard]]
-        Mesh3f toMesh(
-            const Point3f &origin = {},
-            const Rot3f &rotation = {}) const override
+        Mesh3f toMesh() const override
         {
-            return aabbLimits().toMesh(origin, rotation);
+            return aabbLimits().toMesh();
         }
 
     private:
@@ -406,11 +372,9 @@ namespace geometry
         }
 
         [[nodiscard]]
-        Mesh3f toMesh(
-            const Point3f &origin = {},
-            const Rot3f &rotation = {}) const override
+        Mesh3f toMesh() const override
         {
-            return aabbLimits().toMesh(origin, rotation);
+            return aabbLimits().toMesh();
         }
 
     private:
@@ -459,18 +423,16 @@ namespace geometry
         }
 
         [[nodiscard]]
-        Mesh3f toMesh(
-            const Point3f &origin = {},
-            const Rot3f &rotation = {}) const override
+        Mesh3f toMesh() const override
         {
             Mesh3f mesh;
 
             const float s = scale();
 
-            const auto v0 = mesh.addVertex(transformPoint({s, s, s}, origin, rotation));
-            const auto v1 = mesh.addVertex(transformPoint({-s, -s, s}, origin, rotation));
-            const auto v2 = mesh.addVertex(transformPoint({-s, s, -s}, origin, rotation));
-            const auto v3 = mesh.addVertex(transformPoint({s, -s, -s}, origin, rotation));
+            const auto v0 = mesh.addVertex({s, s, s});
+            const auto v1 = mesh.addVertex({-s, -s, s});
+            const auto v2 = mesh.addVertex({-s, s, -s});
+            const auto v3 = mesh.addVertex({s, -s, -s});
 
             // Arestas
             mesh.addEdge(v0, v1);
@@ -546,10 +508,7 @@ namespace geometry
         }
 
         [[nodiscard]]
-        Mesh3f toMesh(
-            int segments,
-            const Point3f &origin = {},
-            const Rot3f &rotation = {}) const override
+        Mesh3f toMesh(int segments) const override
         {
             Mesh3f mesh;
 
@@ -557,11 +516,7 @@ namespace geometry
 
             // Polos são vértices únicos: nada de anel degenerado de raio zero.
             const auto bottom =
-                mesh.addVertex(
-                    transformPoint(
-                        {0.0f, -m_radius, 0.0f},
-                        origin,
-                        rotation));
+                mesh.addVertex({0.0f, -m_radius, 0.0f});
 
             std::vector<std::vector<std::size_t>> ringIndices;
             ringIndices.reserve(static_cast<std::size_t>(rings - 1));
@@ -580,17 +535,11 @@ namespace geometry
                         mesh,
                         m_radius * std::sin(phi),
                         m_radius * std::cos(phi),
-                        segments,
-                        origin,
-                        rotation));
+                        segments));
             }
 
             const auto top =
-                mesh.addVertex(
-                    transformPoint(
-                        {0.0f, m_radius, 0.0f},
-                        origin,
-                        rotation));
+                mesh.addVertex({0.0f, m_radius, 0.0f});
 
             connectApex(mesh, bottom, ringIndices.front(), false);
 
@@ -656,29 +605,26 @@ namespace geometry
         }
 
         [[nodiscard]]
-        Mesh3f toMesh(
-            int segments,
-            const Point3f &origin = {},
-            const Rot3f &rotation = {}) const override
+        Mesh3f toMesh(int segments) const override
         {
             Mesh3f mesh;
 
             const float h = m_height * 0.5f;
 
             const auto bottom =
-                addRing(mesh, m_radius, -h, segments, origin, rotation);
+                addRing(mesh, m_radius, -h, segments);
 
             const auto top =
-                addRing(mesh, m_radius, h, segments, origin, rotation);
+                addRing(mesh, m_radius, h, segments);
 
             connectRings(mesh, bottom, top);
 
             // Tampas: area() já as considera, a malha precisa fechá-las.
             const auto bottomCenter =
-                mesh.addVertex(transformPoint({0.0f, -h, 0.0f}, origin, rotation));
+                mesh.addVertex({0.0f, -h, 0.0f});
 
             const auto topCenter =
-                mesh.addVertex(transformPoint({0.0f, h, 0.0f}, origin, rotation));
+                mesh.addVertex({0.0f, h, 0.0f});
 
             connectApex(mesh, bottomCenter, bottom, false);
             connectApex(mesh, topCenter, top, true);
@@ -739,23 +685,20 @@ namespace geometry
         }
 
         [[nodiscard]]
-        Mesh3f toMesh(
-            int segments,
-            const Point3f &origin = {},
-            const Rot3f &rotation = {}) const override
+        Mesh3f toMesh(int segments) const override
         {
             Mesh3f mesh;
 
             const float h = m_height * 0.5f;
 
             const auto ring =
-                addRing(mesh, m_radius, -h, segments, origin, rotation);
+                addRing(mesh, m_radius, -h, segments);
 
             const auto tip =
-                mesh.addVertex(transformPoint({0.0f, h, 0.0f}, origin, rotation));
+                mesh.addVertex({0.0f, h, 0.0f});
 
             const auto baseCenter =
-                mesh.addVertex(transformPoint({0.0f, -h, 0.0f}, origin, rotation));
+                mesh.addVertex({0.0f, -h, 0.0f});
 
             connectApex(mesh, tip, ring, true);
             connectApex(mesh, baseCenter, ring, false);
@@ -1001,9 +944,7 @@ namespace geometry
         }
 
         [[nodiscard]]
-        Mesh3f toMesh(
-            const Point3f &origin = {},
-            const Rot3f &rotation = {}) const override
+        Mesh3f toMesh() const override
         {
             Mesh3f mesh;
 
@@ -1016,7 +957,7 @@ namespace geometry
             {
                 ids.push_back(
                     mesh.addVertex(
-                        transformPoint(vertex, origin, rotation)));
+                        vertex));
             }
 
             forEachFace(

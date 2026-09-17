@@ -110,42 +110,48 @@ private:
             AABBShape(
                 {-1.5f, -1.0f, -0.5f},
                 {1.0f, 2.0f, 0.5f})
-                .toMesh({-15.0f, 0.0f, 0.0f}),
+                .toMesh()
+                .translated(
+                    {-15.0f, 0.0f, 0.0f}),
             Color::Orange());
 
         drawer.drawMesh(
             Cube(2.0f)
-                .toMesh({-10.0f, 0.0f, 0.0f}),
+                .toMesh()
+                .translated(
+                    {-10.0f, 0.0f, 0.0f}),
             Color::Green());
 
         drawer.drawMesh(
             Block(2.0f, 2.0f, 2.0f)
-                .toMesh({-5.0f, 0.0f, 0.0f}),
+                .toMesh()
+                .translated(
+                    {-5.0f, 0.0f, 0.0f}),
             Color::Red());
 
         drawer.drawMesh(
             RegularTetrahedron(3.0f)
-                .toMesh({0.0f, 0.0f, 0.0f}),
+                .toMesh(),
             Color::Magenta());
 
         drawer.drawMesh(
             Sphere(1.5f)
-                .toMesh(
-                    32,
+                .toMesh(32)
+                .translated(
                     {5.0f, 0.0f, 0.0f}),
             Color::Yellow());
 
         drawer.drawMesh(
             Cylinder(1.0f, 3.0f)
-                .toMesh(
-                    32,
+                .toMesh(32)
+                .translated(
                     {10.0f, 0.0f, 0.0f}),
             Color::Cyan());
 
         drawer.drawMesh(
             Cone(1.0f, 3.0f)
-                .toMesh(
-                    32,
+                .toMesh(32)
+                .translated(
                     {15.0f, 0.0f, 0.0f}),
             Color::White());
 
@@ -161,8 +167,9 @@ private:
         hull.addFace({0.0f, 0.0f, -1.0f});
 
         drawer.drawMesh(
-            hull.toMesh(
-                {20.0f, 0.0f, 0.0f}),
+            hull.toMesh()
+                .translated(
+                    {20.0f, 0.0f, 0.0f}),
             Color::Blue());
     }
 
