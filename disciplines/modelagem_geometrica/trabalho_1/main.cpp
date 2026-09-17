@@ -7,6 +7,7 @@
 #include <imgui_impl_opengl3.h>
 
 #include "shape.hpp"
+#include "octree.hpp"
 
 using namespace geometry;
 
@@ -106,62 +107,21 @@ private:
     {
         using namespace geometry;
 
+        Octree tree(
+            {-8.f, -8.f, -8.f},
+            {8.f, 8.f, 8.f});
+
+        tree.subdivide({});
+
+        tree.fill({7});
+        tree.fill({3, 0});
+        tree.fill({3, 6});
+
+        tree.collapse();
+
         drawer.drawMesh(
-            Cube(2.0f)
-                .toMesh()
-                .translated(
-                    {-10.0f, 0.0f, 0.0f}),
+            tree.toMesh(),
             Color::Green());
-
-        drawer.drawMesh(
-            Block(2.0f, 2.0f, 2.0f)
-                .toMesh()
-                .translated(
-                    {-5.0f, 0.0f, 0.0f}),
-            Color::Red());
-
-        drawer.drawMesh(
-            RegularTetrahedron(3.0f)
-                .toMesh(),
-            Color::Magenta());
-
-        drawer.drawMesh(
-            Sphere(1.5f)
-                .toMesh(32)
-                .translated(
-                    {5.0f, 0.0f, 0.0f}),
-            Color::Yellow());
-
-        drawer.drawMesh(
-            Cylinder(1.0f, 3.0f)
-                .toMesh(32)
-                .translated(
-                    {10.0f, 0.0f, 0.0f}),
-            Color::Cyan());
-
-        drawer.drawMesh(
-            Cone(1.0f, 3.0f)
-                .toMesh(32)
-                .translated(
-                    {15.0f, 0.0f, 0.0f}),
-            Color::White());
-
-        PolarConvexHullShape hull;
-
-        hull.addFace({1.0f, 0.0f, 0.0f});
-        hull.addFace({-1.0f, 0.0f, 0.0f});
-
-        hull.addFace({0.0f, 1.0f, 0.0f});
-        hull.addFace({0.0f, -1.0f, 0.0f});
-
-        hull.addFace({0.0f, 0.0f, 1.0f});
-        hull.addFace({0.0f, 0.0f, -1.0f});
-
-        drawer.drawMesh(
-            hull.toMesh()
-                .translated(
-                    {20.0f, 0.0f, 0.0f}),
-            Color::Blue());
     }
 
     void drawToolsPanel()

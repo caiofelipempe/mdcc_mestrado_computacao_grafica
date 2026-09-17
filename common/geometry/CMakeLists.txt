@@ -4,6 +4,8 @@ add_library(geometry INTERFACE
     point.hpp
     mesh.hpp
     shape.hpp
+    bounding_volume.hpp
+    octree.hpp
 )
 
 target_compile_options(
