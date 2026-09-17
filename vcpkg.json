@@ -12,6 +12,7 @@
         "docking-experimental"
       ]
     },
-    "cgal"
+    "cgal",
+    "entt"
   ]
 }
