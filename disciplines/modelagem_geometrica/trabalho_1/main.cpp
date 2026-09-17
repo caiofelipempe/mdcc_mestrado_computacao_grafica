@@ -107,15 +107,6 @@ private:
         using namespace geometry;
 
         drawer.drawMesh(
-            AABBShape(
-                {-1.5f, -1.0f, -0.5f},
-                {1.0f, 2.0f, 0.5f})
-                .toMesh()
-                .translated(
-                    {-15.0f, 0.0f, 0.0f}),
-            Color::Orange());
-
-        drawer.drawMesh(
             Cube(2.0f)
                 .toMesh()
                 .translated(

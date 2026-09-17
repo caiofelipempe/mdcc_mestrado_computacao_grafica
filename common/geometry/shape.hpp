@@ -29,7 +29,7 @@ namespace geometry
         virtual float volume() const = 0;
 
         [[nodiscard]]
-        virtual AABBShape aabbLimits() const = 0;
+        virtual Vec3f boundSize() const = 0;
 
         [[nodiscard]]
         virtual Mesh3f toMesh() const = 0;
@@ -127,113 +127,66 @@ namespace geometry
     };
 
     // ============================================================================
-    // AABBShape
+    // Block
     // ============================================================================
 
-    class AABBShape : public Shape
+    class Block : public Shape
     {
     public:
-        AABBShape(
-            const Point3f &min = {-1.0f, -1.0f, -1.0f},
-            const Point3f &max = {1.0f, 1.0f, 1.0f})
-            : m_min(min),
-              m_max(max)
+        Block(
+            float width = 1.0f,
+            float height = 1.0f,
+            float depth = 1.0f)
+            : m_width(width), m_height(height), m_depth(depth)
         {
-        }
-
-        [[nodiscard]]
-        const Point3f &min() const
-        {
-            return m_min;
-        }
-
-        [[nodiscard]]
-        const Point3f &max() const
-        {
-            return m_max;
-        }
-
-        [[nodiscard]]
-        Vec3f size() const
-        {
-            return m_max - m_min;
-        }
-
-        [[nodiscard]]
-        Vec3f extent() const
-        {
-            return (m_max - m_min) * 0.5f;
-        }
-
-        [[nodiscard]]
-        Point3f center() const
-        {
-            return m_min.midpoint(m_max);
-        }
-
-        [[nodiscard]]
-        float width() const
-        {
-            return m_max[0] - m_min[0];
-        }
-
-        [[nodiscard]]
-        float height() const
-        {
-            return m_max[1] - m_min[1];
-        }
-
-        [[nodiscard]]
-        float depth() const
-        {
-            return m_max[2] - m_min[2];
         }
 
         [[nodiscard]]
         float area() const override
         {
-            const auto s = size();
-
             return 2.0f *
-                   (s[0] * s[1] +
-                    s[0] * s[2] +
-                    s[1] * s[2]);
+                   (m_width * m_height +
+                    m_width * m_depth +
+                    m_height * m_depth);
         }
 
         [[nodiscard]]
         float volume() const override
         {
-            const auto s = size();
-
-            return s[0] *
-                   s[1] *
-                   s[2];
+            return m_width *
+                   m_height *
+                   m_depth;
         }
 
         [[nodiscard]]
-        AABBShape aabbLimits() const override
+        Vec3f boundSize() const override
         {
-            return *this;
+            return {
+                m_width,
+                m_height,
+                m_depth};
         }
 
-        // Única implementação de caixa do arquivo: Cube e Block delegam aqui.
         [[nodiscard]]
         Mesh3f toMesh() const override
         {
             Mesh3f mesh;
 
-            const auto v0 = mesh.addVertex({m_min[0], m_min[1], m_min[2]});
-            const auto v1 = mesh.addVertex({m_max[0], m_min[1], m_min[2]});
-            const auto v2 = mesh.addVertex({m_max[0], m_max[1], m_min[2]});
-            const auto v3 = mesh.addVertex({m_min[0], m_max[1], m_min[2]});
+            const float hx = m_width * 0.5f;
+            const float hy = m_height * 0.5f;
+            const float hz = m_depth * 0.5f;
 
-            const auto v4 = mesh.addVertex({m_min[0], m_min[1], m_max[2]});
-            const auto v5 = mesh.addVertex({m_max[0], m_min[1], m_max[2]});
-            const auto v6 = mesh.addVertex({m_max[0], m_max[1], m_max[2]});
-            const auto v7 = mesh.addVertex({m_min[0], m_max[1], m_max[2]});
+            const auto v0 = mesh.addVertex({-hx, -hy, -hz});
+            const auto v1 = mesh.addVertex({hx, -hy, -hz});
+            const auto v2 = mesh.addVertex({hx, hy, -hz});
+            const auto v3 = mesh.addVertex({-hx, hy, -hz});
+
+            const auto v4 = mesh.addVertex({-hx, -hy, hz});
+            const auto v5 = mesh.addVertex({hx, -hy, hz});
+            const auto v6 = mesh.addVertex({hx, hy, hz});
+            const auto v7 = mesh.addVertex({-hx, hy, hz});
 
             // Arestas
-
             mesh.addEdge(v0, v1);
             mesh.addEdge(v1, v2);
             mesh.addEdge(v2, v3);
@@ -249,32 +202,32 @@ namespace geometry
             mesh.addEdge(v2, v6);
             mesh.addEdge(v3, v7);
 
-            // Faces (CCW vistas de fora)
-
-            mesh.addFace(v0, v3, v2); // -Z
+            // Faces
+            mesh.addFace(v0, v3, v2);
             mesh.addFace(v0, v2, v1);
 
-            mesh.addFace(v4, v5, v6); // +Z
+            mesh.addFace(v4, v5, v6);
             mesh.addFace(v4, v6, v7);
 
-            mesh.addFace(v0, v1, v5); // -Y
+            mesh.addFace(v0, v1, v5);
             mesh.addFace(v0, v5, v4);
 
-            mesh.addFace(v3, v7, v6); // +Y
+            mesh.addFace(v3, v7, v6);
             mesh.addFace(v3, v6, v2);
 
-            mesh.addFace(v1, v2, v6); // +X
+            mesh.addFace(v1, v2, v6);
             mesh.addFace(v1, v6, v5);
 
-            mesh.addFace(v0, v4, v7); // -X
+            mesh.addFace(v0, v4, v7);
             mesh.addFace(v0, v7, v3);
 
             return mesh;
         }
 
     private:
-        Point3f m_min;
-        Point3f m_max;
+        float m_width;
+        float m_height;
+        float m_depth;
     };
 
     // ============================================================================
@@ -308,79 +261,25 @@ namespace geometry
         }
 
         [[nodiscard]]
-        AABBShape aabbLimits() const override
+        Vec3f boundSize() const override
         {
-            const float h = m_size * 0.5f;
-
-            return {
-                {-h, -h, -h},
-                {h, h, h}};
+            return {m_size, m_size, m_size};
         }
 
         [[nodiscard]]
         Mesh3f toMesh() const override
         {
-            return aabbLimits().toMesh();
+            const float h = m_size * 0.5f;
+
+            return Block(
+                       m_size,
+                       m_size,
+                       m_size)
+                .toMesh();
         }
 
     private:
         float m_size;
-    };
-
-    // ============================================================================
-    // Block
-    // ============================================================================
-
-    class Block : public Shape
-    {
-    public:
-        Block(
-            float width = 1.0f,
-            float height = 1.0f,
-            float depth = 1.0f)
-            : m_width(width), m_height(height), m_depth(depth)
-        {
-        }
-
-        [[nodiscard]]
-        float area() const override
-        {
-            return 2.0f *
-                   (m_width * m_height +
-                    m_width * m_depth +
-                    m_height * m_depth);
-        }
-
-        [[nodiscard]]
-        float volume() const override
-        {
-            return m_width *
-                   m_height *
-                   m_depth;
-        }
-
-        [[nodiscard]]
-        AABBShape aabbLimits() const override
-        {
-            return {
-                {-m_width * 0.5f,
-                 -m_height * 0.5f,
-                 -m_depth * 0.5f},
-                {m_width * 0.5f,
-                 m_height * 0.5f,
-                 m_depth * 0.5f}};
-        }
-
-        [[nodiscard]]
-        Mesh3f toMesh() const override
-        {
-            return aabbLimits().toMesh();
-        }
-
-    private:
-        float m_width;
-        float m_height;
-        float m_depth;
     };
 
     // ============================================================================
@@ -413,13 +312,14 @@ namespace geometry
         }
 
         [[nodiscard]]
-        AABBShape aabbLimits() const override
+        Vec3f boundSize() const override
         {
             const float s = scale();
 
             return {
-                {-s, -s, -s},
-                {s, s, s}};
+                2.0f * s,
+                2.0f * s,
+                2.0f * s};
         }
 
         [[nodiscard]]
@@ -500,11 +400,11 @@ namespace geometry
         }
 
         [[nodiscard]]
-        AABBShape aabbLimits() const override
+        Vec3f boundSize() const override
         {
-            return {
-                {-m_radius, -m_radius, -m_radius},
-                {m_radius, m_radius, m_radius}};
+            const float d = 2.0f * m_radius;
+
+            return {d, d, d};
         }
 
         [[nodiscard]]
@@ -597,11 +497,12 @@ namespace geometry
         }
 
         [[nodiscard]]
-        AABBShape aabbLimits() const override
+        Vec3f boundSize() const override
         {
             return {
-                {-m_radius, -m_height * 0.5f, -m_radius},
-                {m_radius, m_height * 0.5f, m_radius}};
+                2.0f * m_radius,
+                m_height,
+                2.0f * m_radius};
         }
 
         [[nodiscard]]
@@ -677,11 +578,12 @@ namespace geometry
         }
 
         [[nodiscard]]
-        AABBShape aabbLimits() const override
+        Vec3f boundSize() const override
         {
             return {
-                {-m_radius, -m_height * 0.5f, -m_radius},
-                {m_radius, m_height * 0.5f, m_radius}};
+                2.0f * m_radius,
+                m_height,
+                2.0f * m_radius};
         }
 
         [[nodiscard]]
@@ -919,7 +821,7 @@ namespace geometry
         }
 
         [[nodiscard]]
-        AABBShape aabbLimits() const override
+        Vec3f boundSize() const override
         {
             const auto verts = vertices();
 
@@ -940,7 +842,7 @@ namespace geometry
                 }
             }
 
-            return {min, max};
+            return max - min;
         }
 
         [[nodiscard]]
