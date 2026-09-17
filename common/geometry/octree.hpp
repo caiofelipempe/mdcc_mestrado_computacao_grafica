@@ -19,6 +19,15 @@ namespace geometry
         Branch
     };
 
+    enum class OctreeOrientation
+    {
+        CounterClockwiseBottomToTop,
+        CounterClockwiseTopToBottom,
+
+        ClockwiseBottomToTop,
+        ClockwiseTopToBottom
+    };
+
     struct OctreeNode
     {
         OctreeNodeType type =
@@ -26,7 +35,8 @@ namespace geometry
 
         std::array<
             std::unique_ptr<OctreeNode>,
-            8> children;
+            8>
+            children;
 
         OctreeNode() = default;
 
@@ -67,12 +77,12 @@ namespace geometry
             type =
                 OctreeNodeType::Branch;
 
-            for (auto& child : children)
+            for (auto &child : children)
             {
                 child =
                     std::make_unique<
                         OctreeNode>(
-                            OctreeNodeType::Empty);
+                        OctreeNodeType::Empty);
             }
         }
     };
@@ -80,18 +90,17 @@ namespace geometry
     class Octree
     {
     public:
-
         Octree(
-            const Point3f& minimum,
-            const Point3f& maximum)
+            const Point3f &minimum,
+            const Point3f &maximum)
             : m_minimum(minimum),
               m_maximum(maximum)
         {
         }
 
         Octree(
-            const Point3f& minimum,
-            const Point3f& maximum,
+            const Point3f &minimum,
+            const Point3f &maximum,
             std::string_view text)
             : m_minimum(minimum),
               m_maximum(maximum)
@@ -132,7 +141,10 @@ namespace geometry
         }
 
         [[nodiscard]]
-        Mesh3f toMesh() const
+        Mesh3f toMesh(
+            OctreeOrientation orientation =
+                OctreeOrientation::
+                    CounterClockwiseBottomToTop) const
         {
             Mesh3f mesh;
 
@@ -140,17 +152,58 @@ namespace geometry
                 mesh,
                 m_root,
                 m_minimum,
-                m_maximum);
+                m_maximum,
+                orientation);
 
             return mesh;
         }
 
     private:
+        static std::size_t remapIndex(
+            std::size_t index,
+            OctreeOrientation orientation)
+        {
+            std::size_t x =
+                index & 1;
+
+            std::size_t y =
+                (index >> 1) & 1;
+
+            std::size_t z =
+                (index >> 2) & 1;
+
+            switch (orientation)
+            {
+            case OctreeOrientation::
+                CounterClockwiseBottomToTop:
+                break;
+
+            case OctreeOrientation::
+                CounterClockwiseTopToBottom:
+                z = 1 - z;
+                break;
+
+            case OctreeOrientation::
+                ClockwiseBottomToTop:
+                std::swap(x, y);
+                break;
+
+            case OctreeOrientation::
+                ClockwiseTopToBottom:
+                std::swap(x, y);
+                z = 1 - z;
+                break;
+            }
+
+            return x |
+                   (y << 1) |
+                   (z << 2);
+        }
 
         static std::unique_ptr<OctreeNode>
         parseNode(
             std::string_view text,
-            std::size_t& cursor)
+            std::size_t &cursor)
         {
             if (cursor >= text.size())
             {
@@ -165,14 +218,14 @@ namespace geometry
             {
                 return std::make_unique<
                     OctreeNode>(
-                        OctreeNodeType::Empty);
+                    OctreeNodeType::Empty);
             }
 
             if (c == '1')
             {
                 return std::make_unique<
                     OctreeNode>(
-                        OctreeNodeType::Filled);
+                    OctreeNodeType::Filled);
             }
 
             if (c == '{')
@@ -213,8 +266,8 @@ namespace geometry
         }
 
         static void serializeNode(
-            const OctreeNode& node,
-            std::string& text)
+            const OctreeNode &node,
+            std::string &text)
         {
             if (node.isEmpty())
             {
@@ -241,11 +294,11 @@ namespace geometry
         }
 
         static void splitBounds(
-            const Point3f& min,
-            const Point3f& max,
+            const Point3f &min,
+            const Point3f &max,
             std::size_t index,
-            Point3f& childMin,
-            Point3f& childMax)
+            Point3f &childMin,
+            Point3f &childMax)
         {
             const auto center =
                 min.midpoint(max);
@@ -282,20 +335,20 @@ namespace geometry
         }
 
         static void appendMesh(
-            Mesh3f& dst,
-            const Mesh3f& src)
+            Mesh3f &dst,
+            const Mesh3f &src)
         {
             const auto offset =
                 dst.vertexCount();
 
-            for (const auto& vertex :
+            for (const auto &vertex :
                  src.getVertices())
             {
                 (void)dst.addVertex(
                     vertex);
             }
 
-            for (const auto& edge :
+            for (const auto &edge :
                  src.getEdges())
             {
                 dst.addEdge(
@@ -303,7 +356,7 @@ namespace geometry
                     edge.v2 + offset);
             }
 
-            for (const auto& face :
+            for (const auto &face :
                  src.getFaces())
             {
                 dst.addFace(
@@ -314,10 +367,11 @@ namespace geometry
         }
 
         static void buildMesh(
-            Mesh3f& mesh,
-            const OctreeNode& node,
-            const Point3f& min,
-            const Point3f& max)
+            Mesh3f &mesh,
+            const OctreeNode &node,
+            const Point3f &min,
+            const Point3f &max,
+            OctreeOrientation orientation)
         {
             if (node.isEmpty())
             {
@@ -348,13 +402,18 @@ namespace geometry
 
             for (std::size_t i = 0; i < 8; ++i)
             {
+                const auto octant =
+                    remapIndex(
+                        i,
+                        orientation);
+
                 Point3f childMin;
                 Point3f childMax;
 
                 splitBounds(
                     min,
                     max,
-                    i,
+                    octant,
                     childMin,
                     childMax);
 
@@ -362,12 +421,12 @@ namespace geometry
                     mesh,
                     *node.children[i],
                     childMin,
-                    childMax);
+                    childMax,
+                    orientation);
             }
         }
 
     private:
-
         Point3f m_minimum;
         Point3f m_maximum;
 

@@ -110,10 +110,12 @@ private:
         Octree tree(
             {-8.f, -8.f, -8.f},
             {8.f, 8.f, 8.f},
-            "{0010{00011010}110}");
+            "{0010{00011010}11{00101101}}");
 
         drawer.drawMesh(
-            tree.toMesh(),
+            tree.toMesh(
+                OctreeOrientation::
+                    ClockwiseBottomToTop),
             Color::Green());
     }
 
