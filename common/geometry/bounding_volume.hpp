@@ -48,22 +48,9 @@ namespace geometry
         }
 
         [[nodiscard]]
-        const Point3f& minimum() const
-        {
-            return m_minimum;
-        }
-
-        [[nodiscard]]
-        const Point3f& maximum() const
-        {
-            return m_maximum;
-        }
-
-        [[nodiscard]]
         Point3f center() const override
         {
-            return m_minimum.midpoint(
-                m_maximum);
+            return m_minimum.midpoint(m_maximum);
         }
 
         [[nodiscard]]
@@ -113,8 +100,7 @@ namespace geometry
                 m_maximum[2] >= other.m_minimum[2];
         }
 
-        void expand(
-            const Point3f& point)
+        void expand(const Point3f& point)
         {
             for (std::size_t i = 0; i < 3; ++i)
             {
@@ -224,7 +210,7 @@ namespace geometry
                 maximum};
         }
 
-    private:
+    public:
         Point3f m_minimum{};
         Point3f m_maximum{};
     };

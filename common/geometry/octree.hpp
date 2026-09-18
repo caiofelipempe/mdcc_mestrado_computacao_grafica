@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mesh.hpp"
-#include "shape.hpp"
+#include "bounding_volume.hpp"
 
 #include <array>
 #include <memory>
@@ -9,18 +9,6 @@
 
 namespace geometry
 {
-    struct AABB
-    {
-        Point3f minimum;
-        Point3f maximum;
-
-        [[nodiscard]]
-        Point3f center() const
-        {
-            return minimum.midpoint(
-                maximum);
-        }
-    };
 
     enum class OctreeState
     {
@@ -45,8 +33,7 @@ namespace geometry
 
         std::array<
             std::unique_ptr<OctreeNode>,
-            8>
-            children;
+            8> children;
 
         [[nodiscard]]
         bool isEmpty() const
@@ -74,7 +61,7 @@ namespace geometry
             state =
                 OctreeState::Branch;
 
-            for (auto &child : children)
+            for (auto& child : children)
             {
                 if (!child)
                 {
@@ -89,31 +76,51 @@ namespace geometry
     class Octree
     {
     public:
+
         Octree(
-            const Point3f &minimum,
-            const Point3f &maximum)
+            const Point3f& minimum,
+            const Point3f& maximum)
             : m_bounds{
-                  minimum,
-                  maximum}
+                minimum,
+                maximum}
         {
         }
 
-        template <typename Classifier>
+        template<typename Classifier>
         void build(
-            Classifier &&classifier)
+            Classifier&& classifier,
+            OctreeOrientation orientation =
+                OctreeOrientation::
+                    CounterClockwiseBottomToTop)
         {
+            m_orientation =
+                orientation;
+
+            m_root =
+                OctreeNode();
+
             buildRecursive(
                 m_root,
                 m_bounds,
                 0,
-                classifier);
+                classifier,
+                orientation);
+        }
+
+        template<typename Visitor>
+        void read(
+            Visitor&& visitor) const
+        {
+            readRecursive(
+                m_root,
+                m_bounds,
+                0,
+                visitor,
+                m_orientation);
         }
 
         [[nodiscard]]
-        Mesh3f toMesh(
-            OctreeOrientation orientation =
-                OctreeOrientation::
-                    CounterClockwiseBottomToTop) const
+        Mesh3f toMesh() const
         {
             Mesh3f mesh;
 
@@ -121,44 +128,12 @@ namespace geometry
                 mesh,
                 m_root,
                 m_bounds,
-                orientation);
+                m_orientation);
 
             return mesh;
         }
 
     private:
-        template <typename Classifier>
-        static void buildRecursive(
-            OctreeNode &node,
-            const AABB &bounds,
-            std::size_t depth,
-            Classifier &&classifier)
-        {
-            node.state =
-                classifier(
-                    bounds,
-                    depth);
-
-            if (!node.isBranch())
-            {
-                return;
-            }
-
-            node.makeBranch();
-
-            for (std::size_t i = 0;
-                 i < 8;
-                 ++i)
-            {
-                buildRecursive(
-                    *node.children[i],
-                    childBounds(
-                        bounds,
-                        i),
-                    depth + 1,
-                    classifier);
-            }
-        }
 
         static std::size_t remapIndex(
             std::size_t index,
@@ -196,13 +171,14 @@ namespace geometry
                 break;
             }
 
-            return x |
-                   (y << 1) |
-                   (z << 2);
+            return
+                x |
+                (y << 1) |
+                (z << 2);
         }
 
         static AABB childBounds(
-            const AABB &parent,
+            const AABB& parent,
             std::size_t index)
         {
             const auto center =
@@ -210,54 +186,131 @@ namespace geometry
 
             AABB child;
 
-            child.minimum[0] =
+            child.m_minimum[0] =
                 (index & 1)
                     ? center[0]
-                    : parent.minimum[0];
+                    : parent.m_minimum[0];
 
-            child.maximum[0] =
+            child.m_maximum[0] =
                 (index & 1)
-                    ? parent.maximum[0]
+                    ? parent.m_maximum[0]
                     : center[0];
 
-            child.minimum[1] =
+            child.m_minimum[1] =
                 (index & 2)
                     ? center[1]
-                    : parent.minimum[1];
+                    : parent.m_minimum[1];
 
-            child.maximum[1] =
+            child.m_maximum[1] =
                 (index & 2)
-                    ? parent.maximum[1]
+                    ? parent.m_maximum[1]
                     : center[1];
 
-            child.minimum[2] =
+            child.m_minimum[2] =
                 (index & 4)
                     ? center[2]
-                    : parent.minimum[2];
+                    : parent.m_minimum[2];
 
-            child.maximum[2] =
+            child.m_maximum[2] =
                 (index & 4)
-                    ? parent.maximum[2]
+                    ? parent.m_maximum[2]
                     : center[2];
 
             return child;
         }
 
+        template<typename Classifier>
+        static void buildRecursive(
+            OctreeNode& node,
+            const AABB& bounds,
+            std::size_t depth,
+            Classifier&& classifier,
+            OctreeOrientation orientation)
+        {
+            node.state =
+                classifier(
+                    bounds,
+                    depth);
+
+            if (!node.isBranch())
+            {
+                return;
+            }
+
+            node.makeBranch();
+
+            for (std::size_t i = 0;
+                 i < 8;
+                 ++i)
+            {
+                buildRecursive(
+                    *node.children[i],
+                    childBounds(
+                        bounds,
+                        remapIndex(
+                            i,
+                            orientation)),
+                    depth + 1,
+                    classifier,
+                    orientation);
+            }
+        }
+
+        template<typename Visitor>
+        static void readRecursive(
+            const OctreeNode& node,
+            const AABB& bounds,
+            std::size_t depth,
+            Visitor&& visitor,
+            OctreeOrientation orientation)
+        {
+            visitor(
+                bounds,
+                depth,
+                node);
+
+            if (!node.isBranch())
+            {
+                return;
+            }
+
+            for (std::size_t i = 0;
+                 i < 8;
+                 ++i)
+            {
+                if (!node.children[i])
+                {
+                    continue;
+                }
+
+                readRecursive(
+                    *node.children[i],
+                    childBounds(
+                        bounds,
+                        remapIndex(
+                            i,
+                            orientation)),
+                    depth + 1,
+                    visitor,
+                    orientation);
+            }
+        }
+
         static void appendMesh(
-            Mesh3f &dst,
-            const Mesh3f &src)
+            Mesh3f& dst,
+            const Mesh3f& src)
         {
             const auto offset =
                 dst.vertexCount();
 
-            for (const auto &vertex :
+            for (const auto& vertex :
                  src.getVertices())
             {
                 (void)dst.addVertex(
                     vertex);
             }
 
-            for (const auto &edge :
+            for (const auto& edge :
                  src.getEdges())
             {
                 dst.addEdge(
@@ -265,7 +318,7 @@ namespace geometry
                     edge.v2 + offset);
             }
 
-            for (const auto &face :
+            for (const auto& face :
                  src.getFaces())
             {
                 dst.addFace(
@@ -276,9 +329,9 @@ namespace geometry
         }
 
         static void buildMesh(
-            Mesh3f &mesh,
-            const OctreeNode &node,
-            const AABB &bounds,
+            Mesh3f& mesh,
+            const OctreeNode& node,
+            const AABB& bounds,
             OctreeOrientation orientation)
         {
             if (node.isEmpty())
@@ -292,8 +345,8 @@ namespace geometry
                     bounds.center();
 
                 const auto size =
-                    bounds.maximum -
-                    bounds.minimum;
+                    bounds.m_maximum -
+                    bounds.m_minimum;
 
                 Mesh3f cube =
                     Cube(size[0])
@@ -313,23 +366,30 @@ namespace geometry
                  i < 8;
                  ++i)
             {
-                const auto octant =
-                    remapIndex(
-                        i,
-                        orientation);
+                if (!node.children[i])
+                {
+                    continue;
+                }
 
                 buildMesh(
                     mesh,
                     *node.children[i],
                     childBounds(
                         bounds,
-                        octant),
+                        remapIndex(
+                            i,
+                            orientation)),
                     orientation);
             }
         }
 
     private:
+
         AABB m_bounds;
+
+        OctreeOrientation m_orientation =
+            OctreeOrientation::
+                CounterClockwiseBottomToTop;
 
         OctreeNode m_root;
     };
