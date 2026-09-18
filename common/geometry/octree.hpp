@@ -5,14 +5,24 @@
 
 #include <array>
 #include <memory>
-#include <string>
-#include <string_view>
-#include <stdexcept>
 #include <algorithm>
 
 namespace geometry
 {
-    enum class OctreeNodeType
+    struct AABB
+    {
+        Point3f minimum;
+        Point3f maximum;
+
+        [[nodiscard]]
+        Point3f center() const
+        {
+            return minimum.midpoint(
+                maximum);
+        }
+    };
+
+    enum class OctreeState
     {
         Empty,
         Filled,
@@ -30,59 +40,48 @@ namespace geometry
 
     struct OctreeNode
     {
-        OctreeNodeType type =
-            OctreeNodeType::Empty;
+        OctreeState state =
+            OctreeState::Empty;
 
         std::array<
             std::unique_ptr<OctreeNode>,
             8>
             children;
 
-        OctreeNode() = default;
-
-        explicit OctreeNode(
-            OctreeNodeType t)
-            : type(t)
-        {
-        }
-
         [[nodiscard]]
         bool isEmpty() const
         {
-            return type ==
-                   OctreeNodeType::Empty;
+            return state ==
+                   OctreeState::Empty;
         }
 
         [[nodiscard]]
         bool isFilled() const
         {
-            return type ==
-                   OctreeNodeType::Filled;
+            return state ==
+                   OctreeState::Filled;
         }
 
         [[nodiscard]]
         bool isBranch() const
         {
-            return type ==
-                   OctreeNodeType::Branch;
+            return state ==
+                   OctreeState::Branch;
         }
 
         void makeBranch()
         {
-            if (isBranch())
-            {
-                return;
-            }
-
-            type =
-                OctreeNodeType::Branch;
+            state =
+                OctreeState::Branch;
 
             for (auto &child : children)
             {
-                child =
-                    std::make_unique<
-                        OctreeNode>(
-                        OctreeNodeType::Empty);
+                if (!child)
+                {
+                    child =
+                        std::make_unique<
+                            OctreeNode>();
+                }
             }
         }
     };
@@ -93,51 +92,21 @@ namespace geometry
         Octree(
             const Point3f &minimum,
             const Point3f &maximum)
-            : m_minimum(minimum),
-              m_maximum(maximum)
+            : m_bounds{
+                  minimum,
+                  maximum}
         {
         }
 
-        Octree(
-            const Point3f &minimum,
-            const Point3f &maximum,
-            std::string_view text)
-            : m_minimum(minimum),
-              m_maximum(maximum)
+        template <typename Classifier>
+        void build(
+            Classifier &&classifier)
         {
-            parse(text);
-        }
-
-        void parse(
-            std::string_view text)
-        {
-            std::size_t cursor = 0;
-
-            auto root =
-                parseNode(
-                    text,
-                    cursor);
-
-            if (cursor != text.size())
-            {
-                throw std::runtime_error(
-                    "Unexpected characters");
-            }
-
-            m_root =
-                std::move(*root);
-        }
-
-        [[nodiscard]]
-        std::string serialize() const
-        {
-            std::string text;
-
-            serializeNode(
+            buildRecursive(
                 m_root,
-                text);
-
-            return text;
+                m_bounds,
+                0,
+                classifier);
         }
 
         [[nodiscard]]
@@ -151,14 +120,46 @@ namespace geometry
             buildMesh(
                 mesh,
                 m_root,
-                m_minimum,
-                m_maximum,
+                m_bounds,
                 orientation);
 
             return mesh;
         }
 
     private:
+        template <typename Classifier>
+        static void buildRecursive(
+            OctreeNode &node,
+            const AABB &bounds,
+            std::size_t depth,
+            Classifier &&classifier)
+        {
+            node.state =
+                classifier(
+                    bounds,
+                    depth);
+
+            if (!node.isBranch())
+            {
+                return;
+            }
+
+            node.makeBranch();
+
+            for (std::size_t i = 0;
+                 i < 8;
+                 ++i)
+            {
+                buildRecursive(
+                    *node.children[i],
+                    childBounds(
+                        bounds,
+                        i),
+                    depth + 1,
+                    classifier);
+            }
+        }
+
         static std::size_t remapIndex(
             std::size_t index,
             OctreeOrientation orientation)
@@ -200,138 +201,46 @@ namespace geometry
                    (z << 2);
         }
 
-        static std::unique_ptr<OctreeNode>
-        parseNode(
-            std::string_view text,
-            std::size_t &cursor)
-        {
-            if (cursor >= text.size())
-            {
-                throw std::runtime_error(
-                    "Unexpected end");
-            }
-
-            const char c =
-                text[cursor++];
-
-            if (c == '0')
-            {
-                return std::make_unique<
-                    OctreeNode>(
-                    OctreeNodeType::Empty);
-            }
-
-            if (c == '1')
-            {
-                return std::make_unique<
-                    OctreeNode>(
-                    OctreeNodeType::Filled);
-            }
-
-            if (c == '{')
-            {
-                auto node =
-                    std::make_unique<
-                        OctreeNode>();
-
-                node->makeBranch();
-
-                for (std::size_t i = 0; i < 8; ++i)
-                {
-                    node->children[i] =
-                        parseNode(
-                            text,
-                            cursor);
-                }
-
-                if (cursor >= text.size())
-                {
-                    throw std::runtime_error(
-                        "Missing }");
-                }
-
-                if (text[cursor] != '}')
-                {
-                    throw std::runtime_error(
-                        "Missing }");
-                }
-
-                ++cursor;
-
-                return node;
-            }
-
-            throw std::runtime_error(
-                "Invalid character");
-        }
-
-        static void serializeNode(
-            const OctreeNode &node,
-            std::string &text)
-        {
-            if (node.isEmpty())
-            {
-                text.push_back('0');
-                return;
-            }
-
-            if (node.isFilled())
-            {
-                text.push_back('1');
-                return;
-            }
-
-            text.push_back('{');
-
-            for (std::size_t i = 0; i < 8; ++i)
-            {
-                serializeNode(
-                    *node.children[i],
-                    text);
-            }
-
-            text.push_back('}');
-        }
-
-        static void splitBounds(
-            const Point3f &min,
-            const Point3f &max,
-            std::size_t index,
-            Point3f &childMin,
-            Point3f &childMax)
+        static AABB childBounds(
+            const AABB &parent,
+            std::size_t index)
         {
             const auto center =
-                min.midpoint(max);
+                parent.center();
 
-            childMin[0] =
+            AABB child;
+
+            child.minimum[0] =
                 (index & 1)
                     ? center[0]
-                    : min[0];
+                    : parent.minimum[0];
 
-            childMax[0] =
+            child.maximum[0] =
                 (index & 1)
-                    ? max[0]
+                    ? parent.maximum[0]
                     : center[0];
 
-            childMin[1] =
+            child.minimum[1] =
                 (index & 2)
                     ? center[1]
-                    : min[1];
+                    : parent.minimum[1];
 
-            childMax[1] =
+            child.maximum[1] =
                 (index & 2)
-                    ? max[1]
+                    ? parent.maximum[1]
                     : center[1];
 
-            childMin[2] =
+            child.minimum[2] =
                 (index & 4)
                     ? center[2]
-                    : min[2];
+                    : parent.minimum[2];
 
-            childMax[2] =
+            child.maximum[2] =
                 (index & 4)
-                    ? max[2]
+                    ? parent.maximum[2]
                     : center[2];
+
+            return child;
         }
 
         static void appendMesh(
@@ -369,8 +278,7 @@ namespace geometry
         static void buildMesh(
             Mesh3f &mesh,
             const OctreeNode &node,
-            const Point3f &min,
-            const Point3f &max,
+            const AABB &bounds,
             OctreeOrientation orientation)
         {
             if (node.isEmpty())
@@ -381,10 +289,11 @@ namespace geometry
             if (node.isFilled())
             {
                 const auto center =
-                    min.midpoint(max);
+                    bounds.center();
 
                 const auto size =
-                    max - min;
+                    bounds.maximum -
+                    bounds.minimum;
 
                 Mesh3f cube =
                     Cube(size[0])
@@ -400,35 +309,27 @@ namespace geometry
                 return;
             }
 
-            for (std::size_t i = 0; i < 8; ++i)
+            for (std::size_t i = 0;
+                 i < 8;
+                 ++i)
             {
                 const auto octant =
                     remapIndex(
                         i,
                         orientation);
 
-                Point3f childMin;
-                Point3f childMax;
-
-                splitBounds(
-                    min,
-                    max,
-                    octant,
-                    childMin,
-                    childMax);
-
                 buildMesh(
                     mesh,
                     *node.children[i],
-                    childMin,
-                    childMax,
+                    childBounds(
+                        bounds,
+                        octant),
                     orientation);
             }
         }
 
     private:
-        Point3f m_minimum;
-        Point3f m_maximum;
+        AABB m_bounds;
 
         OctreeNode m_root;
     };

@@ -98,24 +98,49 @@ private:
         drawPropertiesPanel();
     }
 
-    // Antes eram 12 chamadas manuais a drawFace, uma por triângulo, com o
-    // winding da face "Trás" escrito na ordem contrária às demais (sem
-    // comentário explicando por quê). Substituído por uma tabela de faces
-    // com convenção única (a,b,c)+(a,c,d), então toda face segue a mesma
-    // regra e o outward winding fica implícito na ordem dos índices.
     void drawScene(Drawer &drawer)
     {
         using namespace geometry;
 
         Octree tree(
             {-8.f, -8.f, -8.f},
-            {8.f, 8.f, 8.f},
-            "{0010{00011010}11{00101101}}");
+            {8.f, 8.f, 8.f});
+
+        const std::string data =
+            "{{01100001}010{00101101}011{11001101}}";
+
+        std::size_t cursor = 0;
+
+        tree.build(
+            [&data, &cursor](const AABB &bounds,
+               std::size_t depth)
+            {
+                while (cursor < data.size())
+                {
+                    const char c =
+                        data[cursor++];
+
+                    switch (c)
+                    {
+                    case '0':
+                        return OctreeState::Empty;
+
+                    case '1':
+                        return OctreeState::Filled;
+
+                    case '{':
+                        return OctreeState::Branch;
+
+                    case '}':
+                        continue;
+                    }
+                }
+
+                return OctreeState::Empty;
+            });
 
         drawer.drawMesh(
-            tree.toMesh(
-                OctreeOrientation::
-                    ClockwiseBottomToTop),
+            tree.toMesh(),
             Color::Green());
     }
 
