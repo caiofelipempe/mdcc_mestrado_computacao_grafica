@@ -183,34 +183,34 @@ namespace geometry
 
             AABB child;
 
-            child.m_minimum[0] =
+            child.minimum()[0] =
                 (index & 1)
                     ? center[0]
-                    : parent.m_minimum[0];
+                    : parent.minimum()[0];
 
-            child.m_maximum[0] =
+            child.maximum()[0] =
                 (index & 1)
-                    ? parent.m_maximum[0]
+                    ? parent.maximum()[0]
                     : center[0];
 
-            child.m_minimum[1] =
+            child.minimum()[1] =
                 (index & 2)
                     ? center[1]
-                    : parent.m_minimum[1];
+                    : parent.minimum()[1];
 
-            child.m_maximum[1] =
+            child.maximum()[1] =
                 (index & 2)
-                    ? parent.m_maximum[1]
+                    ? parent.maximum()[1]
                     : center[1];
 
-            child.m_minimum[2] =
+            child.minimum()[2] =
                 (index & 4)
                     ? center[2]
-                    : parent.m_minimum[2];
+                    : parent.minimum()[2];
 
-            child.m_maximum[2] =
+            child.maximum()[2] =
                 (index & 4)
-                    ? parent.m_maximum[2]
+                    ? parent.maximum()[2]
                     : center[2];
 
             return child;
@@ -342,8 +342,8 @@ namespace geometry
                     bounds.center();
 
                 const auto size =
-                    bounds.m_maximum -
-                    bounds.m_minimum;
+                    bounds.maximum() -
+                    bounds.minimum();
 
                 Mesh3f cube =
                     Cube(size[0])

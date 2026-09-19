@@ -47,6 +47,30 @@ namespace geometry
         {
         }
 
+        const Point3f& minimum() const {
+            return m_minimum;
+        }
+
+        Point3f& minimum() {
+            return m_minimum;
+        }
+
+        void minimum(Point3f set) {
+            m_minimum = set;
+        }
+
+        const Point3f& maximum() const {
+            return m_maximum;
+        }
+
+        Point3f& maximum() {
+            return m_maximum;
+        }
+
+        void maximum(Point3f set) {
+            m_maximum = set;
+        }
+
         [[nodiscard]]
         Point3f center() const override
         {
@@ -210,7 +234,7 @@ namespace geometry
                 maximum};
         }
 
-    public:
+    private:
         Point3f m_minimum{};
         Point3f m_maximum{};
     };
