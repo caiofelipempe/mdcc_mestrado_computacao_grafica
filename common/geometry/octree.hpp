@@ -9,7 +9,6 @@
 
 namespace geometry
 {
-
     enum class OctreeState
     {
         Empty,
@@ -33,7 +32,8 @@ namespace geometry
 
         std::array<
             std::unique_ptr<OctreeNode>,
-            8> children;
+            8>
+            children;
 
         [[nodiscard]]
         bool isEmpty() const
@@ -61,7 +61,7 @@ namespace geometry
             state =
                 OctreeState::Branch;
 
-            for (auto& child : children)
+            for (auto &child : children)
             {
                 if (!child)
                 {
@@ -76,19 +76,18 @@ namespace geometry
     class Octree
     {
     public:
-
         Octree(
-            const Point3f& minimum,
-            const Point3f& maximum)
+            const Point3f &minimum,
+            const Point3f &maximum)
             : m_bounds{
-                minimum,
-                maximum}
+                  minimum,
+                  maximum}
         {
         }
 
-        template<typename Classifier>
+        template <typename Classifier>
         void build(
-            Classifier&& classifier,
+            Classifier &&classifier,
             OctreeOrientation orientation =
                 OctreeOrientation::
                     CounterClockwiseBottomToTop)
@@ -107,9 +106,9 @@ namespace geometry
                 orientation);
         }
 
-        template<typename Visitor>
+        template <typename Visitor>
         void read(
-            Visitor&& visitor) const
+            Visitor &&visitor) const
         {
             readRecursive(
                 m_root,
@@ -134,7 +133,6 @@ namespace geometry
         }
 
     private:
-
         static std::size_t remapIndex(
             std::size_t index,
             OctreeOrientation orientation)
@@ -171,14 +169,13 @@ namespace geometry
                 break;
             }
 
-            return
-                x |
-                (y << 1) |
-                (z << 2);
+            return x |
+                   (y << 1) |
+                   (z << 2);
         }
 
         static AABB childBounds(
-            const AABB& parent,
+            const AABB &parent,
             std::size_t index)
         {
             const auto center =
@@ -219,12 +216,12 @@ namespace geometry
             return child;
         }
 
-        template<typename Classifier>
+        template <typename Classifier>
         static void buildRecursive(
-            OctreeNode& node,
-            const AABB& bounds,
+            OctreeNode &node,
+            const AABB &bounds,
             std::size_t depth,
-            Classifier&& classifier,
+            Classifier &&classifier,
             OctreeOrientation orientation)
         {
             node.state =
@@ -256,12 +253,12 @@ namespace geometry
             }
         }
 
-        template<typename Visitor>
+        template <typename Visitor>
         static void readRecursive(
-            const OctreeNode& node,
-            const AABB& bounds,
+            const OctreeNode &node,
+            const AABB &bounds,
             std::size_t depth,
-            Visitor&& visitor,
+            Visitor &&visitor,
             OctreeOrientation orientation)
         {
             visitor(
@@ -297,20 +294,20 @@ namespace geometry
         }
 
         static void appendMesh(
-            Mesh3f& dst,
-            const Mesh3f& src)
+            Mesh3f &dst,
+            const Mesh3f &src)
         {
             const auto offset =
                 dst.vertexCount();
 
-            for (const auto& vertex :
+            for (const auto &vertex :
                  src.getVertices())
             {
                 (void)dst.addVertex(
                     vertex);
             }
 
-            for (const auto& edge :
+            for (const auto &edge :
                  src.getEdges())
             {
                 dst.addEdge(
@@ -318,7 +315,7 @@ namespace geometry
                     edge.v2 + offset);
             }
 
-            for (const auto& face :
+            for (const auto &face :
                  src.getFaces())
             {
                 dst.addFace(
@@ -329,9 +326,9 @@ namespace geometry
         }
 
         static void buildMesh(
-            Mesh3f& mesh,
-            const OctreeNode& node,
-            const AABB& bounds,
+            Mesh3f &mesh,
+            const OctreeNode &node,
+            const AABB &bounds,
             OctreeOrientation orientation)
         {
             if (node.isEmpty())
@@ -384,7 +381,6 @@ namespace geometry
         }
 
     private:
-
         AABB m_bounds;
 
         OctreeOrientation m_orientation =

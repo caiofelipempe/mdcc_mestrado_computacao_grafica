@@ -79,10 +79,6 @@ protected:
     }
 
 private:
-    // Estado do mouse do frame anterior. Antes eram `static` locais dentro
-    // de onUpdate — movidos para membros para não depender de estado
-    // escondido em função e para poderem ser reiniciados em onInit se
-    // necessário no futuro (ex.: ao trocar de câmera).
     double m_lastMouseX = 0.0;
     double m_lastMouseY = 0.0;
 
