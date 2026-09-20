@@ -5,6 +5,7 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <functional>
 
 #include "shape.hpp"
 #include "octree.hpp"
@@ -23,7 +24,10 @@ class Trabalho01 : public RendererGlfwOpengl
 {
 
 public:
-    Trabalho01() = default;
+    Trabalho01(std::function<void(Drawer &)> draw)
+        : m_drawLambda(draw)
+    {
+    }
 
 protected:
     void onInit(
@@ -79,6 +83,7 @@ protected:
     }
 
 private:
+    std::function<void(Drawer &)> m_drawLambda;
     double m_lastMouseX = 0.0;
     double m_lastMouseY = 0.0;
 
@@ -96,48 +101,7 @@ private:
 
     void drawScene(Drawer &drawer)
     {
-        using namespace geometry;
-
-        Octree tree(
-            {-8.f, -8.f, -8.f},
-            {8.f, 8.f, 8.f});
-
-        const std::string data =
-            "{{01100001}010{00101101}011{11001101}}";
-
-        std::size_t cursor = 0;
-
-        tree.build(
-            [&data, &cursor](const AABB &bounds,
-               std::size_t depth)
-            {
-                while (cursor < data.size())
-                {
-                    const char c =
-                        data[cursor++];
-
-                    switch (c)
-                    {
-                    case '0':
-                        return OctreeState::Empty;
-
-                    case '1':
-                        return OctreeState::Filled;
-
-                    case '{':
-                        return OctreeState::Branch;
-
-                    case '}':
-                        continue;
-                    }
-                }
-
-                return OctreeState::Empty;
-            });
-
-        drawer.drawMesh(
-            tree.toMesh(),
-            Color::Green());
+        m_drawLambda(drawer);
     }
 
     void drawToolsPanel()
@@ -201,9 +165,63 @@ private:
     }
 };
 
+static OctreeState sphereBuild(AABB const& aabb, Sphere const& sphere)
+{
+    auto const sqrRadius = sphere.radius() * sphere.radius();
+    auto const min = aabb.minimum();
+    auto const max = aabb.maximum();
+    Vec3 const furthestVertex{
+        (std::abs(min[0]) > std::abs(max[0])) ? min[0] : max[0],
+        (std::abs(min[1]) > std::abs(max[1])) ? min[1] : max[1],
+        (std::abs(min[2]) > std::abs(max[2])) ? min[2] : max[2]
+    };
+
+    if (furthestVertex.sqrNorm() <= sqrRadius)
+    {
+        return OctreeState::Filled;
+    }
+
+    Vec3 const closestPoint{
+        std::clamp(0.f, min[0], max[0]),
+        std::clamp(0.f, min[1], max[1]),
+        std::clamp(0.f, min[2], max[2])
+    };
+
+    if (closestPoint.sqrNorm() <= sqrRadius)
+    {
+        return OctreeState::Branch;
+    }
+
+    return OctreeState::Empty;
+}
+
 int main()
 {
-    Trabalho01 app;
+    using namespace geometry;
+
+    auto sphere = Sphere(10);
+    auto diagonal = sphere.radius() * (float)sqrt(1.0f);
+
+    Octree tree(
+        {-diagonal, -diagonal, -diagonal},
+        {diagonal, diagonal, diagonal});
+
+    tree.build(
+        [&sphere](const AABB &bounds,
+                  std::size_t depth)
+        {
+            auto result = sphereBuild(bounds, sphere);
+            if (depth > 4 && result == OctreeState::Branch)
+                return OctreeState::Filled;
+            return result;
+        });
+
+    auto mesh = tree.toMesh();
+
+    Trabalho01 app([&mesh](Drawer &drawer)
+                   { drawer.drawMesh(
+                         mesh,
+                         Color::Green()); });
 
     app.run(
         1280,

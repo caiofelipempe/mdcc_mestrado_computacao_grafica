@@ -79,7 +79,6 @@ namespace geometry
             return ring;
         }
 
-        // `lower` deve estar abaixo de `upper`; gera faces com normal para fora.
         static void connectRings(
             Mesh3f &mesh,
             const std::vector<std::size_t> &lower,
@@ -102,7 +101,6 @@ namespace geometry
             }
         }
 
-        // Leque entre um vértice único (ápice ou centro de tampa) e um anel.
         static void connectApex(
             Mesh3f &mesh,
             std::size_t apex,
@@ -460,6 +458,15 @@ namespace geometry
 
     private:
         float m_radius;
+
+    public:
+        float& radius() {
+            return m_radius;
+        }
+
+        const float& radius() const {
+            return m_radius;
+        }
     };
 
     // ============================================================================
