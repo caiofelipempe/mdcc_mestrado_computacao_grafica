@@ -165,7 +165,7 @@ private:
     }
 };
 
-static OctreeState sphereBuild(AABB const& aabb, Sphere const& sphere)
+static OctreeState sphereBuild(AABB const &aabb, Sphere const &sphere)
 {
     auto const sqrRadius = sphere.radius() * sphere.radius();
     auto const min = aabb.minimum();
@@ -173,8 +173,7 @@ static OctreeState sphereBuild(AABB const& aabb, Sphere const& sphere)
     Vec3 const furthestVertex{
         (std::abs(min[0]) > std::abs(max[0])) ? min[0] : max[0],
         (std::abs(min[1]) > std::abs(max[1])) ? min[1] : max[1],
-        (std::abs(min[2]) > std::abs(max[2])) ? min[2] : max[2]
-    };
+        (std::abs(min[2]) > std::abs(max[2])) ? min[2] : max[2]};
 
     if (furthestVertex.sqrNorm() <= sqrRadius)
     {
@@ -184,8 +183,7 @@ static OctreeState sphereBuild(AABB const& aabb, Sphere const& sphere)
     Vec3 const closestPoint{
         std::clamp(0.f, min[0], max[0]),
         std::clamp(0.f, min[1], max[1]),
-        std::clamp(0.f, min[2], max[2])
-    };
+        std::clamp(0.f, min[2], max[2])};
 
     if (closestPoint.sqrNorm() <= sqrRadius)
     {
@@ -195,22 +193,150 @@ static OctreeState sphereBuild(AABB const& aabb, Sphere const& sphere)
     return OctreeState::Empty;
 }
 
+static OctreeState blockBuild(
+    AABB const &aabb,
+    Block const &block)
+{
+    auto const half =
+        block.boundSize() * 0.5f;
+
+    auto const min =
+        aabb.minimum();
+
+    auto const max =
+        aabb.maximum();
+
+    Vec3 const furthestVertex{
+        (std::abs(min[0]) > std::abs(max[0]))
+            ? min[0]
+            : max[0],
+
+        (std::abs(min[1]) > std::abs(max[1]))
+            ? min[1]
+            : max[1],
+
+        (std::abs(min[2]) > std::abs(max[2]))
+            ? min[2]
+            : max[2]};
+
+    if (
+        std::abs(furthestVertex[0]) <= half[0] &&
+        std::abs(furthestVertex[1]) <= half[1] &&
+        std::abs(furthestVertex[2]) <= half[2])
+    {
+        return OctreeState::Filled;
+    }
+
+    if (
+        max[0] < -half[0] ||
+        min[0] > half[0] ||
+
+        max[1] < -half[1] ||
+        min[1] > half[1] ||
+
+        max[2] < -half[2] ||
+        min[2] > half[2])
+    {
+        return OctreeState::Empty;
+    }
+
+    return OctreeState::Branch;
+}
+
+static OctreeState cylinderBuild(
+    AABB const &aabb,
+    Cylinder const &cylinder)
+{
+    auto const sqrRadius =
+        cylinder.radius() *
+        cylinder.radius();
+
+    auto const halfHeight =
+        cylinder.height() * 0.5f;
+
+    auto const min =
+        aabb.minimum();
+
+    auto const max =
+        aabb.maximum();
+
+    Vec3 const furthestVertex{
+        (std::abs(min[0]) > std::abs(max[0]))
+            ? min[0]
+            : max[0],
+
+        (std::abs(min[1]) > std::abs(max[1]))
+            ? min[1]
+            : max[1],
+
+        (std::abs(min[2]) > std::abs(max[2]))
+            ? min[2]
+            : max[2]};
+
+    auto const furthestRadialSquared =
+        furthestVertex[0] *
+            furthestVertex[0] +
+        furthestVertex[2] *
+            furthestVertex[2];
+
+    if (
+        furthestRadialSquared <= sqrRadius &&
+        std::abs(furthestVertex[1]) <= halfHeight)
+    {
+        return OctreeState::Filled;
+    }
+
+    Vec3 const closestPoint{
+        std::clamp(
+            0.f,
+            min[0],
+            max[0]),
+
+        std::clamp(
+            0.f,
+            min[1],
+            max[1]),
+
+        std::clamp(
+            0.f,
+            min[2],
+            max[2])};
+
+    auto const closestRadialSquared =
+        closestPoint[0] *
+            closestPoint[0] +
+        closestPoint[2] *
+            closestPoint[2];
+
+    if (
+        closestRadialSquared > sqrRadius ||
+        closestPoint[1] < -halfHeight ||
+        closestPoint[1] > halfHeight)
+    {
+        return OctreeState::Empty;
+    }
+
+    return OctreeState::Branch;
+}
+
 int main()
 {
     using namespace geometry;
 
     auto sphere = Sphere(10);
-    auto diagonal = sphere.radius() * (float)sqrt(1.0f);
+    auto diagonal = sphere.radius();
+
+    auto cylinder = Cylinder(5, 5);
 
     Octree tree(
         {-diagonal, -diagonal, -diagonal},
         {diagonal, diagonal, diagonal});
 
     tree.build(
-        [&sphere](const AABB &bounds,
+        [&cylinder](const AABB &bounds,
                   std::size_t depth)
         {
-            auto result = sphereBuild(bounds, sphere);
+            auto result = cylinderBuild(bounds, cylinder);
             if (depth > 4 && result == OctreeState::Branch)
                 return OctreeState::Filled;
             return result;

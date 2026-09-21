@@ -460,11 +460,13 @@ namespace geometry
         float m_radius;
 
     public:
-        float& radius() {
+        float &radius()
+        {
             return m_radius;
         }
 
-        const float& radius() const {
+        const float &radius() const
+        {
             return m_radius;
         }
     };
@@ -543,6 +545,12 @@ namespace geometry
     private:
         float m_radius;
         float m_height;
+
+    public:
+        float &radius() { return m_radius; }
+        const float &radius() const { return m_radius; }
+        float &height() { return m_height; }
+        const float &height() const { return m_height; }
     };
 
     // ============================================================================
@@ -618,6 +626,12 @@ namespace geometry
     private:
         float m_radius;
         float m_height;
+
+    public:
+        float &radius() { return m_radius; }
+        const float &radius() const { return m_radius; }
+        float &height() { return m_height; }
+        const float &height() const { return m_height; }
     };
 
     // ============================================================================
