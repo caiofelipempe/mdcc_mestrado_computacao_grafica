@@ -40,7 +40,9 @@ public:
     virtual void drawMeshes(
         const geometry::Mesh3f* meshes,
         std::size_t count,
-        const Color& color) = 0;
+        const Color& faceColor,
+        const Color& edgeColor,
+        const Color& vertexColor) = 0;
 
     // -------------------------------------------------------------
     // Elementos individuais
@@ -64,11 +66,9 @@ public:
         const Color& color,
         float width = 1.0f)
     {
-        const geometry::Point3f points[2] =
-        {
+        const geometry::Point3f points[2]{
             a,
-            b
-        };
+            b};
 
         drawLines(
             points,
@@ -83,12 +83,10 @@ public:
         const geometry::Point3f& c,
         const Color& color)
     {
-        const geometry::Point3f points[3] =
-        {
+        const geometry::Point3f points[3]{
             a,
             b,
-            c
-        };
+            c};
 
         drawFaces(
             points,
@@ -98,12 +96,24 @@ public:
 
     void drawMesh(
         const geometry::Mesh3f& mesh,
-        const Color& color)
+        const Color& faceColor,
+        const Color& edgeColor = {
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f},
+        const Color& vertexColor = {
+            1.0f,
+            0.0f,
+            0.0f,
+            1.0f})
     {
         drawMeshes(
             &mesh,
             1,
-            color);
+            faceColor,
+            edgeColor,
+            vertexColor);
     }
 
     // -------------------------------------------------------------
@@ -155,14 +165,26 @@ public:
 
     void drawMeshes(
         const std::vector<geometry::Mesh3f>& meshes,
-        const Color& color)
+        const Color& faceColor,
+        const Color& edgeColor = {
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f},
+        const Color& vertexColor = {
+            1.0f,
+            0.0f,
+            0.0f,
+            1.0f})
     {
         if (!meshes.empty())
         {
             drawMeshes(
                 meshes.data(),
                 meshes.size(),
-                color);
+                faceColor,
+                edgeColor,
+                vertexColor);
         }
     }
 
@@ -170,7 +192,7 @@ public:
     // Wrappers std::array
     // -------------------------------------------------------------
 
-    template<std::size_t N>
+    template <std::size_t N>
     void drawVertices(
         const std::array<geometry::Point3f, N>& points,
         const Color& color,
@@ -186,7 +208,7 @@ public:
         }
     }
 
-    template<std::size_t N>
+    template <std::size_t N>
     void drawLines(
         const std::array<geometry::Point3f, N>& points,
         const Color& color,
@@ -202,7 +224,7 @@ public:
         }
     }
 
-    template<std::size_t N>
+    template <std::size_t N>
     void drawFaces(
         const std::array<geometry::Point3f, N>& points,
         const Color& color)
@@ -216,17 +238,29 @@ public:
         }
     }
 
-    template<std::size_t N>
+    template <std::size_t N>
     void drawMeshes(
         const std::array<geometry::Mesh3f, N>& meshes,
-        const Color& color)
+        const Color& faceColor,
+        const Color& edgeColor = {
+            0.0f,
+            0.0f,
+            0.0f,
+            1.0f},
+        const Color& vertexColor = {
+            1.0f,
+            0.0f,
+            0.0f,
+            1.0f})
     {
         if constexpr (N > 0)
         {
             drawMeshes(
                 meshes.data(),
                 N,
-                color);
+                faceColor,
+                edgeColor,
+                vertexColor);
         }
     }
 };

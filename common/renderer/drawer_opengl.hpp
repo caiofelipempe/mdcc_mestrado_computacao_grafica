@@ -2,12 +2,13 @@
 
 #include "drawer.hpp"
 
-class DrawerOpengl final : public Drawer
+class DrawerOpengl final :
+    public Drawer
 {
 public:
+
     ~DrawerOpengl() override = default;
 
-    // Traz as sobrecargas do std::vector e std::array da classe base para o escopo
     using Drawer::drawVertices;
     using Drawer::drawLines;
     using Drawer::drawFaces;
@@ -36,5 +37,7 @@ public:
     void drawMeshes(
         const geometry::Mesh3f* meshes,
         std::size_t count,
-        const Color& color) override;
+        const Color& faceColor,
+        const Color& edgeColor,
+        const Color& vertexColor) override;
 };

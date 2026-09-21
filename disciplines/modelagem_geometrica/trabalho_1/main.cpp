@@ -334,20 +334,23 @@ int main()
 
     tree.build(
         [&cylinder](const AABB &bounds,
-                  std::size_t depth)
+                    std::size_t depth)
         {
             auto result = cylinderBuild(bounds, cylinder);
-            if (depth > 4 && result == OctreeState::Branch)
+            if (depth > 3 && result == OctreeState::Branch)
                 return OctreeState::Filled;
             return result;
         });
 
     auto mesh = tree.toMesh();
+    mesh.getEdges().clear();
 
     Trabalho01 app([&mesh](Drawer &drawer)
                    { drawer.drawMesh(
                          mesh,
-                         Color::Green()); });
+                         Color::Green(),
+                         Color::Transparent(),
+                         Color::Transparent()); });
 
     app.run(
         1280,
