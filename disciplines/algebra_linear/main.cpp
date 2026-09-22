@@ -10,7 +10,7 @@
 #include <GL/glu.h>
 
 #include <iomanip>
-#include <vector.hpp>
+#include <algebric_vector.hpp>
 #include <chrono>
 
 // ============================================================

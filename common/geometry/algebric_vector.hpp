@@ -1,6 +1,6 @@
 #pragma once
 
-#include "arithmetic.hpp"
+#include "algebra.hpp"
 
 #include <span>
 #include <initializer_list>
@@ -12,10 +12,10 @@ namespace geometry
 {
 
     /**
-     * @brief Vetor matemático baseado em arithmetic.hpp
+     * @brief Vetor matemático baseado em algebra.hpp
      */
     template <Scalar T, std::size_t N>
-    class Vector
+    class AlgebricVector
     {
     public:
         using ValueType = T;
@@ -25,13 +25,13 @@ namespace geometry
 
         /* ================= CONSTRUTORES ================= */
 
-        constexpr Vector()
+        constexpr AlgebricVector()
         {
             if constexpr (N != 0)
                 data.fill(T{});
         }
 
-        explicit Vector(std::size_t size)
+        explicit AlgebricVector(std::size_t size)
             requires(N == 0)
             : data(size, T{})
         {
@@ -41,7 +41,7 @@ namespace geometry
         // mesmo N sendo conhecido em compile-time — limitação inerente de
         // std::initializer_list em C++. Ver construtor variádico abaixo para
         // uma alternativa checada em compile-time quando N != 0.
-        Vector(std::initializer_list<T> init)
+        AlgebricVector(std::initializer_list<T> init)
         {
             if constexpr (N == 0)
             {
@@ -63,13 +63,13 @@ namespace geometry
         // só oferece uma via extra mais segura pra quem quiser.
         template <typename... Args>
             requires(N != 0 && sizeof...(Args) == N && (std::convertible_to<Args, T> && ...))
-        constexpr Vector(Args &&...args)
+        constexpr AlgebricVector(Args &&...args)
         {
             T tmp[N] = {static_cast<T>(args)...};
             std::copy(std::begin(tmp), std::end(tmp), data.begin());
         }
 
-        explicit Vector(const Storage &storage)
+        explicit AlgebricVector(const Storage &storage)
             : data(storage) {}
 
         /* ================= ACESSO ================= */
@@ -90,54 +90,54 @@ namespace geometry
 
         /* ================= OPERADORES ================= */
 
-        [[nodiscard]] Vector operator+(const Vector &rhs) const
+        [[nodiscard]] AlgebricVector operator+(const AlgebricVector &rhs) const
         {
-            return Vector{geometry::operator+ <T, N>(data, rhs.data)};
+            return AlgebricVector{geometry::operator+ <T, N>(data, rhs.data)};
         }
 
-        [[nodiscard]] Vector operator-(const Vector &rhs) const
+        [[nodiscard]] AlgebricVector operator-(const AlgebricVector &rhs) const
         {
-            return Vector{geometry::operator- <T, N>(data, rhs.data)};
+            return AlgebricVector{geometry::operator- <T, N>(data, rhs.data)};
         }
 
-        [[nodiscard]] Vector operator*(const Vector &rhs) const
+        [[nodiscard]] AlgebricVector operator*(const AlgebricVector &rhs) const
         {
-            return Vector{geometry::operator* <T, N>(data, rhs.data)};
+            return AlgebricVector{geometry::operator* <T, N>(data, rhs.data)};
         }
 
-        [[nodiscard]] Vector operator*(T scalar) const
+        [[nodiscard]] AlgebricVector operator*(T scalar) const
         {
-            return Vector{geometry::mul<T, N>(data, scalar)};
+            return AlgebricVector{geometry::mul<T, N>(data, scalar)};
         }
 
-        [[nodiscard]] Vector operator/(T scalar) const
+        [[nodiscard]] AlgebricVector operator/(T scalar) const
         {
-            Vector result = *this;
+            AlgebricVector result = *this;
             for (auto &x : result.data)
                 x /= scalar;
             return result;
         }
 
-        Vector &operator+=(const Vector &rhs)
+        AlgebricVector &operator+=(const AlgebricVector &rhs)
         {
             geometry::operator+= <T, N>(data, rhs.data);
             return *this;
         }
 
-        Vector &operator-=(const Vector &rhs)
+        AlgebricVector &operator-=(const AlgebricVector &rhs)
         {
             geometry::operator-= <T, N>(data, rhs.data);
             return *this;
         }
 
-        Vector &operator*=(T scalar)
+        AlgebricVector &operator*=(T scalar)
         {
             for (auto &x : data)
                 x *= scalar;
             return *this;
         }
 
-        Vector &operator/=(T scalar)
+        AlgebricVector &operator/=(T scalar)
         {
             for (auto &x : data)
                 x /= scalar;
@@ -146,23 +146,23 @@ namespace geometry
 
         /* ================= ÁLGEBRA ================= */
 
-        [[nodiscard]] T dot(const Vector &rhs) const
+        [[nodiscard]] T dot(const AlgebricVector &rhs) const
         {
             return geometry::dot<T, N>(data, rhs.data);
         }
 
         template <std::size_t M = N>
             requires(M == 2)
-        [[nodiscard]] T cross(const Vector &rhs) const
+        [[nodiscard]] T cross(const AlgebricVector &rhs) const
         {
             return data[0] * rhs.data[1] - data[1] * rhs.data[0];
         }
 
         template <std::size_t M = N>
             requires(M == 3)
-        [[nodiscard]] Vector cross(const Vector &rhs) const
+        [[nodiscard]] AlgebricVector cross(const AlgebricVector &rhs) const
         {
-            return Vector{geometry::cross<T, 3>(data, rhs.data)};
+            return AlgebricVector{geometry::cross<T, 3>(data, rhs.data)};
         }
 
         [[nodiscard]] T sqrNorm() const
@@ -176,40 +176,40 @@ namespace geometry
             return geometry::length<T, N>(data);
         }
 
-        [[nodiscard]] Vector normalized() const
+        [[nodiscard]] AlgebricVector normalized() const
             requires NormalizableScalar<T>
         {
-            return Vector{geometry::normalize<T, N>(data)};
+            return AlgebricVector{geometry::normalize<T, N>(data)};
         }
 
-        [[nodiscard]] Vector projectOnto(const Vector &normal) const
+        [[nodiscard]] AlgebricVector projectOnto(const AlgebricVector &normal) const
         {
-            return Vector{geometry::project<T, N>(data, normal.data)};
+            return AlgebricVector{geometry::project<T, N>(data, normal.data)};
         }
 
-        [[nodiscard]] Vector reflect(const Vector &normal) const
+        [[nodiscard]] AlgebricVector reflect(const AlgebricVector &normal) const
         {
-            return Vector{geometry::reflect<T, N>(data, normal.data)};
+            return AlgebricVector{geometry::reflect<T, N>(data, normal.data)};
         }
 
         /* ================= ROTAÇÃO / QUATÉRNIONS ================= */
 
         // Unificado M==3 (rotaciona um vetor 3D por um quatérnio) e M==4
         // (mesma chamada, aplicada a um Vector<T,4>) — corpo era idêntico nas
-        // duas versões antes. TODO confirmar com quem escreveu arithmetic.hpp:
+        // duas versões antes. TODO confirmar com quem escreveu algebra.hpp:
         // o caso M==4 é redundante com hamilton()?
         template <std::size_t M = N>
             requires(M == 3 || M == 4)
-        [[nodiscard]] Vector rotated(const Vector<T, 4> &q) const
+        [[nodiscard]] AlgebricVector rotated(const AlgebricVector<T, 4> &q) const
         {
-            return Vector{geometry::rotate<T>(data, q.data)};
+            return AlgebricVector{geometry::rotate<T>(data, q.data)};
         }
 
         template <std::size_t M = N>
             requires(M == 4)
-        [[nodiscard]] Vector hamilton(const Vector<T, 4> &q) const
+        [[nodiscard]] AlgebricVector hamilton(const AlgebricVector<T, 4> &q) const
         {
-            return Vector{geometry::hamilton<T>(data, q.data)};
+            return AlgebricVector{geometry::hamilton<T>(data, q.data)};
         }
 
         // TODO: confirmar semântica — conjugado costuma ser unário (nega a
@@ -219,9 +219,9 @@ namespace geometry
         // isso, provavelmente devia existir também para M==3, não só M==4.
         template <std::size_t M = N>
             requires(M == 4)
-        [[nodiscard]] Vector conjugated(const Vector<T, 4> &q) const
+        [[nodiscard]] AlgebricVector conjugated(const AlgebricVector<T, 4> &q) const
         {
-            return Vector{geometry::conjugate<T>(data, q.data)};
+            return AlgebricVector{geometry::conjugate<T>(data, q.data)};
         }
 
         /* ================= ITERADORES ================= */
@@ -233,11 +233,11 @@ namespace geometry
 
         /* ================= COMPARAÇÃO ================= */
 
-        [[nodiscard]] bool operator==(const Vector &) const = default;
+        [[nodiscard]] bool operator==(const AlgebricVector &) const = default;
 
         /* ================= I/O ================= */
 
-        friend std::ostream &operator<<(std::ostream &os, const Vector &v)
+        friend std::ostream &operator<<(std::ostream &os, const AlgebricVector &v)
         {
             os << "[";
             for (std::size_t i = 0; i < v.size(); ++i)
@@ -254,7 +254,7 @@ namespace geometry
     /* ================= OPERADORES GLOBAIS ================= */
 
     template <Scalar T, std::size_t N>
-    [[nodiscard]] Vector<T, N> operator*(T scalar, const Vector<T, N> &v)
+    [[nodiscard]] AlgebricVector<T, N> operator*(T scalar, const AlgebricVector<T, N> &v)
     {
         return v * scalar;
     }
@@ -262,11 +262,11 @@ namespace geometry
     /* ================= ALIASES ================= */
 
     template <Scalar T>
-    using Vec2 = Vector<T, 2>;
+    using Vec2 = AlgebricVector<T, 2>;
     template <Scalar T>
-    using Vec3 = Vector<T, 3>;
+    using Vec3 = AlgebricVector<T, 3>;
     template <Scalar T>
-    using Quat = Vector<T, 4>;
+    using Quat = AlgebricVector<T, 4>;
 
     using Vec2f = Vec2<float>;
     using Vec2d = Vec2<double>;

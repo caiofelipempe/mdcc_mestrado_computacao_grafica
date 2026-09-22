@@ -1,6 +1,6 @@
 add_library(geometry INTERFACE
-    arithmetic.hpp
-    vector.hpp
+    algebra.hpp
+    algebric_vector.hpp
     point.hpp
     mesh.hpp
     shape.hpp

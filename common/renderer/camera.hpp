@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vector.hpp"
+#include "algebric_vector.hpp"
 #include "rotator3.hpp"
 
 class Camera

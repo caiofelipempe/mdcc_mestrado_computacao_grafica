@@ -9,7 +9,7 @@
 #include <cmath>
 
 #include "point.hpp"
-#include "vector.hpp"
+#include "algebric_vector.hpp"
 #include "rotator3.hpp"
 
 namespace geometry
@@ -48,7 +48,7 @@ namespace geometry
     public:
         using ValueType = T;
         using PointType = Point<T, N>;
-        using VectorType = Vector<T, N>;
+        using VectorType = AlgebricVector<T, N>;
 
     private:
         std::vector<PointType> m_vertices;

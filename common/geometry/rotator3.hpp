@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vector.hpp"
+#include "algebric_vector.hpp"
 
 #include <cmath>
 #include <numbers>
@@ -19,7 +19,7 @@ namespace geometry
         //
         // kUnit = maior 2^n tal que 4 * kUnit^2 <= numeric_limits<T>::max().
         //
-        // Motivo do fator 4: hamilton()/dot() em arithmetic.hpp somam até 4
+        // Motivo do fator 4: hamilton()/dot() em algebra.hpp somam até 4
         // produtos de pares de componentes por saída (ex.:
         // out[0] = aw*bx + ax*bw + ay*bz - az*by). Cada produto na escala kUnit
         // vale ~kUnit^2; no pior caso os 4 termos somam no mesmo sentido, então
@@ -76,7 +76,7 @@ namespace geometry
 
     // Convenção do quaternion: (x, y, z, w) — parte vetorial nos índices
     // 0..2, escalar no índice 3. Consistente com hamilton()/rotate()/
-    // conjugate() em arithmetic.hpp.
+    // conjugate() em algebra.hpp.
     //
     // T inteiro: representação em ponto fixo. Um componente "unitário" vale
     // kUnit (não 1) — ver detail::fixedPointScale. Toda aritmética interna
@@ -100,8 +100,8 @@ namespace geometry
                       "Rotator3<T> requer T ponto flutuante ou inteiro com sinal");
 
     public:
-        using Vec3 = Vector<T, 3>;
-        using Quat = Vector<T, 4>;
+        using Vec3 = AlgebricVector<T, 3>;
+        using Quat = AlgebricVector<T, 4>;
 
         // Magnitude de um componente "unitário" (1 para ponto flutuante,
         // escala de ponto fixo para T inteiro).
@@ -114,7 +114,7 @@ namespace geometry
         // Vector::normalized(); ponto fixo calcula em double internamente
         // pra não estourar T e re-escala pro módulo kUnit.
         template <std::size_t N>
-        static Vector<T, N> normalizeAny(const Vector<T, N> &v)
+        static AlgebricVector<T, N> normalizeAny(const AlgebricVector<T, N> &v)
         {
             if constexpr (std::integral<T>)
             {
@@ -127,7 +127,7 @@ namespace geometry
 
                 const double invLen = static_cast<double>(kUnit) / std::sqrt(sumSq);
 
-                Vector<T, N> out;
+                AlgebricVector<T, N> out;
                 for (std::size_t i = 0; i < N; ++i)
                     out[i] = detail::roundToInt<T>(static_cast<double>(v[i]) * invLen);
 

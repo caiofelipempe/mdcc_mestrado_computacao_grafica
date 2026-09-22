@@ -1,6 +1,6 @@
 #include "renderer_glfw_opengl.hpp"
 #include "input.h"
-#include "vector.hpp"
+#include "algebric_vector.hpp"
 #include "point.hpp"
 #include "mesh.hpp"
 

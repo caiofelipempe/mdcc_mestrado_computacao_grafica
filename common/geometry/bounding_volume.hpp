@@ -2,7 +2,7 @@
 
 #include "mesh.hpp"
 #include "point.hpp"
-#include "vector.hpp"
+#include "algebric_vector.hpp"
 
 #include <algorithm>
 

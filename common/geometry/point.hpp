@@ -1,7 +1,7 @@
 #pragma once
 
-#include "arithmetic.hpp"
-#include "vector.hpp"
+#include "algebra.hpp"
+#include "algebric_vector.hpp"
 
 #include <initializer_list>
 #include <algorithm>
@@ -21,7 +21,7 @@ namespace geometry
     {
     public:
         using ValueType = T;
-        using VectorType = Vector<T, N>;
+        using VectorType = AlgebricVector<T, N>;
         using Storage = LinearStorage<T, N>;
 
         Storage data;
