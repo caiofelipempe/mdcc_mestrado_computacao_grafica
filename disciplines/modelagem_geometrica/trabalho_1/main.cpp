@@ -167,6 +167,8 @@ private:
     bool m_showEdges = false;
     bool m_showVertices = false;
 
+    Vec3f m_octreeScale{1.f, 1.f, 1.f};
+
     void init()
     {
         auto sphere = Sphere(10);
@@ -192,7 +194,8 @@ private:
         const Color transparent =
             Color::Transparent();
 
-        if(mesh.edges().empty()) {
+        if (mesh.edges().empty())
+        {
             mesh.buildEdgesFromFaces();
         }
         drawer.drawMesh(
@@ -231,6 +234,17 @@ private:
                 static_cast<ShapeType>(
                     current);
 
+            rebuildMesh();
+        }
+
+        if (
+            ImGui::DragFloat3(
+                "Octree Scale",
+                m_octreeScale.data_ptr(),
+                0.01f,
+                0.1f,
+                100.0f))
+        {
             rebuildMesh();
         }
 
@@ -369,6 +383,7 @@ private:
             mesh =
                 octreeFromShape(
                     m_sphere)
+                    .scaleBounds(m_octreeScale)
                     .toMesh();
             break;
         }
@@ -378,6 +393,7 @@ private:
             mesh =
                 octreeFromShape(
                     m_block)
+                    .scaleBounds(m_octreeScale)
                     .toMesh();
             break;
         }
@@ -387,6 +403,7 @@ private:
             mesh =
                 octreeFromShape(
                     m_cylinder)
+                    .scaleBounds(m_octreeScale)
                     .toMesh();
             break;
         }

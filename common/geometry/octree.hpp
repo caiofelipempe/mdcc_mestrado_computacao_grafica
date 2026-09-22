@@ -346,7 +346,10 @@ namespace geometry
                     bounds.minimum();
 
                 Mesh3f cube =
-                    Cube(size[0])
+                    Block(
+                        size[0],
+                        size[1],
+                        size[2])
                         .toMesh();
 
                 cube.translate(
@@ -392,10 +395,25 @@ namespace geometry
     public:
         const AABB &bounds() const { return m_bounds; }
         AABB &bounds() { return m_bounds; }
-        
-        inline void moveBounds(Vec3f move) {
+
+        inline Octree &moveBounds(Vec3f move)
+        {
             m_bounds.maximum() += move;
             m_bounds.minimum() += move;
+
+            return *this;
+        }
+
+        inline Octree &scaleBounds(Vec3f const scale)
+        {
+            m_bounds.maximum()[0] *= scale[0];
+            m_bounds.maximum()[1] *= scale[1];
+            m_bounds.maximum()[2] *= scale[2];
+            m_bounds.minimum()[0] *= scale[0];
+            m_bounds.minimum()[1] *= scale[1];
+            m_bounds.minimum()[2] *= scale[2];
+
+            return *this;
         }
     };
 
