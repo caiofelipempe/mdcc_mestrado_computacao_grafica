@@ -159,21 +159,7 @@ private:
 
         auto cylinder = Cylinder(5, 5);
 
-        Octree tree(
-            {-diagonal, -diagonal, -diagonal},
-            {diagonal, diagonal, diagonal});
-
-        tree.build(
-            [&sphere](const AABB &bounds,
-                      std::size_t depth)
-            {
-                auto result = sphereBuild(bounds, sphere);
-                if (depth > 4 && result == OctreeState::Branch)
-                    return OctreeState::Filled;
-                return result;
-            });
-
-        mesh = tree.toMesh();
+        mesh = octreeFromShape(sphere).toMesh();
     }
 
     void renderUI()
@@ -409,6 +395,99 @@ private:
         }
 
         return OctreeState::Branch;
+    }
+
+    static Octree octreeFromShape(
+        const Shape &shape,
+        std::size_t maxDepth = 5)
+    {
+        const auto bounds =
+            shape.boundSize();
+
+        const auto half =
+            bounds * 0.5f;
+
+        Octree tree(
+            {-half[0], -half[1], -half[2]},
+            {half[0], half[1], half[2]});
+
+        if (auto sphere =
+                dynamic_cast<const Sphere *>(&shape))
+        {
+            tree.build(
+                [sphere, maxDepth](const AABB &bounds,
+                                   std::size_t depth)
+                {
+                    auto result =
+                        sphereBuild(
+                            bounds,
+                            *sphere);
+
+                    if (
+                        depth > maxDepth &&
+                        result == OctreeState::Branch)
+                    {
+                        return OctreeState::Filled;
+                    }
+
+                    return result;
+                });
+
+            return tree;
+        }
+
+        if (auto block =
+                dynamic_cast<const Block *>(&shape))
+        {
+            tree.build(
+                [block, maxDepth](const AABB &bounds,
+                                  std::size_t depth)
+                {
+                    auto result =
+                        blockBuild(
+                            bounds,
+                            *block);
+
+                    if (
+                        depth > maxDepth &&
+                        result == OctreeState::Branch)
+                    {
+                        return OctreeState::Filled;
+                    }
+
+                    return result;
+                });
+
+            return tree;
+        }
+
+        if (auto cylinder =
+                dynamic_cast<const Cylinder *>(&shape))
+        {
+            tree.build(
+                [cylinder, maxDepth](const AABB &bounds,
+                                     std::size_t depth)
+                {
+                    auto result =
+                        cylinderBuild(
+                            bounds,
+                            *cylinder);
+
+                    if (
+                        depth > maxDepth &&
+                        result == OctreeState::Branch)
+                    {
+                        return OctreeState::Filled;
+                    }
+
+                    return result;
+                });
+
+            return tree;
+        }
+
+        throw std::runtime_error(
+            "Shape nao suportado pela voxelizacao");
     }
 };
 
