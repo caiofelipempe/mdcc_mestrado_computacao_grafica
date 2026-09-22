@@ -458,6 +458,73 @@ private:
         ImGui::DestroyContext();
     }
 
+    static void stringFromOctreeRecursive(
+        const OctreeNode &node,
+        std::string &result)
+    {
+        if (node.isEmpty())
+        {
+            result.push_back('0');
+            return;
+        }
+
+        if (node.isFilled())
+        {
+            result.push_back('1');
+            return;
+        }
+
+        result.push_back('{');
+
+        for (int i = 0;
+             i < 8;
+             ++i)
+        {
+            if (node.children[i])
+            {
+                stringFromOctreeRecursive(
+                    *node.children[i],
+                    result);
+            }
+            else
+            {
+                result.push_back('0');
+            }
+        }
+
+        result.push_back('}');
+    }
+
+    static OctreeState stringBuild(
+        const std::string &text,
+        std::size_t &pos)
+    {
+        if (pos >= text.size())
+        {
+            return OctreeState::Empty;
+        }
+
+        const char c =
+            text[pos++];
+
+        if (c == '0')
+        {
+            return OctreeState::Empty;
+        }
+
+        if (c == '1')
+        {
+            return OctreeState::Filled;
+        }
+
+        if (c == '{')
+        {
+            return OctreeState::Branch;
+        }
+
+        return OctreeState::Empty;
+    }
+
     static OctreeState sphereBuild(AABB const &aabb, Sphere const &sphere)
     {
         auto const min = aabb.minimum();
