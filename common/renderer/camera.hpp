@@ -117,6 +117,9 @@ public:
         m_projectionDirty = value;
     }
 
+    void move(
+        const geometry::Vec3f &delta);
+
     void setDistance(
         float value);
 

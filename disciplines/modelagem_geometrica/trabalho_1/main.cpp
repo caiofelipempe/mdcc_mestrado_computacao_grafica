@@ -24,8 +24,7 @@ class Trabalho01 : public RendererGlfwOpengl
 {
 
 public:
-    Trabalho01(std::function<void(Drawer &)> draw)
-        : m_drawLambda(draw)
+    Trabalho01()
     {
     }
 
@@ -45,6 +44,8 @@ protected:
             static_cast<float>(width) / height,
             kNearPlane,
             kFarPlane);
+
+        init();
     }
 
     void onShutdown() override
@@ -52,26 +53,87 @@ protected:
         shutdownImGui();
     }
 
-    void onUpdate(float) override
+    void onUpdate(float deltaTime) override
     {
-        const double dx = input().m_mouseX - m_lastMouseX;
-        const double dy = input().m_mouseY - m_lastMouseY;
+        const double dx =
+            input().m_mouseX -
+            m_lastMouseX;
 
-        m_lastMouseX = input().m_mouseX;
-        m_lastMouseY = input().m_mouseY;
+        const double dy =
+            input().m_mouseY -
+            m_lastMouseY;
+
+        m_lastMouseX =
+            input().m_mouseX;
+
+        m_lastMouseY =
+            input().m_mouseY;
 
         if (input().rightMouse())
         {
             camera().orbit(
-                static_cast<float>(dx) * kOrbitSensitivity,
-                static_cast<float>(dy) * kOrbitSensitivity);
+                static_cast<float>(dx) *
+                    kOrbitSensitivity,
+                static_cast<float>(dy) *
+                    kOrbitSensitivity);
         }
 
-        if (input().m_scrollOffset != 0.0)
+        if (input().scrollOffset() != 0.0)
         {
             camera().zoom(
                 static_cast<float>(
-                    input().m_scrollOffset));
+                    input().scrollOffset()));
+        }
+
+        constexpr float speed =
+            10.0f;
+
+        const float amount =
+            speed * deltaTime;
+
+        const auto forward =
+            camera().rotation().forward();
+
+        const auto right =
+            camera().rotation().right();
+
+        const auto up =
+            camera().rotation().up();
+
+        if (input().pressed('W'))
+        {
+            camera().move(
+                forward * amount);
+        }
+
+        if (input().pressed('S'))
+        {
+            camera().move(
+                forward * -amount);
+        }
+
+        if (input().pressed('D'))
+        {
+            camera().move(
+                right * amount);
+        }
+
+        if (input().pressed('A'))
+        {
+            camera().move(
+                right * -amount);
+        }
+
+        if (input().pressed('E'))
+        {
+            camera().move(
+                up * amount);
+        }
+
+        if (input().pressed('Q'))
+        {
+            camera().move(
+                up * -amount);
         }
     }
 
@@ -83,9 +145,36 @@ protected:
     }
 
 private:
-    std::function<void(Drawer &)> m_drawLambda;
     double m_lastMouseX = 0.0;
     double m_lastMouseY = 0.0;
+
+    Sphere sphere;
+    Cylinder cylinder;
+    Mesh3f mesh;
+
+    void init()
+    {
+        auto sphere = Sphere(10);
+        auto diagonal = sphere.radius();
+
+        auto cylinder = Cylinder(5, 5);
+
+        Octree tree(
+            {-diagonal, -diagonal, -diagonal},
+            {diagonal, diagonal, diagonal});
+
+        tree.build(
+            [&sphere](const AABB &bounds,
+                      std::size_t depth)
+            {
+                auto result = sphereBuild(bounds, sphere);
+                if (depth > 4 && result == OctreeState::Branch)
+                    return OctreeState::Filled;
+                return result;
+            });
+
+        mesh = tree.toMesh();
+    }
 
     void renderUI()
     {
@@ -101,7 +190,11 @@ private:
 
     void drawScene(Drawer &drawer)
     {
-        m_drawLambda(drawer);
+        drawer.drawMesh(
+            mesh,
+            Color::Transparent(),
+            Color::Red(),
+            Color::Transparent());
     }
 
     void drawToolsPanel()
@@ -163,195 +256,165 @@ private:
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
     }
-};
 
-static OctreeState sphereBuild(AABB const &aabb, Sphere const &sphere)
-{
-    auto const sqrRadius = sphere.radius() * sphere.radius();
-    auto const min = aabb.minimum();
-    auto const max = aabb.maximum();
-    Vec3 const furthestVertex{
-        (std::abs(min[0]) > std::abs(max[0])) ? min[0] : max[0],
-        (std::abs(min[1]) > std::abs(max[1])) ? min[1] : max[1],
-        (std::abs(min[2]) > std::abs(max[2])) ? min[2] : max[2]};
-
-    if (furthestVertex.sqrNorm() <= sqrRadius)
+    static OctreeState sphereBuild(AABB const &aabb, Sphere const &sphere)
     {
-        return OctreeState::Filled;
+        auto const sqrRadius = sphere.radius() * sphere.radius();
+        auto const min = aabb.minimum();
+        auto const max = aabb.maximum();
+        Vec3 const furthestVertex{
+            (std::abs(min[0]) > std::abs(max[0])) ? min[0] : max[0],
+            (std::abs(min[1]) > std::abs(max[1])) ? min[1] : max[1],
+            (std::abs(min[2]) > std::abs(max[2])) ? min[2] : max[2]};
+
+        if (furthestVertex.sqrNorm() <= sqrRadius)
+        {
+            return OctreeState::Filled;
+        }
+
+        Vec3 const closestPoint{
+            std::clamp(0.f, min[0], max[0]),
+            std::clamp(0.f, min[1], max[1]),
+            std::clamp(0.f, min[2], max[2])};
+
+        if (closestPoint.sqrNorm() <= sqrRadius)
+        {
+            return OctreeState::Branch;
+        }
+
+        return OctreeState::Empty;
     }
 
-    Vec3 const closestPoint{
-        std::clamp(0.f, min[0], max[0]),
-        std::clamp(0.f, min[1], max[1]),
-        std::clamp(0.f, min[2], max[2])};
-
-    if (closestPoint.sqrNorm() <= sqrRadius)
+    static OctreeState blockBuild(
+        AABB const &aabb,
+        Block const &block)
     {
+        auto const half =
+            block.boundSize() * 0.5f;
+
+        auto const min =
+            aabb.minimum();
+
+        auto const max =
+            aabb.maximum();
+
+        Vec3 const furthestVertex{
+            (std::abs(min[0]) > std::abs(max[0]))
+                ? min[0]
+                : max[0],
+
+            (std::abs(min[1]) > std::abs(max[1]))
+                ? min[1]
+                : max[1],
+
+            (std::abs(min[2]) > std::abs(max[2]))
+                ? min[2]
+                : max[2]};
+
+        if (
+            std::abs(furthestVertex[0]) <= half[0] &&
+            std::abs(furthestVertex[1]) <= half[1] &&
+            std::abs(furthestVertex[2]) <= half[2])
+        {
+            return OctreeState::Filled;
+        }
+
+        if (
+            max[0] < -half[0] ||
+            min[0] > half[0] ||
+
+            max[1] < -half[1] ||
+            min[1] > half[1] ||
+
+            max[2] < -half[2] ||
+            min[2] > half[2])
+        {
+            return OctreeState::Empty;
+        }
+
         return OctreeState::Branch;
     }
 
-    return OctreeState::Empty;
-}
-
-static OctreeState blockBuild(
-    AABB const &aabb,
-    Block const &block)
-{
-    auto const half =
-        block.boundSize() * 0.5f;
-
-    auto const min =
-        aabb.minimum();
-
-    auto const max =
-        aabb.maximum();
-
-    Vec3 const furthestVertex{
-        (std::abs(min[0]) > std::abs(max[0]))
-            ? min[0]
-            : max[0],
-
-        (std::abs(min[1]) > std::abs(max[1]))
-            ? min[1]
-            : max[1],
-
-        (std::abs(min[2]) > std::abs(max[2]))
-            ? min[2]
-            : max[2]};
-
-    if (
-        std::abs(furthestVertex[0]) <= half[0] &&
-        std::abs(furthestVertex[1]) <= half[1] &&
-        std::abs(furthestVertex[2]) <= half[2])
+    static OctreeState cylinderBuild(
+        AABB const &aabb,
+        Cylinder const &cylinder)
     {
-        return OctreeState::Filled;
+        auto const sqrRadius =
+            cylinder.radius() *
+            cylinder.radius();
+
+        auto const halfHeight =
+            cylinder.height() * 0.5f;
+
+        auto const min =
+            aabb.minimum();
+
+        auto const max =
+            aabb.maximum();
+
+        Vec3 const furthestVertex{
+            (std::abs(min[0]) > std::abs(max[0]))
+                ? min[0]
+                : max[0],
+
+            (std::abs(min[1]) > std::abs(max[1]))
+                ? min[1]
+                : max[1],
+
+            (std::abs(min[2]) > std::abs(max[2]))
+                ? min[2]
+                : max[2]};
+
+        auto const furthestRadialSquared =
+            furthestVertex[0] *
+                furthestVertex[0] +
+            furthestVertex[2] *
+                furthestVertex[2];
+
+        if (
+            furthestRadialSquared <= sqrRadius &&
+            std::abs(furthestVertex[1]) <= halfHeight)
+        {
+            return OctreeState::Filled;
+        }
+
+        Vec3 const closestPoint{
+            std::clamp(
+                0.f,
+                min[0],
+                max[0]),
+
+            std::clamp(
+                0.f,
+                min[1],
+                max[1]),
+
+            std::clamp(
+                0.f,
+                min[2],
+                max[2])};
+
+        auto const closestRadialSquared =
+            closestPoint[0] *
+                closestPoint[0] +
+            closestPoint[2] *
+                closestPoint[2];
+
+        if (
+            closestRadialSquared > sqrRadius ||
+            closestPoint[1] < -halfHeight ||
+            closestPoint[1] > halfHeight)
+        {
+            return OctreeState::Empty;
+        }
+
+        return OctreeState::Branch;
     }
-
-    if (
-        max[0] < -half[0] ||
-        min[0] > half[0] ||
-
-        max[1] < -half[1] ||
-        min[1] > half[1] ||
-
-        max[2] < -half[2] ||
-        min[2] > half[2])
-    {
-        return OctreeState::Empty;
-    }
-
-    return OctreeState::Branch;
-}
-
-static OctreeState cylinderBuild(
-    AABB const &aabb,
-    Cylinder const &cylinder)
-{
-    auto const sqrRadius =
-        cylinder.radius() *
-        cylinder.radius();
-
-    auto const halfHeight =
-        cylinder.height() * 0.5f;
-
-    auto const min =
-        aabb.minimum();
-
-    auto const max =
-        aabb.maximum();
-
-    Vec3 const furthestVertex{
-        (std::abs(min[0]) > std::abs(max[0]))
-            ? min[0]
-            : max[0],
-
-        (std::abs(min[1]) > std::abs(max[1]))
-            ? min[1]
-            : max[1],
-
-        (std::abs(min[2]) > std::abs(max[2]))
-            ? min[2]
-            : max[2]};
-
-    auto const furthestRadialSquared =
-        furthestVertex[0] *
-            furthestVertex[0] +
-        furthestVertex[2] *
-            furthestVertex[2];
-
-    if (
-        furthestRadialSquared <= sqrRadius &&
-        std::abs(furthestVertex[1]) <= halfHeight)
-    {
-        return OctreeState::Filled;
-    }
-
-    Vec3 const closestPoint{
-        std::clamp(
-            0.f,
-            min[0],
-            max[0]),
-
-        std::clamp(
-            0.f,
-            min[1],
-            max[1]),
-
-        std::clamp(
-            0.f,
-            min[2],
-            max[2])};
-
-    auto const closestRadialSquared =
-        closestPoint[0] *
-            closestPoint[0] +
-        closestPoint[2] *
-            closestPoint[2];
-
-    if (
-        closestRadialSquared > sqrRadius ||
-        closestPoint[1] < -halfHeight ||
-        closestPoint[1] > halfHeight)
-    {
-        return OctreeState::Empty;
-    }
-
-    return OctreeState::Branch;
-}
+};
 
 int main()
 {
-    using namespace geometry;
-
-    auto sphere = Sphere(10);
-    auto diagonal = sphere.radius();
-
-    auto cylinder = Cylinder(5, 5);
-
-    Octree tree(
-        {-diagonal, -diagonal, -diagonal},
-        {diagonal, diagonal, diagonal});
-
-    tree.build(
-        [&cylinder](const AABB &bounds,
-                    std::size_t depth)
-        {
-            auto result = cylinderBuild(bounds, cylinder);
-            if (depth > 3 && result == OctreeState::Branch)
-                return OctreeState::Filled;
-            return result;
-        });
-
-    auto mesh = tree.toMesh();
-    mesh.getEdges().clear();
-
-    Trabalho01 app([&mesh](Drawer &drawer)
-                   { drawer.drawMesh(
-                         mesh,
-                         Color::Green(),
-                         Color::Transparent(),
-                         Color::Transparent()); });
-
+    Trabalho01 app;
     app.run(
         1280,
         720,

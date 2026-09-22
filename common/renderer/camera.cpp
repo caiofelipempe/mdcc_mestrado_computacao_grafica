@@ -97,6 +97,16 @@ void Camera::pan(
     m_viewDirty = true;
 }
 
+void Camera::move(
+    const geometry::Vec3f &delta)
+{
+    m_target += delta;
+
+    updatePosition();
+
+    m_viewDirty = true;
+}
+
 void Camera::setDistance(
     float value)
 {

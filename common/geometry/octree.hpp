@@ -12,8 +12,8 @@ namespace geometry
     enum class OctreeState
     {
         Empty,
-        Filled,
-        Branch
+        Branch,
+        Filled
     };
 
     enum class OctreeOrientation
