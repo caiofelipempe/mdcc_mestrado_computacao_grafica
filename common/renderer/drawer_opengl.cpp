@@ -123,13 +123,13 @@ void DrawerOpengl::drawMeshes(
             meshes[m];
 
         const auto &vertices =
-            mesh.getVertices();
+            mesh.vertices();
 
         const auto &edges =
-            mesh.getEdges();
+            mesh.edges();
 
         const auto &faces =
-            mesh.getFaces();
+            mesh.faces();
 
         if (vertices.empty())
         {

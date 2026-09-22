@@ -27,11 +27,6 @@ namespace geometry
     {
         std::array<std::size_t, 3> indices;
 
-        // Igualdade independente de ordem/winding: a mesma face triangular
-        // pode aparecer com vértices em ordens diferentes vindo de
-        // tetraedros/triângulos vizinhos (comum ao comparar faces de
-        // fronteira durante retriangulação tipo Bowyer-Watson). Comparação
-        // ingênua campo-a-campo (indices == indices) não pegaria isso.
         [[nodiscard]] bool operator==(const Face &other) const
         {
             auto a = indices;
@@ -61,16 +56,75 @@ namespace geometry
                 throw std::out_of_range("Mesh: vertex index out of bounds");
         }
 
+        static Edge normalizedEdge(
+            std::size_t a,
+            std::size_t b)
+        {
+            if (a > b)
+            {
+                std::swap(a, b);
+            }
+
+            return {a, b};
+        }
+
     public:
         Mesh() = default;
 
-        [[nodiscard]] const std::vector<PointType> &getVertices() const noexcept { return m_vertices; }
-        [[nodiscard]] const std::vector<Edge> &getEdges() const noexcept { return m_edges; }
-        [[nodiscard]] const std::vector<Face> &getFaces() const noexcept { return m_faces; }
+        void buildEdgesFromFaces()
+        {
+            m_edges.clear();
 
-        [[nodiscard]] std::vector<PointType> &getVertices() noexcept { return m_vertices; }
-        [[nodiscard]] std::vector<Edge> &getEdges() noexcept { return m_edges; }
-        [[nodiscard]] std::vector<Face> &getFaces() noexcept { return m_faces; }
+            std::vector<Edge> unique;
+
+            for (const auto &face : m_faces)
+            {
+                const auto &idx =
+                    face.indices;
+
+                unique.push_back(
+                    normalizedEdge(
+                        idx[0],
+                        idx[1]));
+
+                unique.push_back(
+                    normalizedEdge(
+                        idx[1],
+                        idx[2]));
+
+                unique.push_back(
+                    normalizedEdge(
+                        idx[2],
+                        idx[0]));
+            }
+
+            std::sort(
+                unique.begin(),
+                unique.end(),
+                [](const Edge &a,
+                   const Edge &b)
+                {
+                    return std::tie(a.v1, a.v2) <
+                           std::tie(b.v1, b.v2);
+                });
+
+            unique.erase(
+                std::unique(
+                    unique.begin(),
+                    unique.end()),
+                unique.end());
+
+            m_edges =
+                std::move(unique);
+        }
+
+        [[nodiscard]] const std::vector<PointType> &vertices() const noexcept { return m_vertices; }
+        [[nodiscard]] const std::vector<Edge> &edges() const noexcept { return m_edges; }
+        [[nodiscard]] const std::vector<Face> &faces() const noexcept { return m_faces; }
+
+        [[nodiscard]] std::vector<PointType> &vertices() noexcept { return m_vertices; }
+        [[nodiscard]] std::vector<Edge> &edges() noexcept { return m_edges; }
+        [[nodiscard]] std::vector<Face> &faces() noexcept { return m_faces; }
 
         [[nodiscard]] std::size_t vertexCount() const noexcept { return m_vertices.size(); }
         [[nodiscard]] std::size_t edgeCount() const noexcept { return m_edges.size(); }

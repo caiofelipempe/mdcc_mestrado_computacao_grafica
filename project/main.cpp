@@ -163,8 +163,8 @@ private:
         // Ordenar pontos por ângulo ao redor do centro
         std::sort(indices.begin(), indices.end(),
             [&](int a, int b) {
-                const auto& pa = mesh.getVertices()[a];
-                const auto& pb = mesh.getVertices()[b];
+                const auto& pa = mesh.vertices()[a];
+                const auto& pb = mesh.vertices()[b];
                 Vec3f va = Vec3f{pa[0], pa[1], pa[2]} - centerVec;
                 Vec3f vb = Vec3f{pb[0], pb[1], pb[2]} - centerVec;
                 float angleA = std::atan2(va[2], va[0]);

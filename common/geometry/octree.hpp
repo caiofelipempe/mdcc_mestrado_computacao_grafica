@@ -301,14 +301,14 @@ namespace geometry
                 dst.vertexCount();
 
             for (const auto &vertex :
-                 src.getVertices())
+                 src.vertices())
             {
                 (void)dst.addVertex(
                     vertex);
             }
 
             for (const auto &edge :
-                 src.getEdges())
+                 src.edges())
             {
                 dst.addEdge(
                     edge.v1 + offset,
@@ -316,7 +316,7 @@ namespace geometry
             }
 
             for (const auto &face :
-                 src.getFaces())
+                 src.faces())
             {
                 dst.addFace(
                     face.indices[0] + offset,
@@ -388,6 +388,15 @@ namespace geometry
                 CounterClockwiseBottomToTop;
 
         OctreeNode m_root;
+
+    public:
+        const AABB &bounds() const { return m_bounds; }
+        AABB &bounds() { return m_bounds; }
+        
+        inline void moveBounds(Vec3f move) {
+            m_bounds.maximum() += move;
+            m_bounds.minimum() += move;
+        }
     };
 
 } // namespace geometry

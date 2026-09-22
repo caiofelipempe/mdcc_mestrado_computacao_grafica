@@ -200,7 +200,7 @@ namespace geometry
             const Mesh3f& mesh)
         {
             const auto& vertices =
-                mesh.getVertices();
+                mesh.vertices();
 
             if (vertices.empty())
             {
