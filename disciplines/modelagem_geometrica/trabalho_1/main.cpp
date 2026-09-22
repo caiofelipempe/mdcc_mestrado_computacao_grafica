@@ -5,6 +5,8 @@
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
+#include <imgui_stdlib.h>
+
 #include <functional>
 
 #include "shape.hpp"
@@ -149,7 +151,8 @@ private:
     {
         Sphere,
         Block,
-        Cylinder
+        Cylinder,
+        String
     };
 
     ShapeType m_shapeType =
@@ -169,6 +172,9 @@ private:
 
     Vec3f m_octreeScale{1.f, 1.f, 1.f};
     int m_octreeDepth = 5;
+
+    std::string m_octreeString =
+        "{11111111}";
 
     void init()
     {
@@ -223,7 +229,8 @@ private:
             {
                 "Esfera",
                 "Bloco",
-                "Cilindro"};
+                "Cilindro",
+                "String"};
 
         if (ImGui::Combo(
                 "Forma",
@@ -277,6 +284,115 @@ private:
 
         switch (m_shapeType)
         {
+
+        case ShapeType::String:
+        {
+            if (
+                ImGui::InputTextMultiline(
+                    "Octree",
+                    &m_octreeString,
+                    ImVec2(
+                        0.0f,
+                        150.0f)))
+            {
+                rebuildMesh();
+            }
+
+            ImGui::Separator();
+
+            ImGui::Text("Gramatica:");
+
+            ImGui::BulletText(
+                "0 = No vazio");
+
+            ImGui::BulletText(
+                "1 = No preenchido");
+
+            ImGui::BulletText(
+                "{...} = No subdividido");
+
+            ImGui::Separator();
+
+            ImGui::Text("Exemplos:");
+
+            if (ImGui::Button("Voxel"))
+            {
+                m_octreeString =
+                    "1";
+
+                rebuildMesh();
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("8 Voxels"))
+            {
+                m_octreeString =
+                    "{11111111}";
+
+                rebuildMesh();
+            }
+
+            if (ImGui::Button("Nivel 2"))
+            {
+                m_octreeString =
+                    "{{11111111}0000000}";
+
+                rebuildMesh();
+            }
+
+            if (ImGui::Button("Exemplo"))
+            {
+                m_octreeString =
+                    "{1{01100010}0{0{00010110}011101}0110}";
+
+                rebuildMesh();
+            }
+
+            ImGui::Separator();
+
+            ImGui::Text(
+                "Tamanho do AABB");
+
+            static float minBound[3] =
+                {
+                    -10.0f,
+                    -10.0f,
+                    -10.0f};
+
+            static float maxBound[3] =
+                {
+                    10.0f,
+                    10.0f,
+                    10.0f};
+
+            if (
+                ImGui::DragFloat3(
+                    "Min",
+                    minBound,
+                    0.1f))
+            {
+                rebuildMesh();
+            }
+
+            if (
+                ImGui::DragFloat3(
+                    "Max",
+                    maxBound,
+                    0.1f))
+            {
+                rebuildMesh();
+            }
+
+            if (ImGui::Button(
+                    "Reconstruir"))
+            {
+                rebuildMesh();
+            }
+
+            break;
+        }
+
         case ShapeType::Sphere:
         {
             if (ImGui::DragFloat(
@@ -389,6 +505,47 @@ private:
     {
         switch (m_shapeType)
         {
+        case ShapeType::String:
+        {
+            std::size_t pos = 0;
+
+            Octree tree(
+                {-10.0f * m_octreeScale[0],
+                 -10.0f * m_octreeScale[1],
+                 -10.0f * m_octreeScale[2]},
+                {10.0f * m_octreeScale[0],
+                 10.0f * m_octreeScale[1],
+                 10.0f * m_octreeScale[2]});
+
+            tree.build(
+                [&](
+                    const AABB &bounds,
+                    std::size_t depth)
+                {
+                    auto result =
+                        stringBuildRecursive(
+                            bounds,
+                            m_octreeString,
+                            pos);
+
+                    if (
+                        depth >= static_cast<std::size_t>(
+                                     m_octreeDepth) &&
+                        result ==
+                            OctreeState::Branch)
+                    {
+                        return OctreeState::Filled;
+                    }
+
+                    return result;
+                });
+
+            mesh =
+                tree.toMesh();
+
+            break;
+        }
+
         case ShapeType::Sphere:
         {
             mesh =
@@ -495,8 +652,9 @@ private:
         result.push_back('}');
     }
 
-    static OctreeState stringBuild(
-        const std::string &text,
+    static OctreeState stringBuildRecursive(
+        AABB const &,
+        std::string const &text,
         std::size_t &pos)
     {
         if (pos >= text.size())
@@ -507,22 +665,36 @@ private:
         const char c =
             text[pos++];
 
-        if (c == '0')
+        switch (c)
         {
+        case '0':
+            return OctreeState::Empty;
+
+        case '1':
+            return OctreeState::Filled;
+
+        case '{':
+            return OctreeState::Branch;
+
+        case '}':
+            return OctreeState::Empty;
+
+        default:
             return OctreeState::Empty;
         }
+    }
 
-        if (c == '1')
-        {
-            return OctreeState::Filled;
-        }
+    static OctreeState
+    stringBuild(
+        AABB const &aabb,
+        std::string const &text)
+    {
+        std::size_t pos = 0;
 
-        if (c == '{')
-        {
-            return OctreeState::Branch;
-        }
-
-        return OctreeState::Empty;
+        return stringBuildRecursive(
+            aabb,
+            text,
+            pos);
     }
 
     static OctreeState sphereBuild(AABB const &aabb, Sphere const &sphere)

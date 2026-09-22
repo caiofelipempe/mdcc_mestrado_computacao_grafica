@@ -86,7 +86,7 @@ namespace geometry
         }
 
         template <typename Classifier>
-        void build(
+        Octree& build(
             Classifier &&classifier,
             OctreeOrientation orientation =
                 OctreeOrientation::
@@ -104,6 +104,8 @@ namespace geometry
                 0,
                 classifier,
                 orientation);
+
+            return *this;
         }
 
         template <typename Visitor>
