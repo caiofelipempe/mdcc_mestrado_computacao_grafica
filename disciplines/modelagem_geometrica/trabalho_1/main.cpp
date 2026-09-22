@@ -168,6 +168,7 @@ private:
     bool m_showVertices = false;
 
     Vec3f m_octreeScale{1.f, 1.f, 1.f};
+    int m_octreeDepth = 5;
 
     void init()
     {
@@ -244,6 +245,16 @@ private:
                 0.01f,
                 0.1f,
                 100.0f))
+        {
+            rebuildMesh();
+        }
+
+        if (
+            ImGui::SliderInt(
+                "Octree Depth",
+                &m_octreeDepth,
+                0,
+                5))
         {
             rebuildMesh();
         }
@@ -382,8 +393,10 @@ private:
         {
             mesh =
                 octreeFromShape(
-                    m_sphere)
-                    .scaleBounds(m_octreeScale)
+                    m_sphere,
+                    m_octreeDepth)
+                    .scaleBounds(
+                        m_octreeScale)
                     .toMesh();
             break;
         }
@@ -392,8 +405,10 @@ private:
         {
             mesh =
                 octreeFromShape(
-                    m_block)
-                    .scaleBounds(m_octreeScale)
+                    m_block,
+                    m_octreeDepth)
+                    .scaleBounds(
+                        m_octreeScale)
                     .toMesh();
             break;
         }
@@ -402,8 +417,10 @@ private:
         {
             mesh =
                 octreeFromShape(
-                    m_cylinder)
-                    .scaleBounds(m_octreeScale)
+                    m_cylinder,
+                    m_octreeDepth)
+                    .scaleBounds(
+                        m_octreeScale)
                     .toMesh();
             break;
         }
