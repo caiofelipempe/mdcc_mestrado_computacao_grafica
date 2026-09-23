@@ -22,12 +22,97 @@ void DrawerOpengl::frameBegin()
 {
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
-    glDepthMask(GL_TRUE);
-    glDisable(GL_BLEND);
-    glDisable(GL_CULL_FACE);
 
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_LIGHTING);
+    glEnable(GL_LIGHT0);
+    glEnable(GL_NORMALIZE);
+
+    glEnable(GL_COLOR_MATERIAL);
+
+    glColorMaterial(
+        GL_FRONT_AND_BACK,
+        GL_AMBIENT_AND_DIFFUSE);
+
+    glShadeModel(GL_SMOOTH);
+
+    GLfloat lightPosition[] =
+        {
+            20.0f,
+            20.0f,
+            20.0f,
+            1.0f};
+
+    GLfloat ambient[] =
+        {
+            0.20f,
+            0.20f,
+            0.20f,
+            1.0f};
+
+    GLfloat diffuse[] =
+        {
+            1.0f,
+            1.0f,
+            1.0f,
+            1.0f};
+
+    GLfloat specular[] =
+        {
+            1.0f,
+            1.0f,
+            1.0f,
+            1.0f};
+
+    glLightfv(
+        GL_LIGHT0,
+        GL_POSITION,
+        lightPosition);
+
+    glLightfv(
+        GL_LIGHT0,
+        GL_AMBIENT,
+        ambient);
+
+    glLightfv(
+        GL_LIGHT0,
+        GL_DIFFUSE,
+        diffuse);
+
+    glLightfv(
+        GL_LIGHT0,
+        GL_SPECULAR,
+        specular);
+
+    GLfloat materialSpecular[] =
+        {
+            1.0f,
+            1.0f,
+            1.0f,
+            1.0f};
+
+    GLfloat shininess[] =
+        {
+            64.0f};
+
+    glMaterialfv(
+        GL_FRONT_AND_BACK,
+        GL_SPECULAR,
+        materialSpecular);
+
+    glMaterialfv(
+        GL_FRONT_AND_BACK,
+        GL_SHININESS,
+        shininess);
+
+    glClearColor(
+        0.05f,
+        0.05f,
+        0.05f,
+        1.0f);
+
+    glClear(
+        GL_COLOR_BUFFER_BIT |
+        GL_DEPTH_BUFFER_BIT);
 }
 
 void DrawerOpengl::frameEnd()
@@ -83,22 +168,59 @@ void DrawerOpengl::drawLines(
     glEnd();
 }
 
+inline void emitNormal(
+    const Point3f &a,
+    const Point3f &b,
+    const Point3f &c)
+{
+    auto u = b.to_vector() - a.to_vector();
+    auto v = c.to_vector() - a.to_vector();
+
+    auto n =
+        u.cross(v).normalized();
+
+    glNormal3fv(
+        n.data_ptr());
+}
+
 void DrawerOpengl::drawFaces(
     const Point3f *points,
     std::size_t count,
     const Color &color)
 {
-    if (!points || count == 0)
+    if (!points ||
+        count == 0)
+    {
         return;
+    }
 
     setColor(color);
 
     glBegin(GL_TRIANGLES);
-    const std::size_t totalPoints = count * 3;
-    for (std::size_t i = 0; i < totalPoints; ++i)
+
+    const std::size_t totalPoints =
+        count * 3;
+
+    for (std::size_t i = 0;
+         i < totalPoints;
+         i += 3)
     {
-        emitVertex(points[i]);
+        const auto &a =
+            points[i + 0];
+
+        const auto &b =
+            points[i + 1];
+
+        const auto &c =
+            points[i + 2];
+
+        emitNormal(a, b, c);
+
+        emitVertex(a);
+        emitVertex(b);
+        emitVertex(c);
     }
+
     glEnd();
 }
 

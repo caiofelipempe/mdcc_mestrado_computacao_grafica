@@ -134,7 +134,8 @@ namespace
         {
             return buildOctreeFromTest(
                 shape.boundSize(), maxDepth,
-                [this](const AABB &bounds) { return classify(bounds); });
+                [this](const AABB &bounds)
+                { return classify(bounds); });
         }
 
         // Público para ser reaproveitado pelo ModelEditor, que testa cada
@@ -199,7 +200,8 @@ namespace
         {
             return buildOctreeFromTest(
                 shape.boundSize(), maxDepth,
-                [this](const AABB &bounds) { return classify(bounds); });
+                [this](const AABB &bounds)
+                { return classify(bounds); });
         }
 
         // Público para ser reaproveitado pelo ModelEditor, que testa cada
@@ -255,7 +257,8 @@ namespace
         {
             return buildOctreeFromTest(
                 shape.boundSize(), maxDepth,
-                [this](const AABB &bounds) { return classify(bounds); });
+                [this](const AABB &bounds)
+                { return classify(bounds); });
         }
 
         // Público para ser reaproveitado pelo ModelEditor, que testa cada
@@ -432,10 +435,14 @@ namespace
     {
         switch (index)
         {
-        case 0: return SphereEditor{};
-        case 1: return BlockEditor{};
-        case 2: return CylinderEditor{};
-        default: return StringEditor{};
+        case 0:
+            return SphereEditor{};
+        case 1:
+            return BlockEditor{};
+        case 2:
+            return CylinderEditor{};
+        default:
+            return StringEditor{};
         }
     }
 
@@ -474,9 +481,12 @@ namespace
     {
         switch (index)
         {
-        case 0: return SphereEditor{};
-        case 1: return BlockEditor{};
-        default: return CylinderEditor{};
+        case 0:
+            return SphereEditor{};
+        case 1:
+            return BlockEditor{};
+        default:
+            return CylinderEditor{};
         }
     }
 
@@ -505,7 +515,8 @@ namespace
                 changed = true;
             }
 
-            changed |= std::visit([](auto &e) { return e.drawUI(); }, editor);
+            changed |= std::visit([](auto &e)
+                                  { return e.drawUI(); }, editor);
             changed |= ImGui::DragFloat3("Posicao", position.data_ptr(), kDragSpeed);
             changed |= ImGui::DragFloat3(
                 "Rotacao (graus)", rotationDegrees.data_ptr(), 1.0f);
@@ -516,7 +527,8 @@ namespace
         Vec3f localHalfExtents() const
         {
             return std::visit(
-                [](auto &e) { return e.shape.boundSize() * 0.5f; }, editor);
+                [](auto &e)
+                { return e.shape.boundSize() * 0.5f; }, editor);
         }
 
         Rot3f rotator() const
@@ -586,7 +598,8 @@ namespace
             localBounds.maximum() = Point3f{localMax[0], localMax[1], localMax[2]};
 
             return std::visit(
-                [&localBounds](auto &e) { return e.classify(localBounds); }, editor);
+                [&localBounds](auto &e)
+                { return e.classify(localBounds); }, editor);
         }
     };
 
@@ -721,8 +734,10 @@ namespace
                 anyNonEmpty |= (state != OctreeState::Empty);
             }
 
-            if (anyFilled) return OctreeState::Filled;
-            if (anyNonEmpty) return OctreeState::Branch;
+            if (anyFilled)
+                return OctreeState::Filled;
+            if (anyNonEmpty)
+                return OctreeState::Branch;
             return OctreeState::Empty;
         }
     };
@@ -739,28 +754,59 @@ namespace
     struct OctreeGroupInstance
     {
         OctreeShapeEditor editor = SphereEditor{};
-        Vec3f position{0.0f, 0.0f, 0.0f};
 
-        // Graus, aplicados em ordem X (pitch) -> Y (yaw) -> Z (roll).
+        Vec3f position{0.0f, 0.0f, 0.0f};
         Vec3f rotationDegrees{0.0f, 0.0f, 0.0f};
+
+        Color color = Color::DarkGreen();
 
         bool drawUI()
         {
             bool changed = false;
 
             int current = static_cast<int>(editor.index());
+
             if (ImGui::Combo(
-                    "Tipo", &current, kOctreeShapeLabels.data(),
+                    "Tipo",
+                    &current,
+                    kOctreeShapeLabels.data(),
                     static_cast<int>(kOctreeShapeLabels.size())))
             {
                 editor = makeOctreeShape(static_cast<std::size_t>(current));
                 changed = true;
             }
 
-            changed |= std::visit([](auto &e) { return e.drawUI(); }, editor);
-            changed |= ImGui::DragFloat3("Posicao", position.data_ptr(), kDragSpeed);
+            changed |= std::visit([](auto &e)
+                                  { return e.drawUI(); },
+                                  editor);
+
             changed |= ImGui::DragFloat3(
-                "Rotacao (graus)", rotationDegrees.data_ptr(), 1.0f);
+                "Posicao",
+                position.data_ptr(),
+                kDragSpeed);
+
+            changed |= ImGui::DragFloat3(
+                "Rotacao (graus)",
+                rotationDegrees.data_ptr(),
+                1.0f);
+
+            float rgba[4] =
+                {
+                    color.r,
+                    color.g,
+                    color.b,
+                    color.a};
+
+            if (ImGui::ColorEdit4("Cor", rgba))
+            {
+                color = Color(
+                    rgba[0],
+                    rgba[1],
+                    rgba[2],
+                    rgba[3]);
+
+                changed = true;
+            }
 
             return changed;
         }
@@ -768,22 +814,36 @@ namespace
         Rot3f rotator() const
         {
             Rot3f rot = Rot3f::identity();
-            rot.rotateWorld({1.0f, 0.0f, 0.0f}, rotationDegrees[0] * kDegToRad);
-            rot.rotateWorld({0.0f, 1.0f, 0.0f}, rotationDegrees[1] * kDegToRad);
-            rot.rotateWorld({0.0f, 0.0f, 1.0f}, rotationDegrees[2] * kDegToRad);
+
+            rot.rotateWorld(
+                {1.0f, 0.0f, 0.0f},
+                rotationDegrees[0] * kDegToRad);
+
+            rot.rotateWorld(
+                {0.0f, 1.0f, 0.0f},
+                rotationDegrees[1] * kDegToRad);
+
+            rot.rotateWorld(
+                {0.0f, 0.0f, 1.0f},
+                rotationDegrees[2] * kDegToRad);
+
             return rot;
         }
 
-        // Octree isolada (mesmos parâmetros do editor avulso, incluindo a
-        // escala global), convertida em malha e então transformada pra
-        // posição/rotação desta instância.
-        Mesh3f buildTransformedMesh(int maxDepth, const Vec3f &scale) const
+        Mesh3f buildTransformedMesh(
+            int maxDepth,
+            const Vec3f &scale) const
         {
+
             Mesh3f localMesh = std::visit(
-                [maxDepth, &scale](auto &e) { return buildMeshFor(e, maxDepth, scale); },
+                [maxDepth, &scale](auto &e)
+                { return buildMeshFor(e, maxDepth, scale); },
                 editor);
 
-            return transformMesh(localMesh, position, rotator());
+            return transformMesh(
+                localMesh,
+                position,
+                rotator());
         }
     };
 
@@ -866,12 +926,18 @@ namespace
     {
         switch (index)
         {
-        case 0: return SphereEditor{};
-        case 1: return BlockEditor{};
-        case 2: return CylinderEditor{};
-        case 3: return StringEditor{};
-        case 4: return ModelEditor{};
-        default: return OctreeGroupEditor{};
+        case 0:
+            return SphereEditor{};
+        case 1:
+            return BlockEditor{};
+        case 2:
+            return CylinderEditor{};
+        case 3:
+            return StringEditor{};
+        case 4:
+            return ModelEditor{};
+        default:
+            return OctreeGroupEditor{};
         }
     }
 }
@@ -960,12 +1026,18 @@ private:
         const auto right = camera().rotation().right();
         const auto up = camera().rotation().up();
 
-        if (input().pressed('W')) camera().move(forward * amount);
-        if (input().pressed('S')) camera().move(forward * -amount);
-        if (input().pressed('D')) camera().move(right * amount);
-        if (input().pressed('A')) camera().move(right * -amount);
-        if (input().pressed('E')) camera().move(up * amount);
-        if (input().pressed('Q')) camera().move(up * -amount);
+        if (input().pressed('W'))
+            camera().move(forward * amount);
+        if (input().pressed('S'))
+            camera().move(forward * -amount);
+        if (input().pressed('D'))
+            camera().move(right * amount);
+        if (input().pressed('A'))
+            camera().move(right * -amount);
+        if (input().pressed('E'))
+            camera().move(up * amount);
+        if (input().pressed('Q'))
+            camera().move(up * -amount);
     }
 
     // ---- UI -----------------------------------------------------------
@@ -995,7 +1067,8 @@ private:
         ImGui::Checkbox("Vertices", &m_showVertices);
         ImGui::Separator();
 
-        changed |= std::visit([](auto &editor) { return editor.drawUI(); }, m_editor);
+        changed |= std::visit([](auto &editor)
+                              { return editor.drawUI(); }, m_editor);
 
         if (changed)
         {
@@ -1026,6 +1099,36 @@ private:
     {
         const Color transparent = Color::Transparent();
 
+        if (auto *group = std::get_if<OctreeGroupEditor>(&m_editor))
+        {
+            for (const auto &instance : group->instances)
+            {
+                Mesh3f mesh =
+                    instance.buildTransformedMesh(
+                        m_octreeDepth,
+                        m_octreeScale);
+
+                if (mesh.edges().empty())
+                {
+                    mesh.buildEdgesFromFaces();
+                }
+
+                drawer.drawMesh(
+                    mesh,
+                    m_showFaces
+                        ? instance.color
+                        : transparent,
+                    m_showEdges
+                        ? Color::Yellow()
+                        : transparent,
+                    m_showVertices
+                        ? Color::Red()
+                        : transparent);
+            }
+
+            return;
+        }
+
         if (m_mesh.edges().empty())
         {
             m_mesh.buildEdgesFromFaces();
@@ -1033,9 +1136,15 @@ private:
 
         drawer.drawMesh(
             m_mesh,
-            m_showFaces ? Color::DarkGreen() : transparent,
-            m_showEdges ? Color::Yellow() : transparent,
-            m_showVertices ? Color::Red() : transparent);
+            m_showFaces
+                ? Color::DarkGreen()
+                : transparent,
+            m_showEdges
+                ? Color::Yellow()
+                : transparent,
+            m_showVertices
+                ? Color::Red()
+                : transparent);
     }
 
     // ---- Construção da malha ------------------------------------------
