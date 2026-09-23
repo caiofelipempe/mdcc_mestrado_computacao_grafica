@@ -3,9 +3,12 @@
 #include <algorithm>
 #include <array>
 #include <functional>
+#include <numbers>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <variant>
+#include <vector>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -58,6 +61,56 @@ namespace
         return tree;
     }
 
+    // Aplica rotação (em torno da origem) e depois translação a cada
+    // vértice, preservando a topologia (edges/faces) da malha de origem.
+    Mesh3f transformMesh(const Mesh3f &src, const Vec3f &position, const Rot3f &rotation)
+    {
+        Mesh3f dst;
+
+        for (const auto &vertex : src.vertices())
+        {
+            const Vec3f transformed = rotation.rotateVector(vertex.to_vector()) + position;
+            (void)dst.addVertex(Point3f{transformed[0], transformed[1], transformed[2]});
+        }
+
+        for (const auto &edge : src.edges())
+        {
+            dst.addEdge(edge.v1, edge.v2);
+        }
+
+        for (const auto &face : src.faces())
+        {
+            dst.addFace(face.indices[0], face.indices[1], face.indices[2]);
+        }
+
+        return dst;
+    }
+
+    // Concatena src em dst reindexando os vértices — mesma lógica do
+    // appendMesh privado usado internamente por Octree::toMesh.
+    void appendMesh(Mesh3f &dst, const Mesh3f &src)
+    {
+        const auto offset = dst.vertexCount();
+
+        for (const auto &vertex : src.vertices())
+        {
+            (void)dst.addVertex(vertex);
+        }
+
+        for (const auto &edge : src.edges())
+        {
+            dst.addEdge(edge.v1 + offset, edge.v2 + offset);
+        }
+
+        for (const auto &face : src.faces())
+        {
+            dst.addFace(
+                face.indices[0] + offset,
+                face.indices[1] + offset,
+                face.indices[2] + offset);
+        }
+    }
+
     // -------------------------------------------------------------------
     // Um editor por seleção do combo. Cada um sabe: (1) desenhar seus
     // próprios controles ImGui, (2) construir sua Octree. Nenhuma forma
@@ -81,11 +134,12 @@ namespace
         {
             return buildOctreeFromTest(
                 shape.boundSize(), maxDepth,
-                [this](const AABB &bounds) { return test(bounds); });
+                [this](const AABB &bounds) { return classify(bounds); });
         }
 
-    private:
-        OctreeState test(const AABB &aabb) const
+        // Público para ser reaproveitado pelo ModelEditor, que testa cada
+        // instância diretamente (sem passar por buildOctreeFromTest).
+        OctreeState classify(const AABB &aabb) const
         {
             const auto min = aabb.minimum();
             const auto max = aabb.maximum();
@@ -145,11 +199,12 @@ namespace
         {
             return buildOctreeFromTest(
                 shape.boundSize(), maxDepth,
-                [this](const AABB &bounds) { return test(bounds); });
+                [this](const AABB &bounds) { return classify(bounds); });
         }
 
-    private:
-        OctreeState test(const AABB &aabb) const
+        // Público para ser reaproveitado pelo ModelEditor, que testa cada
+        // instância diretamente (sem passar por buildOctreeFromTest).
+        OctreeState classify(const AABB &aabb) const
         {
             const auto half = shape.boundSize() * 0.5f;
             const auto min = aabb.minimum().to_vector();
@@ -200,11 +255,12 @@ namespace
         {
             return buildOctreeFromTest(
                 shape.boundSize(), maxDepth,
-                [this](const AABB &bounds) { return test(bounds); });
+                [this](const AABB &bounds) { return classify(bounds); });
         }
 
-    private:
-        OctreeState test(const AABB &aabb) const
+        // Público para ser reaproveitado pelo ModelEditor, que testa cada
+        // instância diretamente (sem passar por buildOctreeFromTest).
+        OctreeState classify(const AABB &aabb) const
         {
             const Vec3 axisY{0.0f, 1.0f, 0.0f};
 
@@ -355,14 +411,456 @@ namespace
         }
     };
 
-    using ShapeEditor =
+    // -------------------------------------------------------------------
+    // Variante "octree completa": os mesmos 4 tipos do combo principal
+    // (inclui StringEditor, ao contrário de PrimitiveEditor). Usada pelo
+    // OctreeGroupEditor, cujos itens são octrees construídas de verdade
+    // (com seus próprios limites — ver StringEditor), não formas testadas
+    // por AABB.
+    // -------------------------------------------------------------------
+
+    using OctreeShapeEditor =
         std::variant<SphereEditor, BlockEditor, CylinderEditor, StringEditor>;
 
-    constexpr std::array<const char *, 4> kShapeLabels{
+    constexpr std::array<const char *, 4> kOctreeShapeLabels{
         SphereEditor::kLabel,
         BlockEditor::kLabel,
         CylinderEditor::kLabel,
         StringEditor::kLabel};
+
+    OctreeShapeEditor makeOctreeShape(std::size_t index)
+    {
+        switch (index)
+        {
+        case 0: return SphereEditor{};
+        case 1: return BlockEditor{};
+        case 2: return CylinderEditor{};
+        default: return StringEditor{};
+        }
+    }
+
+    // Constrói a Octree do editor e converte pra malha, aplicando a escala
+    // global (exceto pro StringEditor, cujos limites já são explícitos na
+    // própria UI) — a mesma regra usada no dispatch de Trabalho01::rebuildMesh.
+    template <typename Editor>
+    Mesh3f buildMeshFor(Editor &editor, int maxDepth, const Vec3f &scale)
+    {
+        Octree tree = editor.build(maxDepth);
+
+        if constexpr (std::is_same_v<std::decay_t<Editor>, StringEditor>)
+        {
+            return tree.toMesh();
+        }
+        else
+        {
+            return tree.scaleBounds(scale).toMesh();
+        }
+    }
+
+    // -------------------------------------------------------------------
+    // Modelo: lista de shapes primitivos, cada um com sua própria posição
+    // e rotação. Reaproveita Sphere/Block/CylinderEditor (dados + UI +
+    // classify) — só não inclui StringEditor, que não representa um shape
+    // transformável no sentido geométrico usado aqui.
+    // -------------------------------------------------------------------
+
+    using PrimitiveEditor = std::variant<SphereEditor, BlockEditor, CylinderEditor>;
+    constexpr std::array<const char *, 3> kPrimitiveLabels{
+        SphereEditor::kLabel,
+        BlockEditor::kLabel,
+        CylinderEditor::kLabel};
+
+    PrimitiveEditor makePrimitive(std::size_t index)
+    {
+        switch (index)
+        {
+        case 0: return SphereEditor{};
+        case 1: return BlockEditor{};
+        default: return CylinderEditor{};
+        }
+    }
+
+    constexpr float kDegToRad =
+        std::numbers::pi_v<float> / 180.0f;
+
+    struct ModelInstance
+    {
+        PrimitiveEditor editor = SphereEditor{};
+        Vec3f position{0.0f, 0.0f, 0.0f};
+
+        // Graus, aplicados em ordem X (pitch) -> Y (yaw) -> Z (roll) via
+        // Rot3f::rotateWorld — ver rotator().
+        Vec3f rotationDegrees{0.0f, 0.0f, 0.0f};
+
+        bool drawUI()
+        {
+            bool changed = false;
+
+            int current = static_cast<int>(editor.index());
+            if (ImGui::Combo(
+                    "Tipo", &current, kPrimitiveLabels.data(),
+                    static_cast<int>(kPrimitiveLabels.size())))
+            {
+                editor = makePrimitive(static_cast<std::size_t>(current));
+                changed = true;
+            }
+
+            changed |= std::visit([](auto &e) { return e.drawUI(); }, editor);
+            changed |= ImGui::DragFloat3("Posicao", position.data_ptr(), kDragSpeed);
+            changed |= ImGui::DragFloat3(
+                "Rotacao (graus)", rotationDegrees.data_ptr(), 1.0f);
+
+            return changed;
+        }
+
+        Vec3f localHalfExtents() const
+        {
+            return std::visit(
+                [](auto &e) { return e.shape.boundSize() * 0.5f; }, editor);
+        }
+
+        Rot3f rotator() const
+        {
+            Rot3f rot = Rot3f::identity();
+            rot.rotateWorld({1.0f, 0.0f, 0.0f}, rotationDegrees[0] * kDegToRad);
+            rot.rotateWorld({0.0f, 1.0f, 0.0f}, rotationDegrees[1] * kDegToRad);
+            rot.rotateWorld({0.0f, 0.0f, 1.0f}, rotationDegrees[2] * kDegToRad);
+            return rot;
+        }
+
+        Vec3f localToWorld(const Vec3f &local) const
+        {
+            return rotator().rotateVector(local) + position;
+        }
+
+        // Inversa da rotação = conjugado do quaternion (x,y,z,w) -> (-x,-y,-z,w),
+        // válido porque rotator() sempre devolve um quaternion normalizado.
+        Vec3f worldToLocal(const Vec3f &world) const
+        {
+            const auto rot = rotator();
+            const auto q = rot.quaternion();
+            const Rot3f inverse{Quatf{-q[0], -q[1], -q[2], q[3]}};
+            return inverse.rotateVector(world - position);
+        }
+
+        // Transforma os 8 cantos da AABB do nó (espaço "mundo" do modelo)
+        // para o espaço local do shape e delega pro classify() dele — assim
+        // cada instância é voxelizada exatamente como o shape avulso seria,
+        // só que na posição/rotação certas.
+        OctreeState classify(const AABB &worldBounds) const
+        {
+            const Vec3f worldMin = worldBounds.minimum().to_vector();
+            const Vec3f worldMax = worldBounds.maximum().to_vector();
+
+            Vec3f localMin{};
+            Vec3f localMax{};
+            bool first = true;
+
+            for (int i = 0; i < 8; ++i)
+            {
+                const Vec3f worldCorner{
+                    (i & 1) ? worldMax[0] : worldMin[0],
+                    (i & 2) ? worldMax[1] : worldMin[1],
+                    (i & 4) ? worldMax[2] : worldMin[2]};
+
+                const Vec3f local = worldToLocal(worldCorner);
+
+                if (first)
+                {
+                    localMin = local;
+                    localMax = local;
+                    first = false;
+                }
+                else
+                {
+                    for (int a = 0; a < 3; ++a)
+                    {
+                        localMin[a] = std::min(localMin[a], local[a]);
+                        localMax[a] = std::max(localMax[a], local[a]);
+                    }
+                }
+            }
+
+            AABB localBounds;
+            localBounds.minimum() = Point3f{localMin[0], localMin[1], localMin[2]};
+            localBounds.maximum() = Point3f{localMax[0], localMax[1], localMax[2]};
+
+            return std::visit(
+                [&localBounds](auto &e) { return e.classify(localBounds); }, editor);
+        }
+    };
+
+    struct ModelEditor
+    {
+        static constexpr const char *kLabel = "Modelo";
+
+        std::vector<ModelInstance> instances;
+
+        bool drawUI()
+        {
+            bool changed = false;
+
+            if (ImGui::Button("Adicionar Modelo"))
+            {
+                instances.push_back(ModelInstance{});
+                changed = true;
+            }
+
+            ImGui::BeginChild("ModelInstances", ImVec2(0.0f, 260.0f), true);
+
+            int removeIndex = -1;
+
+            for (int i = 0; i < static_cast<int>(instances.size()); ++i)
+            {
+                ImGui::PushID(i);
+                ImGui::Text("Shape %d", i + 1);
+
+                changed |= instances[i].drawUI();
+
+                if (ImGui::Button("Remover"))
+                {
+                    removeIndex = i;
+                }
+
+                ImGui::Separator();
+                ImGui::PopID();
+            }
+
+            ImGui::EndChild();
+
+            if (removeIndex >= 0)
+            {
+                instances.erase(instances.begin() + removeIndex);
+                changed = true;
+            }
+
+            return changed;
+        }
+
+        Octree build(int maxDepth) const
+        {
+            const auto [worldMin, worldMax] = computeWorldBounds();
+
+            Octree tree(worldMin, worldMax);
+
+            tree.build(
+                [this, maxDepth](const AABB &bounds, std::size_t depth)
+                {
+                    const auto result = classify(bounds);
+
+                    if (depth >= static_cast<std::size_t>(maxDepth) &&
+                        result == OctreeState::Branch)
+                    {
+                        return OctreeState::Filled;
+                    }
+
+                    return result;
+                });
+
+            return tree;
+        }
+
+    private:
+        std::pair<Point3f, Point3f> computeWorldBounds() const
+        {
+            if (instances.empty())
+            {
+                return {Point3f{-1.0f, -1.0f, -1.0f}, Point3f{1.0f, 1.0f, 1.0f}};
+            }
+
+            Vec3f minCorner{};
+            Vec3f maxCorner{};
+            bool first = true;
+
+            for (const auto &instance : instances)
+            {
+                const auto half = instance.localHalfExtents();
+
+                for (int i = 0; i < 8; ++i)
+                {
+                    const Vec3f localCorner{
+                        (i & 1) ? half[0] : -half[0],
+                        (i & 2) ? half[1] : -half[1],
+                        (i & 4) ? half[2] : -half[2]};
+
+                    const Vec3f worldCorner = instance.localToWorld(localCorner);
+
+                    if (first)
+                    {
+                        minCorner = worldCorner;
+                        maxCorner = worldCorner;
+                        first = false;
+                    }
+                    else
+                    {
+                        for (int a = 0; a < 3; ++a)
+                        {
+                            minCorner[a] = std::min(minCorner[a], worldCorner[a]);
+                            maxCorner[a] = std::max(maxCorner[a], worldCorner[a]);
+                        }
+                    }
+                }
+            }
+
+            return {Point3f{minCorner[0], minCorner[1], minCorner[2]},
+                    Point3f{maxCorner[0], maxCorner[1], maxCorner[2]}};
+        }
+
+        // União dos shapes: um nó é Filled se QUALQUER instância o preenche
+        // totalmente. Não subtrai sobreposição entre shapes (aproximação
+        // consistente com o resto do app, que já testa contra AABB).
+        OctreeState classify(const AABB &worldBounds) const
+        {
+            bool anyFilled = false;
+            bool anyNonEmpty = false;
+
+            for (const auto &instance : instances)
+            {
+                const auto state = instance.classify(worldBounds);
+                anyFilled |= (state == OctreeState::Filled);
+                anyNonEmpty |= (state != OctreeState::Empty);
+            }
+
+            if (anyFilled) return OctreeState::Filled;
+            if (anyNonEmpty) return OctreeState::Branch;
+            return OctreeState::Empty;
+        }
+    };
+
+    // -------------------------------------------------------------------
+    // Grupo de octrees: cada item é uma octree "de verdade", com os mesmos
+    // parâmetros do editor avulso (inclui String), mais posição e rotação.
+    // Ao contrário do ModelEditor (que funde tudo numa única octree via
+    // classify), aqui cada instância constrói sua própria Octree/Mesh
+    // isoladamente e as malhas resultantes são só transformadas e
+    // concatenadas — sem união em nível de voxel.
+    // -------------------------------------------------------------------
+
+    struct OctreeGroupInstance
+    {
+        OctreeShapeEditor editor = SphereEditor{};
+        Vec3f position{0.0f, 0.0f, 0.0f};
+
+        // Graus, aplicados em ordem X (pitch) -> Y (yaw) -> Z (roll).
+        Vec3f rotationDegrees{0.0f, 0.0f, 0.0f};
+
+        bool drawUI()
+        {
+            bool changed = false;
+
+            int current = static_cast<int>(editor.index());
+            if (ImGui::Combo(
+                    "Tipo", &current, kOctreeShapeLabels.data(),
+                    static_cast<int>(kOctreeShapeLabels.size())))
+            {
+                editor = makeOctreeShape(static_cast<std::size_t>(current));
+                changed = true;
+            }
+
+            changed |= std::visit([](auto &e) { return e.drawUI(); }, editor);
+            changed |= ImGui::DragFloat3("Posicao", position.data_ptr(), kDragSpeed);
+            changed |= ImGui::DragFloat3(
+                "Rotacao (graus)", rotationDegrees.data_ptr(), 1.0f);
+
+            return changed;
+        }
+
+        Rot3f rotator() const
+        {
+            Rot3f rot = Rot3f::identity();
+            rot.rotateWorld({1.0f, 0.0f, 0.0f}, rotationDegrees[0] * kDegToRad);
+            rot.rotateWorld({0.0f, 1.0f, 0.0f}, rotationDegrees[1] * kDegToRad);
+            rot.rotateWorld({0.0f, 0.0f, 1.0f}, rotationDegrees[2] * kDegToRad);
+            return rot;
+        }
+
+        // Octree isolada (mesmos parâmetros do editor avulso, incluindo a
+        // escala global), convertida em malha e então transformada pra
+        // posição/rotação desta instância.
+        Mesh3f buildTransformedMesh(int maxDepth, const Vec3f &scale) const
+        {
+            Mesh3f localMesh = std::visit(
+                [maxDepth, &scale](auto &e) { return buildMeshFor(e, maxDepth, scale); },
+                editor);
+
+            return transformMesh(localMesh, position, rotator());
+        }
+    };
+
+    struct OctreeGroupEditor
+    {
+        static constexpr const char *kLabel = "Grupo de Octrees";
+
+        std::vector<OctreeGroupInstance> instances;
+
+        bool drawUI()
+        {
+            bool changed = false;
+
+            if (ImGui::Button("Adicionar Octree"))
+            {
+                instances.push_back(OctreeGroupInstance{});
+                changed = true;
+            }
+
+            ImGui::BeginChild("OctreeGroupInstances", ImVec2(0.0f, 260.0f), true);
+
+            int removeIndex = -1;
+
+            for (int i = 0; i < static_cast<int>(instances.size()); ++i)
+            {
+                ImGui::PushID(i);
+                ImGui::Text("Octree %d", i + 1);
+
+                changed |= instances[i].drawUI();
+
+                if (ImGui::Button("Remover"))
+                {
+                    removeIndex = i;
+                }
+
+                ImGui::Separator();
+                ImGui::PopID();
+            }
+
+            ImGui::EndChild();
+
+            if (removeIndex >= 0)
+            {
+                instances.erase(instances.begin() + removeIndex);
+                changed = true;
+            }
+
+            return changed;
+        }
+
+        // Assinatura própria (Mesh3f, não Octree): cada instância já é uma
+        // malha completa, então não há uma Octree única pra devolver — só
+        // faz sentido tratada como caso especial em Trabalho01::rebuildMesh.
+        Mesh3f build(int maxDepth, const Vec3f &scale) const
+        {
+            Mesh3f result;
+
+            for (const auto &instance : instances)
+            {
+                appendMesh(result, instance.buildTransformedMesh(maxDepth, scale));
+            }
+
+            return result;
+        }
+    };
+
+    using ShapeEditor = std::variant<
+        SphereEditor, BlockEditor, CylinderEditor, StringEditor, ModelEditor,
+        OctreeGroupEditor>;
+
+    constexpr std::array<const char *, 6> kShapeLabels{
+        SphereEditor::kLabel,
+        BlockEditor::kLabel,
+        CylinderEditor::kLabel,
+        StringEditor::kLabel,
+        ModelEditor::kLabel,
+        OctreeGroupEditor::kLabel};
 
     ShapeEditor makeEditor(std::size_t index)
     {
@@ -371,7 +869,9 @@ namespace
         case 0: return SphereEditor{};
         case 1: return BlockEditor{};
         case 2: return CylinderEditor{};
-        default: return StringEditor{};
+        case 3: return StringEditor{};
+        case 4: return ModelEditor{};
+        default: return OctreeGroupEditor{};
         }
     }
 }
@@ -545,16 +1045,15 @@ private:
         m_mesh = std::visit(
             [this](auto &editor) -> Mesh3f
             {
-                Octree tree = editor.build(m_octreeDepth);
-
                 using Editor = std::decay_t<decltype(editor)>;
-                if constexpr (std::is_same_v<Editor, StringEditor>)
+
+                if constexpr (std::is_same_v<Editor, OctreeGroupEditor>)
                 {
-                    return tree.toMesh();
+                    return editor.build(m_octreeDepth, m_octreeScale);
                 }
                 else
                 {
-                    return tree.scaleBounds(m_octreeScale).toMesh();
+                    return buildMeshFor(editor, m_octreeDepth, m_octreeScale);
                 }
             },
             m_editor);
