@@ -36,6 +36,8 @@ protected:
         Drawer& drawer
     ) override {};
 
+    virtual void onUI() override {};
+
     virtual void onShutdown() override {};
 
     virtual void onWindowResize(

@@ -165,6 +165,7 @@ void RendererGlfwOpengl::run(const int w, const int h, const std::string& t) {
             updateCamera();
             onRender(drawer);
             drawer.frameEnd();
+            onUI();
 
             glfwSwapBuffers(m_window);
         }

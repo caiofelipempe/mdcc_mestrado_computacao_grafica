@@ -1001,8 +1001,11 @@ protected:
 
     void onRender(Drawer &drawer) override
     {
-        imguiStartRender();
         drawScene(drawer);
+    }
+
+    void onUI() override {
+        imguiStartRender();
         imguiEndRender();
     }
 
