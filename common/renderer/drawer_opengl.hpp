@@ -1,6 +1,7 @@
 #pragma once
 
 #include "drawer.hpp"
+#include <vector>
 
 class DrawerOpengl final :
     public Drawer
@@ -40,4 +41,36 @@ public:
         const Color& faceColor,
         const Color& edgeColor,
         const Color& vertexColor) override;
+
+private:
+
+    struct FaceVertex
+    {
+        geometry::Point3f normal;
+        geometry::Point3f position;
+    };
+
+    struct BatchVertices
+    {
+        Color color;
+        float size;
+        std::vector<geometry::Point3f> points;
+    };
+
+    struct BatchLines
+    {
+        Color color;
+        float width;
+        std::vector<geometry::Point3f> points;
+    };
+
+    struct BatchFaces
+    {
+        Color color;
+        std::vector<FaceVertex> vertices;
+    };
+
+    std::vector<BatchVertices> m_pendingVertices;
+    std::vector<BatchLines> m_pendingLines;
+    std::vector<BatchFaces> m_pendingFaces;
 };

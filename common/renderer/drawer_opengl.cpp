@@ -7,14 +7,20 @@ using namespace geometry;
 
 namespace
 {
-    inline void emitVertex(const Point3f &point)
-    {
-        glVertex3fv(point.data_ptr());
-    }
-
     inline void setColor(const Color &color)
     {
         glColor4f(color.r, color.g, color.b, color.a);
+    }
+
+    inline Point3f computeNormal(
+        const Point3f &a,
+        const Point3f &b,
+        const Point3f &c)
+    {
+        auto u = b.to_vector() - a.to_vector();
+        auto v = c.to_vector() - a.to_vector();
+        auto n = u.cross(v).normalized();
+        return Point3f({n[0], n[1], n[2]});
     }
 }
 
@@ -113,10 +119,86 @@ void DrawerOpengl::frameBegin()
     glClear(
         GL_COLOR_BUFFER_BIT |
         GL_DEPTH_BUFFER_BIT);
+
+    m_pendingVertices.clear();
+    m_pendingLines.clear();
+    m_pendingFaces.clear();
 }
 
 void DrawerOpengl::frameEnd()
 {
+    glEnableClientState(GL_VERTEX_ARRAY);
+
+    // Renderiza todas as faces acumuladas com suporte a normais
+    if (!m_pendingFaces.empty())
+    {
+        glEnableClientState(GL_NORMAL_ARRAY);
+
+        for (const auto &batch : m_pendingFaces)
+        {
+            setColor(batch.color);
+
+            glNormalPointer(
+                GL_FLOAT,
+                sizeof(FaceVertex),
+                batch.vertices[0].normal.data_ptr());
+
+            glVertexPointer(
+                3,
+                GL_FLOAT,
+                sizeof(FaceVertex),
+                batch.vertices[0].position.data_ptr());
+
+            glDrawArrays(
+                GL_TRIANGLES,
+                0,
+                static_cast<GLsizei>(batch.vertices.size()));
+        }
+
+        glDisableClientState(GL_NORMAL_ARRAY);
+    }
+
+    // Desativa iluminação para renderizar linhas e pontos com cores sólidas
+    glDisable(GL_LIGHTING);
+
+    // Renderiza todas as linhas acumuladas
+    for (const auto &batch : m_pendingLines)
+    {
+        glLineWidth(batch.width);
+        setColor(batch.color);
+
+        glVertexPointer(
+            3,
+            GL_FLOAT,
+            sizeof(Point3f),
+            batch.points[0].data_ptr());
+
+        glDrawArrays(
+            GL_LINES,
+            0,
+            static_cast<GLsizei>(batch.points.size()));
+    }
+
+    // Renderiza todos os vértices acumulados
+    for (const auto &batch : m_pendingVertices)
+    {
+        glPointSize(batch.size);
+        setColor(batch.color);
+
+        glVertexPointer(
+            3,
+            GL_FLOAT,
+            sizeof(Point3f),
+            batch.points[0].data_ptr());
+
+        glDrawArrays(
+            GL_POINTS,
+            0,
+            static_cast<GLsizei>(batch.points.size()));
+    }
+
+    glDisableClientState(GL_VERTEX_ARRAY);
+
     glFlush();
 }
 
@@ -133,18 +215,12 @@ void DrawerOpengl::drawVertices(
         return;
     }
 
-    glPointSize(size);
+    BatchVertices batch;
+    batch.color = color;
+    batch.size = size;
+    batch.points.assign(points, points + count);
 
-    setColor(color);
-
-    glBegin(GL_POINTS);
-
-    for (std::size_t i = 0; i < count; ++i)
-    {
-        emitVertex(points[i]);
-    }
-
-    glEnd();
+    m_pendingVertices.push_back(std::move(batch));
 }
 
 void DrawerOpengl::drawLines(
@@ -153,34 +229,19 @@ void DrawerOpengl::drawLines(
     const Color &color,
     float width)
 {
-    if (!points || count == 0)
-        return;
-
-    glLineWidth(width);
-    setColor(color);
-
-    glBegin(GL_LINES);
-    const std::size_t totalPoints = count * 2;
-    for (std::size_t i = 0; i < totalPoints; ++i)
+    if (!points ||
+        count == 0 ||
+        color.a <= 0.0f)
     {
-        emitVertex(points[i]);
+        return;
     }
-    glEnd();
-}
 
-inline void emitNormal(
-    const Point3f &a,
-    const Point3f &b,
-    const Point3f &c)
-{
-    auto u = b.to_vector() - a.to_vector();
-    auto v = c.to_vector() - a.to_vector();
+    BatchLines batch;
+    batch.color = color;
+    batch.width = width;
+    batch.points.assign(points, points + (count * 2));
 
-    auto n =
-        u.cross(v).normalized();
-
-    glNormal3fv(
-        n.data_ptr());
+    m_pendingLines.push_back(std::move(batch));
 }
 
 void DrawerOpengl::drawFaces(
@@ -189,39 +250,34 @@ void DrawerOpengl::drawFaces(
     const Color &color)
 {
     if (!points ||
-        count == 0)
+        count == 0 ||
+        color.a <= 0.0f)
     {
         return;
     }
 
-    setColor(color);
+    BatchFaces batch;
+    batch.color = color;
+    batch.vertices.reserve(count * 3);
 
-    glBegin(GL_TRIANGLES);
-
-    const std::size_t totalPoints =
-        count * 3;
+    const std::size_t totalPoints = count * 3;
 
     for (std::size_t i = 0;
          i < totalPoints;
          i += 3)
     {
-        const auto &a =
-            points[i + 0];
+        const auto &a = points[i + 0];
+        const auto &b = points[i + 1];
+        const auto &c = points[i + 2];
 
-        const auto &b =
-            points[i + 1];
+        Point3f norm = computeNormal(a, b, c);
 
-        const auto &c =
-            points[i + 2];
-
-        emitNormal(a, b, c);
-
-        emitVertex(a);
-        emitVertex(b);
-        emitVertex(c);
+        batch.vertices.push_back({norm, a});
+        batch.vertices.push_back({norm, b});
+        batch.vertices.push_back({norm, c});
     }
 
-    glEnd();
+    m_pendingFaces.push_back(std::move(batch));
 }
 
 void DrawerOpengl::drawMeshes(
@@ -235,9 +291,6 @@ void DrawerOpengl::drawMeshes(
     {
         return;
     }
-
-    std::vector<Point3f> faceVertices;
-    std::vector<Point3f> lineVertices;
 
     for (std::size_t m = 0; m < count; ++m)
     {
@@ -262,52 +315,42 @@ void DrawerOpengl::drawMeshes(
         if (faceColor.a > 0.0f &&
             !faces.empty())
         {
-            faceVertices.clear();
-
-            faceVertices.reserve(
-                faces.size() * 3);
+            BatchFaces batch;
+            batch.color = faceColor;
+            batch.vertices.reserve(faces.size() * 3);
 
             for (const auto &face : faces)
             {
-                faceVertices.push_back(
-                    vertices[face.indices[0]]);
+                const auto &a = vertices[face.indices[0]];
+                const auto &b = vertices[face.indices[1]];
+                const auto &c = vertices[face.indices[2]];
 
-                faceVertices.push_back(
-                    vertices[face.indices[1]]);
+                Point3f norm = computeNormal(a, b, c);
 
-                faceVertices.push_back(
-                    vertices[face.indices[2]]);
+                batch.vertices.push_back({norm, a});
+                batch.vertices.push_back({norm, b});
+                batch.vertices.push_back({norm, c});
             }
 
-            drawFaces(
-                faceVertices.data(),
-                faces.size(),
-                faceColor);
+            m_pendingFaces.push_back(std::move(batch));
         }
 
         // Arestas
         if (edgeColor.a > 0.0f &&
             !edges.empty())
         {
-            lineVertices.clear();
-
-            lineVertices.reserve(
-                edges.size() * 2);
+            BatchLines batch;
+            batch.color = edgeColor;
+            batch.width = 1.0f;
+            batch.points.reserve(edges.size() * 2);
 
             for (const auto &edge : edges)
             {
-                lineVertices.push_back(
-                    vertices[edge.v1]);
-
-                lineVertices.push_back(
-                    vertices[edge.v2]);
+                batch.points.push_back(vertices[edge.v1]);
+                batch.points.push_back(vertices[edge.v2]);
             }
 
-            drawLines(
-                lineVertices.data(),
-                edges.size(),
-                edgeColor,
-                1.0f);
+            m_pendingLines.push_back(std::move(batch));
         }
 
         // Vértices
