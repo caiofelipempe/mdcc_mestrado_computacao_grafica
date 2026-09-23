@@ -86,7 +86,7 @@ namespace geometry
         }
 
         template <typename Classifier>
-        Octree& build(
+        Octree &build(
             Classifier &&classifier,
             OctreeOrientation orientation =
                 OctreeOrientation::
@@ -134,7 +134,136 @@ namespace geometry
             return mesh;
         }
 
+        Octree &unite(const Octree &other)
+        {
+            return apply(other, [](bool a, bool b)
+                         { return a || b; });
+        }
+
+        Octree &intersect(const Octree &other)
+        {
+            return apply(other, [](bool a, bool b)
+                         { return a && b; });
+        }
+
+        Octree &subtract(const Octree &other)
+        {
+            return apply(other, [](bool a, bool b)
+                         { return a && !b; });
+        }
+
     private:
+        template <typename Op>
+        Octree &apply(const Octree &other, Op op)
+        {
+            // As duas árvores precisam cobrir o mesmo AABB e ter a mesma
+            // orientação, senão o filho i não é a mesma região do espaço.
+            assert(m_orientation == other.m_orientation);
+
+            OctreeNode result;
+            combine(result, m_root, other.m_root, op);
+            m_root = std::move(result); // result separado: seguro mesmo com other == *this
+
+            return *this;
+        }
+
+        // Folha age como um ramo com 8 filhos iguais a ela mesma.
+        static const OctreeNode &childOrLeaf(
+            const OctreeNode &node,
+            std::size_t index)
+        {
+            if (!node.isBranch())
+            {
+                return node;
+            }
+
+            static const OctreeNode empty;
+
+            return node.children[index]
+                       ? *node.children[index]
+                       : empty;
+        }
+
+        template <typename Op>
+        static void combine(
+            OctreeNode &out,
+            const OctreeNode &a,
+            const OctreeNode &b,
+            Op op)
+        {
+            const auto leaf = [](bool filled)
+            {
+                return filled ? OctreeState::Filled
+                              : OctreeState::Empty;
+            };
+
+            if (!a.isBranch() && !b.isBranch())
+            {
+                out.state = leaf(op(a.isFilled(), b.isFilled()));
+                return;
+            }
+
+            // Absorção: a folha decide sozinha, sem olhar o outro lado.
+            if (!a.isBranch())
+            {
+                const bool f = a.isFilled();
+                if (op(f, false) == op(f, true))
+                {
+                    out.state = leaf(op(f, false));
+                    return;
+                }
+            }
+
+            if (!b.isBranch())
+            {
+                const bool f = b.isFilled();
+                if (op(false, f) == op(true, f))
+                {
+                    out.state = leaf(op(false, f));
+                    return;
+                }
+            }
+
+            out.makeBranch();
+
+            for (std::size_t i = 0; i < 8; ++i)
+            {
+                combine(
+                    *out.children[i],
+                    childOrLeaf(a, i),
+                    childOrLeaf(b, i),
+                    op);
+            }
+
+            collapse(out);
+        }
+
+        // Ramo com 8 filhos folha de mesmo estado vira folha.
+        static void collapse(OctreeNode &node)
+        {
+            const auto first = node.children[0]->state;
+
+            if (first == OctreeState::Branch)
+            {
+                return;
+            }
+
+            for (const auto &child : node.children)
+            {
+                if (child->state != first)
+                {
+                    return;
+                }
+            }
+
+            node.state = first;
+
+            for (auto &child : node.children)
+            {
+                child.reset();
+            }
+        }
+
         static std::size_t remapIndex(
             std::size_t index,
             OctreeOrientation orientation)

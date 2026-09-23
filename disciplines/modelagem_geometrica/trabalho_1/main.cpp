@@ -306,15 +306,34 @@ namespace
         }
     };
 
-    // A octree é descrita diretamente por uma gramática textual
-    // ('0' vazio, '1' preenchido, '{...}' subdividido), em vez de testada
-    // contra uma forma geométrica — por isso não compartilha
-    // buildOctreeFromTest e define seus próprios limites (AABB).
+    enum class BooleanOp
+    {
+        OnlyA,
+        OnlyB,
+        Union,
+        Intersection,
+        Difference
+    };
+
+    constexpr std::array<const char *, 5> kBooleanOpLabels{
+        "A",
+        "B",
+        "Uniao (A + B)",
+        "Intersecao (A & B)",
+        "Diferenca (A - B)"};
+
+    // Duas octrees descritas por strings ('0' vazio, '1' preenchido,
+    // '{...}' subdividido) que compartilham o mesmo AABB, combinadas pela
+    // operação booleana escolhida. O compartilhamento do AABB é o que
+    // garante que os filhos de A e B cobrem as mesmas regiões.
     struct StringEditor
     {
         static constexpr const char *kLabel = "String";
 
-        std::string text = "{11111111}";
+        std::string textA = "{11111111}";
+        std::string textB = "{10101010}";
+        BooleanOp operation = BooleanOp::Union;
+
         std::array<float, 3> minBound{-10.0f, -10.0f, -10.0f};
         std::array<float, 3> maxBound{10.0f, 10.0f, 10.0f};
 
@@ -323,26 +342,21 @@ namespace
             bool changed = false;
 
             changed |= ImGui::InputTextMultiline(
-                "Octree", &text, ImVec2(0.0f, 150.0f));
+                "Octree A", &textA, ImVec2(0.0f, 80.0f));
+            changed |= ImGui::InputTextMultiline(
+                "Octree B", &textB, ImVec2(0.0f, 80.0f));
+
+            int current = static_cast<int>(operation);
+            if (ImGui::Combo(
+                    "Operacao", &current, kBooleanOpLabels.data(),
+                    static_cast<int>(kBooleanOpLabels.size())))
+            {
+                operation = static_cast<BooleanOp>(current);
+                changed = true;
+            }
 
             ImGui::Separator();
-            ImGui::Text("Gramatica:");
-            ImGui::BulletText("0 = No vazio");
-            ImGui::BulletText("1 = No preenchido");
-            ImGui::BulletText("{...} = No subdividido");
-
-            ImGui::Separator();
-            ImGui::Text("Exemplos:");
-
-            changed |= drawExampleButton("Voxel", "1");
-            ImGui::SameLine();
-            changed |= drawExampleButton("8 Voxels", "{11111111}");
-            changed |= drawExampleButton("Nivel 2", "{{11111111}0000000}");
-            changed |= drawExampleButton(
-                "Exemplo", "{1{01100010}0{0{00010110}011101}0110}");
-
-            ImGui::Separator();
-            ImGui::Text("Tamanho do AABB");
+            ImGui::Text("Tamanho do AABB (compartilhado)");
             changed |= ImGui::DragFloat3("Min", minBound.data(), kDragSpeed);
             changed |= ImGui::DragFloat3("Max", maxBound.data(), kDragSpeed);
 
@@ -354,8 +368,33 @@ namespace
             return changed;
         }
 
-        // Sem parâmetro de escala: os limites já vêm explícitos da UI.
         Octree build(int maxDepth) const
+        {
+            Octree a = buildFromText(textA, maxDepth);
+            Octree b = buildFromText(textB, maxDepth);
+
+            switch (operation)
+            {
+            case BooleanOp::OnlyA:
+                return a;
+            case BooleanOp::OnlyB:
+                return b;
+            case BooleanOp::Union:
+                a.unite(b);
+                break;
+            case BooleanOp::Intersection:
+                a.intersect(b);
+                break;
+            case BooleanOp::Difference:
+                a.subtract(b);
+                break;
+            }
+
+            return a;
+        }
+
+    private:
+        Octree buildFromText(const std::string &text, int maxDepth) const
         {
             Octree tree(
                 {minBound[0], minBound[1], minBound[2]},
@@ -364,9 +403,9 @@ namespace
             std::size_t pos = 0;
 
             tree.build(
-                [this, maxDepth, &pos](const AABB &, std::size_t depth)
+                [&text, maxDepth, &pos](const AABB &, std::size_t depth)
                 {
-                    const auto result = parseNext(pos);
+                    const auto result = parseNext(text, pos);
 
                     if (depth >= static_cast<std::size_t>(maxDepth) &&
                         result == OctreeState::Branch)
@@ -380,19 +419,7 @@ namespace
             return tree;
         }
 
-    private:
-        bool drawExampleButton(const char *label, const char *pattern)
-        {
-            if (!ImGui::Button(label))
-            {
-                return false;
-            }
-
-            text = pattern;
-            return true;
-        }
-
-        OctreeState parseNext(std::size_t &pos) const
+        static OctreeState parseNext(const std::string &text, std::size_t &pos)
         {
             if (pos >= text.size())
             {
@@ -401,12 +428,11 @@ namespace
 
             switch (text[pos++])
             {
-            case '0':
-                return OctreeState::Empty;
             case '1':
                 return OctreeState::Filled;
             case '{':
                 return OctreeState::Branch;
+            case '0':
             case '}':
             default:
                 return OctreeState::Empty;
