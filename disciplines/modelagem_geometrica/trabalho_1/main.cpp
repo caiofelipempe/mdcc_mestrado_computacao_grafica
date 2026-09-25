@@ -142,7 +142,7 @@ namespace
         return OctreeState::Branch;
     }
 
-    // Parser sequencial da String ('0' vazio, '1' preenchido, '{...}'
+    // Parser sequencial da String ('B' vazio, 'W' preenchido, '{...}'
     // subdividido) — mesma logica de antes. O consumo de `pos` acompanha a
     // ordem de visita (prefix/DFS) com que Octree::build chama o
     // classificador, entao nao depende de posicao/rotacao.
@@ -156,11 +156,13 @@ namespace
         switch (text[pos++])
         {
         case '1':
+        case 'W':
+        case 'B':
+        case 'w':
+        case 'b':
             return OctreeState::Filled;
-        case '{':
+        case '(':
             return OctreeState::Branch;
-        case '0':
-        case '}':
         default:
             return OctreeState::Empty;
         }
@@ -204,7 +206,7 @@ namespace
         Sphere sphere{10.0f};
         Block block{4.0f, 5.0f, 3.0f};
         Cylinder cylinder{5.0f, 5.0f};
-        std::string text = "{11111111}";
+        std::string text = "(WBWBWBWB";
 
         Vec3f position{0.0f, 0.0f, 0.0f};
         Vec3f rotationDegrees{0.0f, 0.0f, 0.0f};
