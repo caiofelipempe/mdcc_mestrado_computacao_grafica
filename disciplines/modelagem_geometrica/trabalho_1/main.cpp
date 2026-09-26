@@ -6,11 +6,13 @@
 #include <numbers>
 #include <string>
 #include <vector>
+#include <variant>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <imgui_stdlib.h>
+#include <imgui_internal.h>
 
 #include "shape.hpp"
 #include "octree.hpp"
@@ -19,6 +21,28 @@ using namespace geometry;
 
 namespace
 {
+    template <typename... Ts>
+    struct overloaded : Ts...
+    {
+        using Ts::operator()...;
+    };
+    template <typename... Ts>
+    overloaded(Ts...) -> overloaded<Ts...>;
+
+    struct HoveredVariants
+    {
+        struct Canvas
+        {
+        };
+
+        struct ImGui
+        {
+            std::string windowName;
+        };
+
+        using Variant = std::variant<Canvas, ImGui>;
+    };
+
     constexpr float kOrbitSensitivity = 0.25f;
     constexpr float kFovDegrees = 45.0f;
     constexpr float kNearPlane = 0.1f;
@@ -28,14 +52,10 @@ namespace
     constexpr float kDragMin = 0.1f;
     constexpr float kDragMax = 100.0f;
 
-    constexpr float kDegToRad =
-        std::numbers::pi_v<float> / 180.0f;
+    constexpr float kDegToRad = std::numbers::pi_v<float> / 180.0f;
 
     // -------------------------------------------------------------------
-    // Classificacao AABB-vs-forma. Mesma logica de antes, so que agora
-    // operando direto sobre Sphere/Block/Cylinder (sem uma classe
-    // "editor" por forma) — a forma nao sabe nada sobre octree, transform
-    // ou UI; isso tudo fica em SceneObject.
+    // Classificacao AABB-vs-forma
     // -------------------------------------------------------------------
 
     OctreeState classifySphere(const Sphere &shape, const AABB &aabb)
@@ -51,9 +71,7 @@ namespace
         const auto sqrRadius = shape.radius() * shape.radius();
 
         if (furthest.dot(furthest) <= sqrRadius)
-        {
             return OctreeState::Filled;
-        }
 
         const Vec3 closest{
             std::clamp(0.0f, min[0], max[0]),
@@ -61,9 +79,7 @@ namespace
             std::clamp(0.0f, min[2], max[2])};
 
         if (closest.dot(closest) <= sqrRadius)
-        {
             return OctreeState::Branch;
-        }
 
         return OctreeState::Empty;
     }
@@ -142,16 +158,10 @@ namespace
         return OctreeState::Branch;
     }
 
-    // Parser sequencial da String ('B' vazio, 'W' preenchido, '{...}'
-    // subdividido) — mesma logica de antes. O consumo de `pos` acompanha a
-    // ordem de visita (prefix/DFS) com que Octree::build chama o
-    // classificador, entao nao depende de posicao/rotacao.
     OctreeState parseNextStringToken(const std::string &text, std::size_t &pos)
     {
         if (pos >= text.size())
-        {
             return OctreeState::Empty;
-        }
 
         switch (text[pos++])
         {
@@ -168,6 +178,10 @@ namespace
         }
     }
 
+    // -------------------------------------------------------------------
+    // Tipos de objeto
+    // -------------------------------------------------------------------
+
     enum class ObjectKind
     {
         Sphere,
@@ -182,30 +196,50 @@ namespace
         "Cilindro",
         "String"};
 
+    // Icone textual simples para o outliner.
+    const char *kindIcon(ObjectKind kind)
+    {
+        switch (kind)
+        {
+        case ObjectKind::Sphere:
+            return "(o)";
+        case ObjectKind::Block:
+            return "[#]";
+        case ObjectKind::Cylinder:
+            return "(=)";
+        case ObjectKind::String:
+            return "{ }";
+        }
+        return "(?)";
+    }
+
+    bool drawColorEdit(const char *label, Color &color)
+    {
+        float rgba[4] = {color.r, color.g, color.b, color.a};
+
+        if (ImGui::ColorEdit4(label, rgba))
+        {
+            color = Color(rgba[0], rgba[1], rgba[2], rgba[3]);
+            return true;
+        }
+
+        return false;
+    }
+
     // -------------------------------------------------------------------
-    // SceneObject: unico tipo de item da lista de objetos. Guarda os
-    // parametros de todas as formas possiveis (so os do `kind` atual sao
-    // usados/mostrados) e, para formas (nao para String), uma origem e
-    // rotacao proprias.
-    //
-    // Origem/rotacao NAO sao aplicadas como transform de malha depois de
-    // gerar a octree: elas entram na propria classificacao (classify
-    // recebe o AABB do nó em espaco de MUNDO, leva pro espaco local do
-    // shape via worldToLocal, e testa o shape ali) — ou seja, a octree de
-    // cada objeto ja "nasce" no lugar/orientacao certos.
-    //
-    // String nao tem origem/rotacao: seu conteudo já é posicional (ordem
-    // de caracteres = ordem de visita da octree), aplicar uma transform
-    // nao faria sentido sem reamostrar o padrao.
+    // SceneObject (inalterado na logica; agora so com UI separada em
+    // secoes para serem chamadas pelo painel de Propriedades).
     // -------------------------------------------------------------------
 
     struct SceneObject
     {
+        std::string name = "Objeto";
+
         ObjectKind kind = ObjectKind::Sphere;
 
-        Sphere sphere{10.0f};
+        Sphere sphere{5.0f};
         Block block{4.0f, 5.0f, 3.0f};
-        Cylinder cylinder{5.0f, 5.0f};
+        Cylinder cylinder{3.0f, 5.0f};
         std::string text = "(WBWBWBWB";
 
         Vec3f position{0.0f, 0.0f, 0.0f};
@@ -215,10 +249,7 @@ namespace
         Color edgeColor = Color::Yellow();
         Color vertexColor = Color::Red();
 
-        bool hasTransform() const
-        {
-            return kind != ObjectKind::String;
-        }
+        bool hasTransform() const { return kind != ObjectKind::String; }
 
         Rot3f rotator() const
         {
@@ -229,9 +260,6 @@ namespace
             return rot;
         }
 
-        // Inversa da rotacao = conjugado do quaternion (x,y,z,w) ->
-        // (-x,-y,-z,w), valido porque rotator() sempre devolve um
-        // quaternion normalizado.
         Vec3f worldToLocal(const Vec3f &world) const
         {
             const auto rot = rotator();
@@ -240,10 +268,6 @@ namespace
             return inverse.rotateVector(world - position);
         }
 
-        // Transforma os 8 cantos do AABB do no (espaco de mundo) para o
-        // espaco local do objeto e delega para o classify() da forma —
-        // assim cada objeto e voxelizado na posicao/rotacao certas, sem
-        // nenhum pos-processamento de malha.
         OctreeState classifyShape(const AABB &worldBounds) const
         {
             const Vec3f worldMin = worldBounds.minimum().to_vector();
@@ -295,10 +319,6 @@ namespace
             }
         }
 
-        // Constroi a Octree deste objeto usando os bounds GLOBAIS
-        // compartilhados por toda a cena (definidos no painel) — e por
-        // isso que todas as octrees ficam consistentes entre si mesmo
-        // sendo construidas/desenhadas separadamente.
         Octree buildOctree(const Point3f &worldMin, const Point3f &worldMax, int maxDepth) const
         {
             Octree tree(worldMin, worldMax);
@@ -341,18 +361,22 @@ namespace
             return tree;
         }
 
-        bool drawUI()
+        // ---- Secoes de UI ------------------------------------------------
+
+        // Parametros da forma (inclui o seletor de tipo).
+        bool drawShapeUI()
         {
             bool changed = false;
 
             int current = static_cast<int>(kind);
-            if (ImGui::Combo(
-                    "Tipo", &current, kObjectKindLabels.data(),
-                    static_cast<int>(kObjectKindLabels.size())))
+            if (ImGui::Combo("Tipo", &current, kObjectKindLabels.data(),
+                             static_cast<int>(kObjectKindLabels.size())))
             {
                 kind = static_cast<ObjectKind>(current);
                 changed = true;
             }
+
+            ImGui::Spacing();
 
             switch (kind)
             {
@@ -388,42 +412,93 @@ namespace
                 break;
 
             case ObjectKind::String:
-                changed |= ImGui::InputTextMultiline(
-                    "Padrao", &text, ImVec2(0.0f, 80.0f));
+                changed |= ImGui::InputTextMultiline("Padrao", &text, ImVec2(0.0f, 90.0f));
+                ImGui::TextDisabled("W/B = preenchido/vazio, '(' = subdividir");
                 break;
             }
-
-            if (hasTransform())
-            {
-                changed |= ImGui::DragFloat3("Posicao", position.data_ptr(), kDragSpeed);
-                changed |= ImGui::DragFloat3(
-                    "Rotacao (graus)", rotationDegrees.data_ptr(), 1.0f);
-            }
-
-            ImGui::Separator();
-            ImGui::Text("Cores");
-
-            changed |= drawColorEdit("Face", faceColor);
-            changed |= drawColorEdit("Aresta", edgeColor);
-            changed |= drawColorEdit("Vertice", vertexColor);
 
             return changed;
         }
 
-    private:
-        static bool drawColorEdit(const char *label, Color &color)
+        // Transformacao (posicao + rotacao).
+        bool drawTransformUI()
         {
-            float rgba[4] = {color.r, color.g, color.b, color.a};
+            bool changed = false;
 
-            if (ImGui::ColorEdit4(label, rgba))
+            changed |= ImGui::DragFloat3("Posicao", position.data_ptr(), kDragSpeed);
+            changed |= ImGui::DragFloat3("Rotacao (graus)", rotationDegrees.data_ptr(), 1.0f);
+
+            if (ImGui::SmallButton("Resetar"))
             {
-                color = Color(rgba[0], rgba[1], rgba[2], rgba[3]);
-                return true;
+                position = Vec3f{0.0f, 0.0f, 0.0f};
+                rotationDegrees = Vec3f{0.0f, 0.0f, 0.0f};
+                changed = true;
             }
 
-            return false;
+            return changed;
+        }
+
+        // Cores.
+        bool drawColorsUI()
+        {
+            bool changed = false;
+            changed |= drawColorEdit("Face", faceColor);
+            changed |= drawColorEdit("Aresta", edgeColor);
+            changed |= drawColorEdit("Vertice", vertexColor);
+            return changed;
         }
     };
+
+    // -------------------------------------------------------------------
+    // Tema escuro estilo
+    // -------------------------------------------------------------------
+
+    void applyStyle()
+    {
+        ImGuiStyle &style = ImGui::GetStyle();
+
+        style.WindowPadding = ImVec2(8.0f, 8.0f);
+        style.FramePadding = ImVec2(6.0f, 3.0f);
+        style.ItemSpacing = ImVec2(6.0f, 5.0f);
+        style.ItemInnerSpacing = ImVec2(4.0f, 4.0f);
+        style.IndentSpacing = 18.0f;
+        style.ScrollbarSize = 12.0f;
+        style.GrabMinSize = 10.0f;
+
+        style.WindowBorderSize = 1.0f;
+        style.FrameBorderSize = 0.0f;
+        style.PopupBorderSize = 1.0f;
+
+        style.WindowRounding = 4.0f;
+        style.FrameRounding = 3.0f;
+        style.PopupRounding = 3.0f;
+        style.ScrollbarRounding = 3.0f;
+        style.GrabRounding = 3.0f;
+        style.TabRounding = 4.0f;
+
+        ImVec4 *c = style.Colors;
+        c[ImGuiCol_WindowBg] = ImVec4(0.14f, 0.14f, 0.14f, 1.00f);
+        c[ImGuiCol_ChildBg] = ImVec4(0.11f, 0.11f, 0.11f, 1.00f);
+        c[ImGuiCol_PopupBg] = ImVec4(0.10f, 0.10f, 0.10f, 0.98f);
+        c[ImGuiCol_Header] = ImVec4(0.22f, 0.22f, 0.22f, 1.00f);
+        c[ImGuiCol_HeaderHovered] = ImVec4(0.28f, 0.28f, 0.28f, 1.00f);
+        c[ImGuiCol_HeaderActive] = ImVec4(0.32f, 0.32f, 0.32f, 1.00f);
+        c[ImGuiCol_Button] = ImVec4(0.22f, 0.22f, 0.22f, 1.00f);
+        c[ImGuiCol_ButtonHovered] = ImVec4(0.30f, 0.30f, 0.30f, 1.00f);
+        c[ImGuiCol_ButtonActive] = ImVec4(0.35f, 0.35f, 0.35f, 1.00f);
+        c[ImGuiCol_FrameBg] = ImVec4(0.18f, 0.18f, 0.18f, 1.00f);
+        c[ImGuiCol_FrameBgHovered] = ImVec4(0.24f, 0.24f, 0.24f, 1.00f);
+        c[ImGuiCol_FrameBgActive] = ImVec4(0.28f, 0.28f, 0.28f, 1.00f);
+        c[ImGuiCol_CheckMark] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+        c[ImGuiCol_SliderGrab] = ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
+        c[ImGuiCol_SliderGrabActive] = ImVec4(0.36f, 0.69f, 1.00f, 1.00f);
+        c[ImGuiCol_Separator] = ImVec4(0.28f, 0.28f, 0.28f, 1.00f);
+        c[ImGuiCol_Tab] = ImVec4(0.15f, 0.15f, 0.15f, 1.00f);
+        c[ImGuiCol_TabHovered] = ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
+        c[ImGuiCol_TabActive] = ImVec4(0.20f, 0.41f, 0.68f, 1.00f);
+        c[ImGuiCol_TabUnfocused] = ImVec4(0.15f, 0.15f, 0.15f, 1.00f);
+        c[ImGuiCol_TabUnfocusedActive] = ImVec4(0.18f, 0.30f, 0.48f, 1.00f);
+    }
 }
 
 class Trabalho01 : public RendererGlfwOpengl
@@ -437,13 +512,15 @@ protected:
         initImGui();
         ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-        camera().setPerspective(
-            kFovDegrees,
-            static_cast<float>(width) / height,
-            kNearPlane,
-            kFarPlane);
+        m_width = width;
+        m_height = height;
 
-        m_objects.push_back(SceneObject{});
+        applyCameraProjection(); // antes: camera().setPerspective(kFovDegrees, ...)
+
+        SceneObject first;
+        first.name = "Esfera 1";
+        m_objects.push_back(first);
+        m_selectedIndex = 0;
 
         rebuildMeshes();
     }
@@ -451,6 +528,14 @@ protected:
     void onShutdown() override
     {
         shutdownImGui();
+    }
+
+    void onWindowResize(
+        int width,
+        int height) override
+    {
+        m_width = width;
+        m_height = height;
     }
 
     void onUpdate(float deltaTime) override
@@ -464,18 +549,22 @@ protected:
         drawScene(drawer);
     }
 
-    void onUI() override {
+    void onUI() override
+    {
         imguiStartRender();
         imguiEndRender();
     }
 
 private:
+    int m_width = 1280;
+    int m_height = 720;
+
     std::vector<SceneObject> m_objects;
     std::vector<Mesh3f> m_meshes;
 
-    // Espaco global compartilhado por TODAS as octrees da cena — e o que
-    // garante que ficam consistentes entre si mesmo desenhadas
-    // separadamente.
+    int m_selectedIndex = -1;
+    bool m_needRebuild = false;
+
     Vec3f m_worldMin{-10.0f, -10.0f, -10.0f};
     Vec3f m_worldMax{10.0f, 10.0f, 10.0f};
 
@@ -488,11 +577,24 @@ private:
     bool m_showFaces = true;
     bool m_showEdges = false;
     bool m_showVertices = false;
+    HoveredVariants::Variant m_hoveredPanel = HoveredVariants::Canvas{};
+
+    // ---- Membros - Camera ------------------------------------------
+    float m_cameraFov = kFovDegrees;
+    float m_cameraNear = kNearPlane;
+    float m_cameraFar = kFarPlane;
+
+    float m_orbitSensitivity = kOrbitSensitivity; // ja existia como const
+    float m_zoomSensitivity = 1.0f;
+    float m_moveSpeed = 10.0f;
 
     // ---- Câmera / input --------------------------------------------
 
     void updateCameraOrbit()
     {
+        if (!std::holds_alternative<HoveredVariants::Canvas>(m_hoveredPanel))
+            return;
+
         const double dx = input().m_mouseX - m_lastMouseX;
         const double dy = input().m_mouseY - m_lastMouseY;
 
@@ -502,20 +604,23 @@ private:
         if (input().rightMouse())
         {
             camera().orbit(
-                static_cast<float>(dx) * kOrbitSensitivity,
-                static_cast<float>(dy) * kOrbitSensitivity);
+                static_cast<float>(dx) * m_orbitSensitivity,  // <- membro
+                static_cast<float>(dy) * m_orbitSensitivity); // <- membro
         }
 
         if (input().scrollOffset() != 0.0)
         {
-            camera().zoom(static_cast<float>(input().scrollOffset()));
+            camera().zoom(
+                static_cast<float>(input().scrollOffset()) * m_zoomSensitivity);
         }
     }
 
     void updateCameraMovement(float deltaTime)
     {
-        constexpr float speed = 10.0f;
-        const float amount = speed * deltaTime;
+        if (!std::holds_alternative<HoveredVariants::Canvas>(m_hoveredPanel))
+            return;
+
+        const float amount = m_moveSpeed * deltaTime; // <- membro
 
         const auto forward = camera().rotation().forward();
         const auto right = camera().rotation().right();
@@ -535,6 +640,15 @@ private:
             camera().move(up * -amount);
     }
 
+    void applyCameraProjection()
+    {
+        const float aspect = (m_height > 0)
+                                 ? static_cast<float>(m_width) / static_cast<float>(m_height)
+                                 : 1.0f;
+
+        camera().setPerspective(m_cameraFov, aspect, m_cameraNear, m_cameraFar);
+    }
+
     // ---- UI -----------------------------------------------------------
 
     void renderUI()
@@ -542,95 +656,364 @@ private:
         ImGui::DockSpaceOverViewport(
             0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
 
-        drawPanel();
-    }
+        drawOutlinerPanel();
+        drawPropertiesPanel();
 
-    void drawPanel()
-    {
-        ImGui::Begin("Ferramentas");
+        ImGuiContext *ctx = ImGui::GetCurrentContext();
+        ImGuiWindow *w = ctx->HoveredWindow;
 
-        bool changed = false;
-
-        ImGui::Text("Espaco Global (bounds compartilhados)");
-        changed |= ImGui::DragFloat3("Min", m_worldMin.data_ptr(), kDragSpeed);
-        changed |= ImGui::DragFloat3("Max", m_worldMax.data_ptr(), kDragSpeed);
-        changed |= ImGui::DragFloat3(
-            "Octree Scale", m_octreeScale.data_ptr(), 0.01f, 0.1f, 100.0f);
-        changed |= ImGui::SliderInt("Octree Depth", &m_octreeDepth, 0, 5);
-
-        ImGui::Separator();
-        ImGui::Checkbox("Faces", &m_showFaces);
-        ImGui::Checkbox("Arestas", &m_showEdges);
-        ImGui::Checkbox("Vertices", &m_showVertices);
-        ImGui::Separator();
-
-        if (ImGui::Button("Adicionar Objeto"))
+        if (w == nullptr)
         {
-            m_objects.push_back(SceneObject{});
-            changed = true;
+            m_hoveredPanel = HoveredVariants::Canvas{};
+        }
+        else
+        {
+            while (w->ParentWindow)
+                w = w->ParentWindow;
+
+            m_hoveredPanel = HoveredVariants::ImGui{std::string(w->Name)};
         }
 
-        ImGui::BeginChild("SceneObjects", ImVec2(0.0f, 360.0f), true);
-
-        int removeIndex = -1;
-
-        for (int i = 0; i < static_cast<int>(m_objects.size()); ++i)
+        if (m_needRebuild)
         {
-            ImGui::PushID(i);
-            ImGui::Text("Objeto %d", i + 1);
+            rebuildMeshes();
+            m_needRebuild = false;
+        }
+    }
 
-            changed |= m_objects[i].drawUI();
+    // ---- Painel "Outliner" --------------------------------------------
 
-            if (ImGui::Button("Remover"))
+    void drawOutlinerPanel()
+    {
+        ImGui::SetNextWindowSize(ImVec2(260.0f, 480.0f), ImGuiCond_FirstUseEver);
+        ImGui::Begin("Outliner");
+
+        // Cabecalho: raiz "Cena"
+        if (ImGui::TreeNodeEx("Cena",
+                              ImGuiTreeNodeFlags_DefaultOpen |
+                                  ImGuiTreeNodeFlags_SpanAvailWidth))
+        {
+            // Botao "+ Adicionar" com popup de tipo
+            if (ImGui::Button("+ Adicionar Objeto", ImVec2(-1.0f, 0.0f)))
             {
-                removeIndex = i;
+                ImGui::OpenPopup("AddObjectPopup");
+            }
+
+            if (ImGui::BeginPopup("AddObjectPopup"))
+            {
+                for (int i = 0; i < static_cast<int>(kObjectKindLabels.size()); ++i)
+                {
+                    if (ImGui::MenuItem(kObjectKindLabels[i]))
+                    {
+                        SceneObject obj;
+                        obj.kind = static_cast<ObjectKind>(i);
+                        obj.name = std::string(kObjectKindLabels[i]) + " " +
+                                   std::to_string(m_objects.size() + 1);
+
+                        if (obj.kind == ObjectKind::String)
+                            obj.text = "(WBWBWBWB";
+
+                        m_objects.push_back(obj);
+                        m_selectedIndex = static_cast<int>(m_objects.size()) - 1;
+                        m_needRebuild = true;
+                    }
+                }
+                ImGui::EndPopup();
             }
 
             ImGui::Separator();
-            ImGui::PopID();
+
+            // Lista de objetos
+            ImGui::BeginChild("ObjectList", ImVec2(0.0f, 0.0f), false);
+
+            int pendingRemove = -1;
+            int pendingDuplicate = -1;
+
+            for (int i = 0; i < static_cast<int>(m_objects.size()); ++i)
+            {
+                SceneObject &obj = m_objects[i];
+
+                ImGui::PushID(i);
+
+                const bool isSelected = (m_selectedIndex == i);
+                const std::string label =
+                    std::string(kindIcon(obj.kind)) + "  " + obj.name;
+
+                if (ImGui::Selectable(label.c_str(), isSelected))
+                {
+                    m_selectedIndex = i;
+                }
+
+                if (ImGui::BeginPopupContextItem("object_ctx"))
+                {
+                    if (ImGui::MenuItem("Duplicar"))
+                        pendingDuplicate = i;
+                    if (ImGui::MenuItem("Remover"))
+                        pendingRemove = i;
+                    ImGui::EndPopup();
+                }
+
+                ImGui::PopID();
+            }
+
+            if (pendingDuplicate >= 0)
+            {
+                SceneObject copy = m_objects[pendingDuplicate];
+                copy.name += " copia";
+                m_objects.insert(m_objects.begin() + pendingDuplicate + 1, copy);
+                m_selectedIndex = pendingDuplicate + 1;
+                m_needRebuild = true;
+            }
+
+            if (pendingRemove >= 0)
+            {
+                m_objects.erase(m_objects.begin() + pendingRemove);
+
+                if (m_selectedIndex == pendingRemove)
+                {
+                    m_selectedIndex = m_objects.empty()
+                                          ? -1
+                                          : std::min(pendingRemove,
+                                                     static_cast<int>(m_objects.size()) - 1);
+                }
+                else if (m_selectedIndex > pendingRemove)
+                {
+                    --m_selectedIndex;
+                }
+
+                m_needRebuild = true;
+            }
+
+            ImGui::EndChild();
+            ImGui::TreePop();
         }
-
-        ImGui::EndChild();
-
-        if (removeIndex >= 0)
-        {
-            m_objects.erase(m_objects.begin() + removeIndex);
-            changed = true;
-        }
-
-        if (changed)
-        {
-            rebuildMeshes();
-        }
-
-        std::size_t totalVertices = 0;
-        std::size_t totalFaces = 0;
-
-        for (const auto &mesh : m_meshes)
-        {
-            totalVertices += mesh.vertices().size();
-            totalFaces += mesh.faces().size();
-        }
-
-        ImGui::Separator();
-        ImGui::Text("Objetos: %zu", m_objects.size());
-        ImGui::Text("Vertices: %zu", totalVertices);
-        ImGui::Text("Faces: %zu", totalFaces);
 
         ImGui::End();
     }
+
+    // ---- Painel "Propriedades" ----------------------------------------
+
+    void drawPropertiesPanel()
+    {
+        ImGui::SetNextWindowSize(ImVec2(340.0f, 540.0f), ImGuiCond_FirstUseEver);
+        ImGui::Begin("Propriedades");
+
+        bool changed = false;
+
+        if (ImGui::BeginTabBar("PropertiesTabs"))
+        {
+            if (ImGui::BeginTabItem("Cena"))
+            {
+                changed |= drawSceneSettingsUI();
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Objeto"))
+            {
+                changed |= drawObjectSettingsUI();
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Camera")) // <-- nova aba
+            {
+                changed |= drawCameraSettingsUI();
+                ImGui::EndTabItem();
+            }
+
+            ImGui::EndTabBar();
+        }
+
+        if (changed)
+            m_needRebuild = true;
+
+        ImGui::End();
+    }
+
+    bool drawCameraSettingsUI()
+    {
+        bool changed = false;
+        auto &cam = camera();
+
+        // ---- Projecao --------------------------------------------------
+        if (ImGui::CollapsingHeader("Projecao", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            bool projChanged = false;
+            projChanged |= ImGui::SliderFloat(
+                "FOV (graus)", &m_cameraFov, 10.0f, 120.0f, "%.1f");
+
+            projChanged |= ImGui::DragFloat(
+                "Near", &m_cameraNear, 0.001f,
+                0.001f, m_cameraFar - 0.01f, "%.3f");
+
+            projChanged |= ImGui::DragFloat(
+                "Far", &m_cameraFar, 1.0f,
+                m_cameraNear + 0.01f, 10000.0f, "%.1f");
+
+            if (projChanged)
+            {
+                applyCameraProjection();
+                changed = true;
+            }
+
+            ImGui::TextDisabled("Aspect: %.3f",
+                                (m_height > 0) ? static_cast<float>(m_width) / m_height : 1.0f);
+        }
+
+        // ---- Controle --------------------------------------------------
+        if (ImGui::CollapsingHeader("Controle", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::SliderFloat("Sens. Orbita", &m_orbitSensitivity,
+                               0.01f, 2.0f, "%.2f");
+            ImGui::SliderFloat("Sens. Zoom", &m_zoomSensitivity,
+                               0.10f, 5.0f, "%.2f");
+            ImGui::SliderFloat("Vel. Movimento (WASD)", &m_moveSpeed,
+                               1.0f, 50.0f, "%.1f");
+        }
+
+        // ---- Estado atual ----------------------------------------------
+        if (ImGui::CollapsingHeader("Estado", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            const auto p = cam.position();
+            ImGui::Text("Posicao:  %.3f, %.3f, %.3f", p[0], p[1], p[2]);
+
+            const auto f = cam.rotation().forward();
+            ImGui::Text("Forward:  %.3f, %.3f, %.3f", f[0], f[1], f[2]);
+
+            const auto u = cam.rotation().up();
+            ImGui::Text("Up:       %.3f, %.3f, %.3f", u[0], u[1], u[2]);
+        }
+
+        // ---- Reset -----------------------------------------------------
+        ImGui::Separator();
+
+        if (ImGui::Button("Resetar camera", ImVec2(-1.0f, 0.0f)))
+        {
+            m_cameraFov = kFovDegrees;
+            m_cameraNear = kNearPlane;
+            m_cameraFar = kFarPlane;
+            m_orbitSensitivity = kOrbitSensitivity;
+            m_zoomSensitivity = 1.0f;
+            m_moveSpeed = 10.0f;
+
+            applyCameraProjection();
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    // ---- Secao "Cena" --------------------------------------------------
+
+    bool drawSceneSettingsUI()
+    {
+        bool changed = false;
+
+        if (ImGui::CollapsingHeader("Espaco Global", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            changed |= ImGui::DragFloat3("Minimo", m_worldMin.data_ptr(), kDragSpeed);
+            changed |= ImGui::DragFloat3("Maximo", m_worldMax.data_ptr(), kDragSpeed);
+            ImGui::TextDisabled("Bounds compartilhados por todas as octrees.");
+        }
+
+        if (ImGui::CollapsingHeader("Octree", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            changed |= ImGui::DragFloat3(
+                "Escala", m_octreeScale.data_ptr(), 0.01f, 0.1f, 100.0f);
+            changed |= ImGui::SliderInt("Profundidade", &m_octreeDepth, 0, 5);
+        }
+
+        if (ImGui::CollapsingHeader("Exibicao", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            ImGui::Checkbox("Faces", &m_showFaces);
+            ImGui::Checkbox("Arestas", &m_showEdges);
+            ImGui::Checkbox("Vertices", &m_showVertices);
+        }
+
+        if (ImGui::CollapsingHeader("Estatisticas"))
+        {
+            std::size_t totalVertices = 0;
+            std::size_t totalFaces = 0;
+
+            for (const auto &mesh : m_meshes)
+            {
+                totalVertices += mesh.vertices().size();
+                totalFaces += mesh.faces().size();
+            }
+
+            ImGui::Text("Objetos: %zu", m_objects.size());
+            ImGui::Text("Vertices: %zu", totalVertices);
+            ImGui::Text("Faces: %zu", totalFaces);
+        }
+
+        return changed;
+    }
+
+    // ---- Secao "Objeto" ------------------------------------------------
+
+    bool drawObjectSettingsUI()
+    {
+        if (m_selectedIndex < 0 ||
+            m_selectedIndex >= static_cast<int>(m_objects.size()))
+        {
+            ImGui::Spacing();
+            ImGui::TextDisabled("Nenhum objeto selecionado.");
+            ImGui::Spacing();
+            ImGui::TextWrapped(
+                "Selecione um objeto no Outliner para editar suas propriedades.");
+            return false;
+        }
+
+        SceneObject &obj = m_objects[m_selectedIndex];
+        bool changed = false;
+
+        // Cabecalho do objeto: icone + nome editavel
+        ImGui::Text("%s", kindIcon(obj.kind));
+        ImGui::SameLine();
+
+        char nameBuf[128];
+        std::snprintf(nameBuf, sizeof(nameBuf), "%s", obj.name.c_str());
+
+        if (ImGui::InputText("##name", nameBuf, sizeof(nameBuf)))
+            obj.name = nameBuf;
+
+        ImGui::Separator();
+
+        if (obj.hasTransform())
+        {
+            if (ImGui::CollapsingHeader("Transformacao",
+                                        ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                changed |= obj.drawTransformUI();
+            }
+        }
+
+        if (ImGui::CollapsingHeader("Forma", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            changed |= obj.drawShapeUI();
+        }
+
+        if (ImGui::CollapsingHeader("Cores", ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            changed |= obj.drawColorsUI();
+        }
+
+        return changed;
+    }
+
+    // ---- Renderizacao da cena -----------------------------------------
 
     void drawScene(Drawer &drawer)
     {
         const Color transparent = Color::Transparent();
 
-        // Cada octree/malha foi construida com os MESMOS bounds globais,
-        // entao desenha-las separadamente ainda resulta numa cena
-        // espacialmente consistente.
-        for (std::size_t i = 0; i < m_objects.size() && i < m_meshes.size(); ++i)
+        for (std::size_t i = 0;
+             i < m_objects.size() && i < m_meshes.size(); ++i)
         {
             const auto &object = m_objects[i];
-            const auto &mesh = m_meshes[i];
+            Mesh3f &mesh = m_meshes[i];
+
+            if (mesh.edges().empty())
+                mesh.buildEdgesFromFaces();
 
             drawer.drawMesh(
                 mesh,
@@ -640,7 +1023,7 @@ private:
         }
     }
 
-    // ---- Construção das malhas ------------------------------------------
+    // ---- Construcao das malhas -----------------------------------------
 
     void rebuildMeshes()
     {
@@ -657,9 +1040,7 @@ private:
             Mesh3f mesh = tree.scaleBounds(m_octreeScale).toMesh();
 
             if (mesh.edges().empty())
-            {
                 mesh.buildEdgesFromFaces();
-            }
 
             m_meshes.push_back(std::move(mesh));
         }
@@ -671,7 +1052,7 @@ private:
     {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
-        ImGui::StyleColorsDark();
+        applyStyle();
 
         ImGui_ImplGlfw_InitForOpenGL(window(), true);
         ImGui_ImplOpenGL3_Init("#version 330");

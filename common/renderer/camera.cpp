@@ -56,8 +56,10 @@ void Camera::orbit(
         {0, 1, 0},
         -deltaYaw * DEG2RAD);
 
-    m_rotation.rotateLocal(
-        {1, 0, 0},
+    const auto right = m_rotation.right();
+
+    m_rotation.rotateWorld(
+        right,
         -deltaPitch * DEG2RAD);
 
     updatePosition();
