@@ -649,6 +649,75 @@ private:
         camera().setPerspective(m_cameraFov, aspect, m_cameraNear, m_cameraFar);
     }
 
+    // ---- unionToString -----------------------------------------------------------
+
+    std::string unionToString() const
+    {
+        if (m_objects.empty())
+        {
+            return {};
+        }
+
+        const Point3f worldMin{
+            m_worldMin[0],
+            m_worldMin[1],
+            m_worldMin[2]};
+
+        const Point3f worldMax{
+            m_worldMax[0],
+            m_worldMax[1],
+            m_worldMax[2]};
+
+        Octree tree =
+            m_objects.front().buildOctree(
+                worldMin,
+                worldMax,
+                m_octreeDepth);
+
+        for (std::size_t i = 1;
+             i < m_objects.size();
+             ++i)
+        {
+            tree.unite(
+                m_objects[i].buildOctree(
+                    worldMin,
+                    worldMax,
+                    m_octreeDepth));
+        }
+
+        std::string result;
+
+        struct Visitor
+        {
+            std::string &output;
+
+            void operator()(
+                const AABB &,
+                std::size_t,
+                const OctreeNode &node) const
+            {
+                if (node.isFilled())
+                {
+                    output += 'W';
+                }
+                else if (node.isEmpty())
+                {
+                    output += 'B';
+                }
+                else
+                {
+                    output += '(';
+                }
+            }
+        };
+
+        Visitor visitor{result};
+
+        tree.read(visitor);
+
+        return result;
+    }
+
     // ---- UI -----------------------------------------------------------
 
     void renderUI()
@@ -943,6 +1012,17 @@ private:
             ImGui::Text("Objetos: %zu", m_objects.size());
             ImGui::Text("Vertices: %zu", totalVertices);
             ImGui::Text("Faces: %zu", totalFaces);
+        }
+
+        if (ImGui::Button(
+                "Copiar Uniao para Area de Transferencia",
+                ImVec2(-1.0f, 0.0f)))
+        {
+            const std::string text =
+                unionToString();
+
+            ImGui::SetClipboardText(
+                text.c_str());
         }
 
         return changed;

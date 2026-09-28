@@ -109,8 +109,7 @@ namespace geometry
         }
 
         template <typename Visitor>
-        void read(
-            Visitor &&visitor) const
+        void read(Visitor &&visitor) const
         {
             readRecursive(
                 m_root,
