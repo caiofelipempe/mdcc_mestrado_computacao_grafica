@@ -565,8 +565,7 @@ private:
     int m_selectedIndex = -1;
     bool m_needRebuild = false;
 
-    Vec3f m_worldMin{-10.0f, -10.0f, -10.0f};
-    Vec3f m_worldMax{10.0f, 10.0f, 10.0f};
+    AABB m_world_bounds{{-10.0f, -10.0f, -10.0f}, {10.0f, 10.0f, 10.0f}};
 
     Vec3f m_octreeScale{1.0f, 1.0f, 1.0f};
     int m_octreeDepth = 5;
@@ -659,14 +658,14 @@ private:
         }
 
         const Point3f worldMin{
-            m_worldMin[0],
-            m_worldMin[1],
-            m_worldMin[2]};
+            m_world_bounds.minimum()[0],
+            m_world_bounds.minimum()[1],
+            m_world_bounds.minimum()[2]};
 
         const Point3f worldMax{
-            m_worldMax[0],
-            m_worldMax[1],
-            m_worldMax[2]};
+            m_world_bounds.maximum()[0],
+            m_world_bounds.maximum()[1],
+            m_world_bounds.maximum()[2]};
 
         Octree tree =
             m_objects.front().buildOctree(
@@ -979,8 +978,8 @@ private:
 
         if (ImGui::CollapsingHeader("Espaco Global", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            changed |= ImGui::DragFloat3("Minimo", m_worldMin.data_ptr(), kDragSpeed);
-            changed |= ImGui::DragFloat3("Maximo", m_worldMax.data_ptr(), kDragSpeed);
+            changed |= ImGui::DragFloat3("Minimo", m_world_bounds.minimum().data_ptr(), kDragSpeed);
+            changed |= ImGui::DragFloat3("Maximo", m_world_bounds.maximum().data_ptr(), kDragSpeed);
             ImGui::TextDisabled("Bounds compartilhados por todas as octrees.");
         }
 
@@ -1110,8 +1109,8 @@ private:
         m_meshes.clear();
         m_meshes.reserve(m_objects.size());
 
-        const Point3f worldMin{m_worldMin[0], m_worldMin[1], m_worldMin[2]};
-        const Point3f worldMax{m_worldMax[0], m_worldMax[1], m_worldMax[2]};
+        const Point3f worldMin{m_world_bounds.minimum()[0], m_world_bounds.minimum()[1], m_world_bounds.minimum()[2]};
+        const Point3f worldMax{m_world_bounds.maximum()[0], m_world_bounds.maximum()[1], m_world_bounds.maximum()[2]};
 
         for (const auto &object : m_objects)
         {
