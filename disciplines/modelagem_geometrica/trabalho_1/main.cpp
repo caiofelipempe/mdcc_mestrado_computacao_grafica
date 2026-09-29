@@ -576,6 +576,8 @@ private:
     bool m_showFaces = true;
     bool m_showEdges = false;
     bool m_showVertices = false;
+    bool m_showWorldBounds = true;
+    Color m_worldBoundsColor = Color::White();
     HoveredVariants::Variant m_hoveredPanel = HoveredVariants::Canvas{};
 
     // ---- Membros - Camera ------------------------------------------
@@ -995,6 +997,9 @@ private:
             ImGui::Checkbox("Faces", &m_showFaces);
             ImGui::Checkbox("Arestas", &m_showEdges);
             ImGui::Checkbox("Vertices", &m_showVertices);
+            ImGui::Separator();
+            ImGui::Checkbox("Limites do Mundo", &m_showWorldBounds);
+            drawColorEdit("Cor dos Limites", m_worldBoundsColor);
         }
 
         if (ImGui::CollapsingHeader("Estatisticas"))
@@ -1085,8 +1090,19 @@ private:
     {
         const Color transparent = Color::Transparent();
 
-        for (std::size_t i = 0;
-             i < m_objects.size() && i < m_meshes.size(); ++i)
+        if (m_showWorldBounds)
+        {
+            Mesh3f boundsMesh = m_world_bounds.toMesh();
+
+            drawer.drawMesh(
+                boundsMesh,
+                transparent,
+                m_worldBoundsColor,
+                transparent
+            );
+        }
+
+        for (std::size_t i = 0; i < m_objects.size() && i < m_meshes.size(); ++i)
         {
             const auto &object = m_objects[i];
             Mesh3f &mesh = m_meshes[i];
