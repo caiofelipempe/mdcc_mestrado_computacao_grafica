@@ -167,9 +167,7 @@ namespace
         {
         case '1':
         case 'W':
-        case 'B':
         case 'w':
-        case 'b':
             return OctreeState::Filled;
         case '(':
             return OctreeState::Branch;
