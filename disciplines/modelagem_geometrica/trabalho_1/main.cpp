@@ -578,6 +578,8 @@ private:
     Color m_worldBoundsColor = Color::White();
     HoveredVariants::Variant m_hoveredPanel = HoveredVariants::Canvas{};
 
+    std::vector<float> m_volumes;
+
     // ---- Membros - Camera ------------------------------------------
     float m_cameraFov = kFovDegrees;
     float m_cameraNear = kNearPlane;
@@ -1059,6 +1061,17 @@ private:
             obj.name = nameBuf;
 
         ImGui::Separator();
+        ImGui::Separator();
+
+        if (m_selectedIndex >= 0 &&
+            m_selectedIndex < static_cast<int>(m_volumes.size()))
+        {
+            ImGui::Text(
+                "Volume: %.6f",
+                m_volumes[m_selectedIndex]);
+        }
+        
+        ImGui::Separator();
 
         if (obj.hasTransform())
         {
@@ -1096,8 +1109,7 @@ private:
                 boundsMesh,
                 transparent,
                 m_worldBoundsColor,
-                transparent
-            );
+                transparent);
         }
 
         for (std::size_t i = 0; i < m_objects.size() && i < m_meshes.size(); ++i)
@@ -1121,21 +1133,44 @@ private:
     void rebuildMeshes()
     {
         m_meshes.clear();
-        m_meshes.reserve(m_objects.size());
+        m_volumes.clear();
 
-        const Point3f worldMin{m_world_bounds.minimum()[0], m_world_bounds.minimum()[1], m_world_bounds.minimum()[2]};
-        const Point3f worldMax{m_world_bounds.maximum()[0], m_world_bounds.maximum()[1], m_world_bounds.maximum()[2]};
+        m_meshes.reserve(m_objects.size());
+        m_volumes.reserve(m_objects.size());
+
+        const Point3f worldMin{
+            m_world_bounds.minimum()[0],
+            m_world_bounds.minimum()[1],
+            m_world_bounds.minimum()[2]};
+
+        const Point3f worldMax{
+            m_world_bounds.maximum()[0],
+            m_world_bounds.maximum()[1],
+            m_world_bounds.maximum()[2]};
 
         for (const auto &object : m_objects)
         {
-            Octree tree = object.buildOctree(worldMin, worldMax, m_octreeDepth);
+            Octree tree =
+                object.buildOctree(
+                    worldMin,
+                    worldMax,
+                    m_octreeDepth);
 
-            Mesh3f mesh = tree.scaleBounds(m_octreeScale).toMesh();
+            m_volumes.push_back(
+                tree.volume());
+
+            Mesh3f mesh =
+                tree
+                    .scaleBounds(m_octreeScale)
+                    .toMesh();
 
             if (mesh.edges().empty())
+            {
                 mesh.buildEdgesFromFaces();
+            }
 
-            m_meshes.push_back(std::move(mesh));
+            m_meshes.push_back(
+                std::move(mesh));
         }
     }
 

@@ -151,7 +151,53 @@ namespace geometry
                          { return a && !b; });
         }
 
+        [[nodiscard]]
+        float volume() const
+        {
+            return volumeRecursive(
+                m_root,
+                m_bounds,
+                m_orientation);
+        }
+
     private:
+        static float volumeRecursive(
+            const Node &node,
+            const AABB &bounds,
+            Orientation orientation)
+        {
+            if (node.isEmpty())
+            {
+                return 0.0f;
+            }
+
+            if (node.isFilled())
+            {
+                return bounds.volume();
+            }
+
+            float total = 0.0f;
+
+            for (std::size_t i = 0; i < 8; ++i)
+            {
+                if (!node.children[i])
+                {
+                    continue;
+                }
+
+                total += volumeRecursive(
+                    *node.children[i],
+                    childBounds(
+                        bounds,
+                        remapIndex(
+                            i,
+                            orientation)),
+                    orientation);
+            }
+
+            return total;
+        }
+
         template <typename Op>
         Octree &apply(const Octree &other, Op op)
         {
