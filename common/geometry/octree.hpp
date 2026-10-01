@@ -9,73 +9,73 @@
 
 namespace geometry
 {
-    enum class OctreeState
-    {
-        Empty,
-        Branch,
-        Filled
-    };
-
-    enum class OctreeOrientation
-    {
-        CounterClockwiseBottomToTop,
-        CounterClockwiseTopToBottom,
-
-        ClockwiseBottomToTop,
-        ClockwiseTopToBottom
-    };
-
-    struct OctreeNode
-    {
-        OctreeState state =
-            OctreeState::Empty;
-
-        std::array<
-            std::unique_ptr<OctreeNode>,
-            8>
-            children;
-
-        [[nodiscard]]
-        bool isEmpty() const
-        {
-            return state ==
-                   OctreeState::Empty;
-        }
-
-        [[nodiscard]]
-        bool isFilled() const
-        {
-            return state ==
-                   OctreeState::Filled;
-        }
-
-        [[nodiscard]]
-        bool isBranch() const
-        {
-            return state ==
-                   OctreeState::Branch;
-        }
-
-        void makeBranch()
-        {
-            state =
-                OctreeState::Branch;
-
-            for (auto &child : children)
-            {
-                if (!child)
-                {
-                    child =
-                        std::make_unique<
-                            OctreeNode>();
-                }
-            }
-        }
-    };
-
     class Octree
     {
     public:
+        enum class NodeState
+        {
+            Empty,
+            Branch,
+            Filled
+        };
+
+        enum class Orientation
+        {
+            CounterClockwiseBottomToTop,
+            CounterClockwiseTopToBottom,
+
+            ClockwiseBottomToTop,
+            ClockwiseTopToBottom
+        };
+
+        struct Node
+        {
+            NodeState state =
+                NodeState::Empty;
+
+            std::array<
+                std::unique_ptr<Node>,
+                8>
+                children;
+
+            [[nodiscard]]
+            bool isEmpty() const
+            {
+                return state ==
+                       NodeState::Empty;
+            }
+
+            [[nodiscard]]
+            bool isFilled() const
+            {
+                return state ==
+                       NodeState::Filled;
+            }
+
+            [[nodiscard]]
+            bool isBranch() const
+            {
+                return state ==
+                       NodeState::Branch;
+            }
+
+            void makeBranch()
+            {
+                state =
+                    NodeState::Branch;
+
+                for (auto &child : children)
+                {
+                    if (!child)
+                    {
+                        child =
+                            std::make_unique<
+                                Node>();
+                    }
+                }
+            }
+        };
+
         Octree(
             const Point3f &minimum,
             const Point3f &maximum)
@@ -88,15 +88,15 @@ namespace geometry
         template <typename Classifier>
         Octree &build(
             Classifier &&classifier,
-            OctreeOrientation orientation =
-                OctreeOrientation::
+            Orientation orientation =
+                Orientation::
                     CounterClockwiseBottomToTop)
         {
             m_orientation =
                 orientation;
 
             m_root =
-                OctreeNode();
+                Node();
 
             buildRecursive(
                 m_root,
@@ -159,7 +159,7 @@ namespace geometry
             // orientação, senão o filho i não é a mesma região do espaço.
             assert(m_orientation == other.m_orientation);
 
-            OctreeNode result;
+            Node result;
             combine(result, m_root, other.m_root, op);
             m_root = std::move(result); // result separado: seguro mesmo com other == *this
 
@@ -167,8 +167,8 @@ namespace geometry
         }
 
         // Folha age como um ramo com 8 filhos iguais a ela mesma.
-        static const OctreeNode &childOrLeaf(
-            const OctreeNode &node,
+        static const Node &childOrLeaf(
+            const Node &node,
             std::size_t index)
         {
             if (!node.isBranch())
@@ -176,7 +176,7 @@ namespace geometry
                 return node;
             }
 
-            static const OctreeNode empty;
+            static const Node empty;
 
             return node.children[index]
                        ? *node.children[index]
@@ -185,15 +185,15 @@ namespace geometry
 
         template <typename Op>
         static void combine(
-            OctreeNode &out,
-            const OctreeNode &a,
-            const OctreeNode &b,
+            Node &out,
+            const Node &a,
+            const Node &b,
             Op op)
         {
             const auto leaf = [](bool filled)
             {
-                return filled ? OctreeState::Filled
-                              : OctreeState::Empty;
+                return filled ? NodeState::Filled
+                              : NodeState::Empty;
             };
 
             if (!a.isBranch() && !b.isBranch())
@@ -238,11 +238,11 @@ namespace geometry
         }
 
         // Ramo com 8 filhos folha de mesmo estado vira folha.
-        static void collapse(OctreeNode &node)
+        static void collapse(Node &node)
         {
             const auto first = node.children[0]->state;
 
-            if (first == OctreeState::Branch)
+            if (first == NodeState::Branch)
             {
                 return;
             }
@@ -265,7 +265,7 @@ namespace geometry
 
         static std::size_t remapIndex(
             std::size_t index,
-            OctreeOrientation orientation)
+            Orientation orientation)
         {
             std::size_t x =
                 index & 1;
@@ -278,21 +278,21 @@ namespace geometry
 
             switch (orientation)
             {
-            case OctreeOrientation::
+            case Orientation::
                 CounterClockwiseBottomToTop:
                 break;
 
-            case OctreeOrientation::
+            case Orientation::
                 CounterClockwiseTopToBottom:
                 z = 1 - z;
                 break;
 
-            case OctreeOrientation::
+            case Orientation::
                 ClockwiseBottomToTop:
                 std::swap(x, y);
                 break;
 
-            case OctreeOrientation::
+            case Orientation::
                 ClockwiseTopToBottom:
                 std::swap(x, y);
                 z = 1 - z;
@@ -348,11 +348,11 @@ namespace geometry
 
         template <typename Classifier>
         static void buildRecursive(
-            OctreeNode &node,
+            Node &node,
             const AABB &bounds,
             std::size_t depth,
             Classifier &&classifier,
-            OctreeOrientation orientation)
+            Orientation orientation)
         {
             node.state =
                 classifier(
@@ -385,11 +385,11 @@ namespace geometry
 
         template <typename Visitor>
         static void readRecursive(
-            const OctreeNode &node,
+            const Node &node,
             const AABB &bounds,
             std::size_t depth,
             Visitor &&visitor,
-            OctreeOrientation orientation)
+            Orientation orientation)
         {
             visitor(
                 bounds,
@@ -457,9 +457,9 @@ namespace geometry
 
         static void buildMesh(
             Mesh3f &mesh,
-            const OctreeNode &node,
+            const Node &node,
             const AABB &bounds,
-            OctreeOrientation orientation)
+            Orientation orientation)
         {
             if (node.isEmpty())
             {
@@ -516,11 +516,11 @@ namespace geometry
     private:
         AABB m_bounds;
 
-        OctreeOrientation m_orientation =
-            OctreeOrientation::
+        Orientation m_orientation =
+            Orientation::
                 CounterClockwiseBottomToTop;
 
-        OctreeNode m_root;
+        Node m_root;
 
     public:
         const AABB &bounds() const { return m_bounds; }

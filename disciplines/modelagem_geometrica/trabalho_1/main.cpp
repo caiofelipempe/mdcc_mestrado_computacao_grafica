@@ -58,7 +58,7 @@ namespace
     // Classificacao AABB-vs-forma
     // -------------------------------------------------------------------
 
-    OctreeState classifySphere(const Sphere &shape, const AABB &aabb)
+    Octree::NodeState classifySphere(const Sphere &shape, const AABB &aabb)
     {
         const auto min = aabb.minimum();
         const auto max = aabb.maximum();
@@ -71,7 +71,7 @@ namespace
         const auto sqrRadius = shape.radius() * shape.radius();
 
         if (furthest.dot(furthest) <= sqrRadius)
-            return OctreeState::Filled;
+            return Octree::NodeState::Filled;
 
         const Vec3 closest{
             std::clamp(0.0f, min[0], max[0]),
@@ -79,12 +79,12 @@ namespace
             std::clamp(0.0f, min[2], max[2])};
 
         if (closest.dot(closest) <= sqrRadius)
-            return OctreeState::Branch;
+            return Octree::NodeState::Branch;
 
-        return OctreeState::Empty;
+        return Octree::NodeState::Empty;
     }
 
-    OctreeState classifyBlock(const Block &shape, const AABB &aabb)
+    Octree::NodeState classifyBlock(const Block &shape, const AABB &aabb)
     {
         const auto half = shape.boundSize() * 0.5f;
         const auto min = aabb.minimum().to_vector();
@@ -103,20 +103,20 @@ namespace
             std::abs(furthest.dot(v)) <= half[1] &&
             std::abs(furthest.dot(w)) <= half[2])
         {
-            return OctreeState::Filled;
+            return Octree::NodeState::Filled;
         }
 
         if (max.dot(u) < -half[0] || min.dot(u) > half[0] ||
             max.dot(v) < -half[1] || min.dot(v) > half[1] ||
             max.dot(w) < -half[2] || min.dot(w) > half[2])
         {
-            return OctreeState::Empty;
+            return Octree::NodeState::Empty;
         }
 
-        return OctreeState::Branch;
+        return Octree::NodeState::Branch;
     }
 
-    OctreeState classifyCylinder(const Cylinder &shape, const AABB &aabb)
+    Octree::NodeState classifyCylinder(const Cylinder &shape, const AABB &aabb)
     {
         const Vec3 axisY{0.0f, 1.0f, 0.0f};
 
@@ -137,7 +137,7 @@ namespace
         if (furthestRadial.dot(furthestRadial) <= sqrRadius &&
             furthestHeight <= halfHeight)
         {
-            return OctreeState::Filled;
+            return Octree::NodeState::Filled;
         }
 
         const Vec3 closest{
@@ -152,27 +152,27 @@ namespace
             closestHeight < -halfHeight ||
             closestHeight > halfHeight)
         {
-            return OctreeState::Empty;
+            return Octree::NodeState::Empty;
         }
 
-        return OctreeState::Branch;
+        return Octree::NodeState::Branch;
     }
 
-    OctreeState parseNextStringToken(const std::string &text, std::size_t &pos)
+    Octree::NodeState parseNextStringToken(const std::string &text, std::size_t &pos)
     {
         if (pos >= text.size())
-            return OctreeState::Empty;
+            return Octree::NodeState::Empty;
 
         switch (text[pos++])
         {
         case '1':
         case 'W':
         case 'w':
-            return OctreeState::Filled;
+            return Octree::NodeState::Filled;
         case '(':
-            return OctreeState::Branch;
+            return Octree::NodeState::Branch;
         default:
-            return OctreeState::Empty;
+            return Octree::NodeState::Empty;
         }
     }
 
@@ -266,7 +266,7 @@ namespace
             return inverse.rotateVector(world - position);
         }
 
-        OctreeState classifyShape(const AABB &worldBounds) const
+        Octree::NodeState classifyShape(const AABB &worldBounds) const
         {
             const Vec3f worldMin = worldBounds.minimum().to_vector();
             const Vec3f worldMax = worldBounds.maximum().to_vector();
@@ -313,7 +313,7 @@ namespace
             case ObjectKind::Cylinder:
                 return classifyCylinder(cylinder, localBounds);
             default:
-                return OctreeState::Empty;
+                return Octree::NodeState::Empty;
             }
         }
 
@@ -331,9 +331,9 @@ namespace
                         const auto result = parseNextStringToken(text, pos);
 
                         if (depth >= static_cast<std::size_t>(maxDepth) &&
-                            result == OctreeState::Branch)
+                            result == Octree::NodeState::Branch)
                         {
-                            return OctreeState::Filled;
+                            return Octree::NodeState::Filled;
                         }
 
                         return result;
@@ -348,9 +348,9 @@ namespace
                     const auto result = classifyShape(bounds);
 
                     if (depth >= static_cast<std::size_t>(maxDepth) &&
-                        result == OctreeState::Branch)
+                        result == Octree::NodeState::Branch)
                     {
-                        return OctreeState::Filled;
+                        return Octree::NodeState::Filled;
                     }
 
                     return result;
@@ -693,7 +693,7 @@ private:
             void operator()(
                 const AABB &,
                 std::size_t,
-                const OctreeNode &node) const
+                const Octree::Node &node) const
             {
                 if (node.isFilled())
                 {
