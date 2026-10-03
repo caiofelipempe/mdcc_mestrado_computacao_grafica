@@ -23,7 +23,7 @@ using namespace geometry;
 
 namespace
 {
-    using NodeState = Octree::NodeState;
+    using Coverage = Octree::Coverage;
 
     constexpr float kOrbitSensitivity = 0.25f;
     constexpr float kFovDegrees = 45.0f;
@@ -44,7 +44,7 @@ namespace
         const auto pick = [&](int a)
         { return std::abs(min[a]) > std::abs(max[a]) ? min[a] : max[a]; };
 
-        return Vec3{pick(0), pick(1), pick(2)};
+        return Vec3f{pick(0), pick(1), pick(2)};
     }
 
     Vec3f closestToOrigin(const AABB &box)
@@ -55,7 +55,7 @@ namespace
         const auto pick = [&](int a)
         { return std::clamp(0.0f, min[a], max[a]); };
 
-        return Vec3{pick(0), pick(1), pick(2)};
+        return Vec3f{pick(0), pick(1), pick(2)};
     }
 
     float radialSquared(const Vec3f &v)
@@ -63,25 +63,25 @@ namespace
         return v[0] * v[0] + v[2] * v[2];
     }
 
-    NodeState classifySphere(const Sphere &shape, const AABB &box)
+    Coverage classifySphere(const Sphere &shape, const AABB &box)
     {
         const float sqrRadius = shape.radius() * shape.radius();
 
-        const Vec3 farthest = furthestCorner(box);
+        const Vec3f farthest = furthestCorner(box);
         if (farthest.dot(farthest) <= sqrRadius)
-            return NodeState::Filled;
+            return Coverage::Filled;
 
-        const Vec3 closest = closestToOrigin(box);
+        const Vec3f closest = closestToOrigin(box);
         if (closest.dot(closest) <= sqrRadius)
-            return NodeState::Branch;
+            return Coverage::Partial;
 
-        return NodeState::Empty;
+        return Coverage::Empty;
     }
 
-    NodeState classifyBlock(const Block &shape, const AABB &box)
+    Coverage classifyBlock(const Block &shape, const AABB &box)
     {
         const auto half = shape.boundSize() * 0.5f;
-        const Vec3 farthest = furthestCorner(box);
+        const Vec3f farthest = furthestCorner(box);
 
         bool inside = true;
         bool outside = false;
@@ -95,49 +95,31 @@ namespace
         }
 
         if (inside)
-            return NodeState::Filled;
+            return Coverage::Filled;
 
-        return outside ? NodeState::Empty : NodeState::Branch;
+        return outside ? Coverage::Empty : Coverage::Partial;
     }
 
-    NodeState classifyCylinder(const Cylinder &shape, const AABB &box)
+    Coverage classifyCylinder(const Cylinder &shape, const AABB &box)
     {
         const float sqrRadius = shape.radius() * shape.radius();
         const float halfHeight = shape.height() * 0.5f;
 
-        const Vec3 farthest = furthestCorner(box);
+        const Vec3f farthest = furthestCorner(box);
         if (radialSquared(farthest) <= sqrRadius &&
             std::abs(farthest[1]) <= halfHeight)
         {
-            return NodeState::Filled;
+            return Coverage::Filled;
         }
 
-        const Vec3 closest = closestToOrigin(box);
+        const Vec3f closest = closestToOrigin(box);
         if (radialSquared(closest) > sqrRadius ||
             std::abs(closest[1]) > halfHeight)
         {
-            return NodeState::Empty;
+            return Coverage::Empty;
         }
 
-        return NodeState::Branch;
-    }
-
-    NodeState parseNextStringToken(const std::string &text, std::size_t &pos)
-    {
-        if (pos >= text.size())
-            return NodeState::Empty;
-
-        switch (text[pos++])
-        {
-        case '1':
-        case 'W':
-        case 'w':
-            return NodeState::Filled;
-        case '(':
-            return NodeState::Branch;
-        default:
-            return NodeState::Empty;
-        }
+        return Coverage::Partial;
     }
 
     enum class ObjectKind
@@ -153,6 +135,12 @@ namespace
         "Bloco",
         "Cilindro",
         "String"};
+
+    constexpr std::array<const char *, 4> kOrientationLabels{
+        "Anti-horario, baixo para cima",
+        "Anti-horario, cima para baixo",
+        "Horario, baixo para cima",
+        "Horario, cima para baixo"};
 
     const char *kindIcon(ObjectKind kind)
     {
@@ -192,6 +180,7 @@ namespace
         std::string text = "(WBWBWBWB";
 
         AABB bounds{{-10.0f, -10.0f, -10.0f}, {10.0f, 10.0f, 10.0f}};
+        Octree::Orientation orientation = Octree::Orientation::CounterClockwiseBottomToTop;
 
         Vec3f position{0.0f, 0.0f, 0.0f};
         Vec3f rotationDegrees{0.0f, 0.0f, 0.0f};
@@ -217,31 +206,21 @@ namespace
 
         Octree buildOctree(int maxDepth) const
         {
-            const auto limit = static_cast<std::size_t>(maxDepth);
+            return buildOctree(maxDepth, orientation);
+        }
 
-            const auto capDepth = [limit](NodeState state, std::size_t depth)
-            {
-                return (depth >= limit && state == NodeState::Branch)
-                           ? NodeState::Filled
-                           : state;
-            };
-
-            Octree tree;
+        Octree buildOctree(int maxDepth, Octree::Orientation treeOrientation) const
+        {
+            const auto depth = static_cast<std::size_t>(maxDepth);
 
             if (kind == ObjectKind::String)
-            {
-                std::size_t pos = 0;
+                return Octree::fromString(text, depth, treeOrientation);
 
-                tree.build([&](const AABB &, std::size_t depth)
-                           { return capDepth(parseNextStringToken(text, pos), depth); });
-            }
-            else
-            {
-                tree.build([&](const AABB &unitBox, std::size_t depth)
-                           { return capDepth(classifyShape(unitBox), depth); });
-            }
-
-            return tree;
+            return Octree::fromShape(
+                depth,
+                [this](const AABB &unitBox)
+                { return classifyShape(unitBox); },
+                treeOrientation);
         }
 
         bool drawShapeUI()
@@ -253,6 +232,14 @@ namespace
                              static_cast<int>(kObjectKindLabels.size())))
             {
                 kind = static_cast<ObjectKind>(current);
+                changed = true;
+            }
+
+            int currentOrientation = static_cast<int>(orientation);
+            if (ImGui::Combo("Orientacao", &currentOrientation, kOrientationLabels.data(),
+                             static_cast<int>(kOrientationLabels.size())))
+            {
+                orientation = static_cast<Octree::Orientation>(currentOrientation);
                 changed = true;
             }
 
@@ -389,7 +376,7 @@ namespace
                 Point3f{localMax[0], localMax[1], localMax[2]}};
         }
 
-        NodeState classifyShape(const AABB &unitBox) const
+        Coverage classifyShape(const AABB &unitBox) const
         {
             const AABB local = unitToLocal(unitBox);
 
@@ -402,7 +389,7 @@ namespace
             case ObjectKind::Cylinder:
                 return classifyCylinder(cylinder, local);
             default:
-                return NodeState::Empty;
+                return Coverage::Empty;
             }
         }
     };
@@ -666,18 +653,14 @@ private:
         if (m_objects.empty())
             return {};
 
-        Octree tree = m_objects.front().buildOctree(m_octreeDepth);
+        const Octree::Orientation orientation = m_objects.front().orientation;
+
+        Octree tree = m_objects.front().buildOctree(m_octreeDepth, orientation);
 
         for (std::size_t i = 1; i < m_objects.size(); ++i)
-            tree.unite(m_objects[i].buildOctree(m_octreeDepth));
+            tree |= m_objects[i].buildOctree(m_octreeDepth, orientation);
 
-        std::string result;
-
-        tree.read([&result](const AABB &, std::size_t, const Octree::Node &node)
-                  { result += node.isFilled() ? 'W' : node.isEmpty() ? 'B'
-                                                                     : '('; });
-
-        return result;
+        return tree.toString();
     }
 
     void drawScene(Drawer &drawer)

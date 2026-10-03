@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstddef>
 #include <memory>
+#include <string>
 #include <utility>
 
 namespace geometry
@@ -14,10 +15,10 @@ namespace geometry
     class Octree
     {
     public:
-        enum class NodeState
+        enum class Coverage
         {
             Empty,
-            Branch,
+            Partial,
             Filled
         };
 
@@ -29,86 +30,160 @@ namespace geometry
             ClockwiseTopToBottom
         };
 
-        struct Node
-        {
-            NodeState state = NodeState::Empty;
-            std::array<std::unique_ptr<Node>, 8> children;
-
-            [[nodiscard]] bool isEmpty() const { return state == NodeState::Empty; }
-            [[nodiscard]] bool isFilled() const { return state == NodeState::Filled; }
-            [[nodiscard]] bool isBranch() const { return state == NodeState::Branch; }
-
-            void makeBranch()
-            {
-                state = NodeState::Branch;
-
-                for (auto &child : children)
-                {
-                    if (!child)
-                    {
-                        child = std::make_unique<Node>();
-                    }
-                }
-            }
-        };
-
         [[nodiscard]] static AABB unitSpace()
         {
             return AABB{Point3f{-1.0f, -1.0f, -1.0f}, Point3f{1.0f, 1.0f, 1.0f}};
         }
 
         template <typename Classifier>
-        Octree &build(
+        [[nodiscard]] static Octree fromShape(
+            std::size_t maxDepth,
             Classifier &&classifier,
             Orientation orientation = Orientation::CounterClockwiseBottomToTop)
         {
-            m_orientation = orientation;
-            m_root = Node();
+            Octree tree(orientation);
+            tree.grow(tree.m_root, unitSpace(), 0, maxDepth, classifier);
+            return tree;
+        }
 
-            buildRecursive(m_root, unitSpace(), 0, classifier);
+        [[nodiscard]] static Octree fromString(
+            const std::string &text,
+            std::size_t maxDepth,
+            Orientation orientation = Orientation::CounterClockwiseBottomToTop)
+        {
+            std::size_t pos = 0;
 
-            return *this;
+            return fromShape(
+                maxDepth,
+                [&](const AABB &)
+                { return parseToken(text, pos); },
+                orientation);
         }
 
         template <typename Visitor>
-        void read(Visitor &&visitor, const AABB &space = unitSpace()) const
+        void forEachLeaf(Visitor &&visitor, const AABB &space = unitSpace()) const
         {
-            readRecursive(m_root, space, 0, visitor);
+            visitLeaves(m_root, space, 0, visitor);
+        }
+
+        [[nodiscard]] float volume(const AABB &space = unitSpace()) const
+        {
+            float total = 0.0f;
+
+            forEachLeaf(
+                [&](const AABB &box, bool filled, std::size_t)
+                {
+                    if (filled)
+                        total += box.volume();
+                },
+                space);
+
+            return total;
         }
 
         [[nodiscard]] Mesh3f toMesh(const AABB &space = unitSpace()) const
         {
             Mesh3f mesh;
-            buildMesh(mesh, m_root, space);
+
+            forEachLeaf(
+                [&](const AABB &box, bool filled, std::size_t)
+                {
+                    if (!filled)
+                        return;
+
+                    const auto size = box.maximum() - box.minimum();
+
+                    Mesh3f cube = Block(size[0], size[1], size[2]).toMesh();
+                    cube.translate(box.center().to_vector());
+
+                    appendMesh(mesh, cube);
+                },
+                space);
+
             return mesh;
         }
 
-        [[nodiscard]] float volume(const AABB &space = unitSpace()) const
+        [[nodiscard]] std::string toString() const
         {
-            return volumeRecursive(m_root, space);
+            std::string text;
+            writeString(m_root, text);
+            return text;
         }
 
-        Octree &unite(const Octree &other)
+        friend Octree operator|(const Octree &a, const Octree &b)
         {
-            return apply(other, [](bool a, bool b)
-                         { return a || b; });
+            return combined(a, b, [](bool x, bool y)
+                            { return x || y; });
         }
 
-        Octree &intersect(const Octree &other)
+        friend Octree operator&(const Octree &a, const Octree &b)
         {
-            return apply(other, [](bool a, bool b)
-                         { return a && b; });
+            return combined(a, b, [](bool x, bool y)
+                            { return x && y; });
         }
 
-        Octree &subtract(const Octree &other)
+        friend Octree operator-(const Octree &a, const Octree &b)
         {
-            return apply(other, [](bool a, bool b)
-                         { return a && !b; });
+            return combined(a, b, [](bool x, bool y)
+                            { return x && !y; });
         }
+
+        Octree &operator|=(const Octree &other) { return *this = *this | other; }
+        Octree &operator&=(const Octree &other) { return *this = *this & other; }
+        Octree &operator-=(const Octree &other) { return *this = *this - other; }
 
     private:
-        Orientation m_orientation = Orientation::CounterClockwiseBottomToTop;
+        struct Node
+        {
+            bool filled = false;
+            std::unique_ptr<std::array<Node, 8>> children;
+
+            [[nodiscard]] bool isBranch() const { return children != nullptr; }
+
+            void split()
+            {
+                filled = false;
+
+                if (!children)
+                {
+                    children = std::make_unique<std::array<Node, 8>>();
+                }
+            }
+
+            void setLeaf(bool value)
+            {
+                filled = value;
+                children.reset();
+            }
+        };
+
+        Orientation m_orientation;
         Node m_root;
+
+        explicit Octree(Orientation orientation)
+            : m_orientation(orientation)
+        {
+        }
+
+        static Coverage parseToken(const std::string &text, std::size_t &pos)
+        {
+            if (pos >= text.size())
+            {
+                return Coverage::Empty;
+            }
+
+            switch (text[pos++])
+            {
+            case '1':
+            case 'W':
+            case 'w':
+                return Coverage::Filled;
+            case '(':
+                return Coverage::Partial;
+            default:
+                return Coverage::Empty;
+            }
+        }
 
         static std::size_t remapIndex(std::size_t index, Orientation orientation)
         {
@@ -161,91 +236,68 @@ namespace geometry
         {
             for (std::size_t i = 0; i < 8; ++i)
             {
-                if (node.children[i])
-                {
-                    fn(*node.children[i], childBounds(bounds, i, m_orientation));
-                }
+                fn((*node.children)[i], childBounds(bounds, i, m_orientation));
             }
         }
 
         template <typename Classifier>
-        void buildRecursive(
+        void grow(
             Node &node,
             const AABB &bounds,
             std::size_t depth,
+            std::size_t maxDepth,
             Classifier &classifier) const
         {
-            node.state = classifier(bounds, depth);
+            Coverage coverage = classifier(bounds);
 
-            if (!node.isBranch())
+            if (coverage == Coverage::Partial && depth >= maxDepth)
             {
+                coverage = Coverage::Filled;
+            }
+
+            if (coverage != Coverage::Partial)
+            {
+                node.setLeaf(coverage == Coverage::Filled);
                 return;
             }
 
-            node.makeBranch();
+            node.split();
 
             forEachChild(node, bounds, [&](Node &child, const AABB &childBox)
-                         { buildRecursive(child, childBox, depth + 1, classifier); });
+                         { grow(child, childBox, depth + 1, maxDepth, classifier); });
         }
 
         template <typename Visitor>
-        void readRecursive(
+        void visitLeaves(
             const Node &node,
             const AABB &bounds,
             std::size_t depth,
             Visitor &visitor) const
         {
-            visitor(bounds, depth, node);
-
             if (!node.isBranch())
             {
+                visitor(bounds, node.filled, depth);
                 return;
             }
 
             forEachChild(node, bounds, [&](const Node &child, const AABB &childBox)
-                         { readRecursive(child, childBox, depth + 1, visitor); });
+                         { visitLeaves(child, childBox, depth + 1, visitor); });
         }
 
-        float volumeRecursive(const Node &node, const AABB &bounds) const
+        static void writeString(const Node &node, std::string &out)
         {
-            if (node.isEmpty())
+            if (!node.isBranch())
             {
-                return 0.0f;
-            }
-
-            if (node.isFilled())
-            {
-                return bounds.volume();
-            }
-
-            float total = 0.0f;
-
-            forEachChild(node, bounds, [&](const Node &child, const AABB &childBox)
-                         { total += volumeRecursive(child, childBox); });
-
-            return total;
-        }
-
-        void buildMesh(Mesh3f &mesh, const Node &node, const AABB &bounds) const
-        {
-            if (node.isEmpty())
-            {
+                out += node.filled ? 'W' : 'B';
                 return;
             }
 
-            if (node.isFilled())
+            out += '(';
+
+            for (const auto &child : *node.children)
             {
-                const auto size = bounds.maximum() - bounds.minimum();
-
-                Mesh3f cube = Block(size[0], size[1], size[2]).toMesh();
-                cube.translate(bounds.center().to_vector());
-
-                appendMesh(mesh, cube);
-                return;
+                writeString(child, out);
             }
-
-            forEachChild(node, bounds, [&](const Node &child, const AABB &childBox)
-                         { buildMesh(mesh, child, childBox); });
         }
 
         static void appendMesh(Mesh3f &dst, const Mesh3f &src)
@@ -272,32 +324,18 @@ namespace geometry
         }
 
         template <typename Op>
-        Octree &apply(const Octree &other, Op op)
+        static Octree combined(const Octree &a, const Octree &b, Op op)
         {
-            assert(m_orientation == other.m_orientation);
+            assert(a.m_orientation == b.m_orientation);
 
-            Node result;
-            combine(result, m_root, other.m_root, op);
-            m_root = std::move(result);
-
-            return *this;
-        }
-
-        static NodeState leaf(bool filled)
-        {
-            return filled ? NodeState::Filled : NodeState::Empty;
+            Octree result(a.m_orientation);
+            combine(result.m_root, a.m_root, b.m_root, op);
+            return result;
         }
 
         static const Node &childOrLeaf(const Node &node, std::size_t index)
         {
-            if (!node.isBranch())
-            {
-                return node;
-            }
-
-            static const Node empty;
-
-            return node.children[index] ? *node.children[index] : empty;
+            return node.isBranch() ? (*node.children)[index] : node;
         }
 
         template <typename Op>
@@ -305,37 +343,27 @@ namespace geometry
         {
             if (!a.isBranch() && !b.isBranch())
             {
-                out.state = leaf(op(a.isFilled(), b.isFilled()));
+                out.setLeaf(op(a.filled, b.filled));
                 return;
             }
 
-            if (!a.isBranch())
+            if (!a.isBranch() && op(a.filled, false) == op(a.filled, true))
             {
-                const bool f = a.isFilled();
-
-                if (op(f, false) == op(f, true))
-                {
-                    out.state = leaf(op(f, false));
-                    return;
-                }
+                out.setLeaf(op(a.filled, false));
+                return;
             }
 
-            if (!b.isBranch())
+            if (!b.isBranch() && op(false, b.filled) == op(true, b.filled))
             {
-                const bool f = b.isFilled();
-
-                if (op(false, f) == op(true, f))
-                {
-                    out.state = leaf(op(false, f));
-                    return;
-                }
+                out.setLeaf(op(false, b.filled));
+                return;
             }
 
-            out.makeBranch();
+            out.split();
 
             for (std::size_t i = 0; i < 8; ++i)
             {
-                combine(*out.children[i], childOrLeaf(a, i), childOrLeaf(b, i), op);
+                combine((*out.children)[i], childOrLeaf(a, i), childOrLeaf(b, i), op);
             }
 
             collapse(out);
@@ -343,27 +371,17 @@ namespace geometry
 
         static void collapse(Node &node)
         {
-            const NodeState first = node.children[0]->state;
+            const bool filled = (*node.children)[0].filled;
 
-            if (first == NodeState::Branch)
+            for (const auto &child : *node.children)
             {
-                return;
-            }
-
-            for (const auto &child : node.children)
-            {
-                if (child->state != first)
+                if (child.isBranch() || child.filled != filled)
                 {
                     return;
                 }
             }
 
-            node.state = first;
-
-            for (auto &child : node.children)
-            {
-                child.reset();
-            }
+            node.setLeaf(filled);
         }
     };
 
