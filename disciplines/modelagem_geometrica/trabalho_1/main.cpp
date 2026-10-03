@@ -2,11 +2,13 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
+#include <limits>
 #include <numbers>
 #include <string>
+#include <utility>
 #include <vector>
-#include <variant>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -21,27 +23,7 @@ using namespace geometry;
 
 namespace
 {
-    template <typename... Ts>
-    struct overloaded : Ts...
-    {
-        using Ts::operator()...;
-    };
-    template <typename... Ts>
-    overloaded(Ts...) -> overloaded<Ts...>;
-
-    struct HoveredVariants
-    {
-        struct Canvas
-        {
-        };
-
-        struct ImGui
-        {
-            std::string windowName;
-        };
-
-        using Variant = std::variant<Canvas, ImGui>;
-    };
+    using NodeState = Octree::NodeState;
 
     constexpr float kOrbitSensitivity = 0.25f;
     constexpr float kFovDegrees = 45.0f;
@@ -54,131 +36,109 @@ namespace
 
     constexpr float kDegToRad = std::numbers::pi_v<float> / 180.0f;
 
-    // -------------------------------------------------------------------
-    // Classificacao AABB-vs-forma
-    // -------------------------------------------------------------------
-
-    Octree::NodeState classifySphere(const Sphere &shape, const AABB &aabb)
+    Vec3f furthestCorner(const AABB &box)
     {
-        const auto min = aabb.minimum();
-        const auto max = aabb.maximum();
+        const auto min = box.minimum();
+        const auto max = box.maximum();
 
-        const Vec3 furthest{
-            (std::abs(min[0]) > std::abs(max[0])) ? min[0] : max[0],
-            (std::abs(min[1]) > std::abs(max[1])) ? min[1] : max[1],
-            (std::abs(min[2]) > std::abs(max[2])) ? min[2] : max[2]};
+        const auto pick = [&](int a)
+        { return std::abs(min[a]) > std::abs(max[a]) ? min[a] : max[a]; };
 
-        const auto sqrRadius = shape.radius() * shape.radius();
-
-        if (furthest.dot(furthest) <= sqrRadius)
-            return Octree::NodeState::Filled;
-
-        const Vec3 closest{
-            std::clamp(0.0f, min[0], max[0]),
-            std::clamp(0.0f, min[1], max[1]),
-            std::clamp(0.0f, min[2], max[2])};
-
-        if (closest.dot(closest) <= sqrRadius)
-            return Octree::NodeState::Branch;
-
-        return Octree::NodeState::Empty;
+        return Vec3{pick(0), pick(1), pick(2)};
     }
 
-    Octree::NodeState classifyBlock(const Block &shape, const AABB &aabb)
+    Vec3f closestToOrigin(const AABB &box)
+    {
+        const auto min = box.minimum();
+        const auto max = box.maximum();
+
+        const auto pick = [&](int a)
+        { return std::clamp(0.0f, min[a], max[a]); };
+
+        return Vec3{pick(0), pick(1), pick(2)};
+    }
+
+    float radialSquared(const Vec3f &v)
+    {
+        return v[0] * v[0] + v[2] * v[2];
+    }
+
+    NodeState classifySphere(const Sphere &shape, const AABB &box)
+    {
+        const float sqrRadius = shape.radius() * shape.radius();
+
+        const Vec3 farthest = furthestCorner(box);
+        if (farthest.dot(farthest) <= sqrRadius)
+            return NodeState::Filled;
+
+        const Vec3 closest = closestToOrigin(box);
+        if (closest.dot(closest) <= sqrRadius)
+            return NodeState::Branch;
+
+        return NodeState::Empty;
+    }
+
+    NodeState classifyBlock(const Block &shape, const AABB &box)
     {
         const auto half = shape.boundSize() * 0.5f;
-        const auto min = aabb.minimum().to_vector();
-        const auto max = aabb.maximum().to_vector();
+        const Vec3 farthest = furthestCorner(box);
 
-        const Vec3 furthest{
-            (std::abs(min[0]) > std::abs(max[0])) ? min[0] : max[0],
-            (std::abs(min[1]) > std::abs(max[1])) ? min[1] : max[1],
-            (std::abs(min[2]) > std::abs(max[2])) ? min[2] : max[2]};
+        bool inside = true;
+        bool outside = false;
 
-        const Vec3 u{1.0f, 0.0f, 0.0f};
-        const Vec3 v{0.0f, 1.0f, 0.0f};
-        const Vec3 w{0.0f, 0.0f, 1.0f};
-
-        if (std::abs(furthest.dot(u)) <= half[0] &&
-            std::abs(furthest.dot(v)) <= half[1] &&
-            std::abs(furthest.dot(w)) <= half[2])
+        for (int a = 0; a < 3; ++a)
         {
-            return Octree::NodeState::Filled;
+            inside = inside && std::abs(farthest[a]) <= half[a];
+            outside = outside ||
+                      box.maximum()[a] < -half[a] ||
+                      box.minimum()[a] > half[a];
         }
 
-        if (max.dot(u) < -half[0] || min.dot(u) > half[0] ||
-            max.dot(v) < -half[1] || min.dot(v) > half[1] ||
-            max.dot(w) < -half[2] || min.dot(w) > half[2])
-        {
-            return Octree::NodeState::Empty;
-        }
+        if (inside)
+            return NodeState::Filled;
 
-        return Octree::NodeState::Branch;
+        return outside ? NodeState::Empty : NodeState::Branch;
     }
 
-    Octree::NodeState classifyCylinder(const Cylinder &shape, const AABB &aabb)
+    NodeState classifyCylinder(const Cylinder &shape, const AABB &box)
     {
-        const Vec3 axisY{0.0f, 1.0f, 0.0f};
+        const float sqrRadius = shape.radius() * shape.radius();
+        const float halfHeight = shape.height() * 0.5f;
 
-        const auto sqrRadius = shape.radius() * shape.radius();
-        const auto halfHeight = shape.height() * 0.5f;
-
-        const auto min = aabb.minimum();
-        const auto max = aabb.maximum();
-
-        const Vec3 furthest{
-            (std::abs(min[0]) > std::abs(max[0])) ? min[0] : max[0],
-            (std::abs(min[1]) > std::abs(max[1])) ? min[1] : max[1],
-            (std::abs(min[2]) > std::abs(max[2])) ? min[2] : max[2]};
-
-        const float furthestHeight = std::abs(furthest.dot(axisY));
-        const Vec3 furthestRadial = furthest - (furthest.dot(axisY) * axisY);
-
-        if (furthestRadial.dot(furthestRadial) <= sqrRadius &&
-            furthestHeight <= halfHeight)
+        const Vec3 farthest = furthestCorner(box);
+        if (radialSquared(farthest) <= sqrRadius &&
+            std::abs(farthest[1]) <= halfHeight)
         {
-            return Octree::NodeState::Filled;
+            return NodeState::Filled;
         }
 
-        const Vec3 closest{
-            std::clamp(0.0f, min[0], max[0]),
-            std::clamp(0.0f, min[1], max[1]),
-            std::clamp(0.0f, min[2], max[2])};
-
-        const float closestHeight = closest.dot(axisY);
-        const Vec3 closestRadial = closest - (closest.dot(axisY) * axisY);
-
-        if (closestRadial.dot(closestRadial) > sqrRadius ||
-            closestHeight < -halfHeight ||
-            closestHeight > halfHeight)
+        const Vec3 closest = closestToOrigin(box);
+        if (radialSquared(closest) > sqrRadius ||
+            std::abs(closest[1]) > halfHeight)
         {
-            return Octree::NodeState::Empty;
+            return NodeState::Empty;
         }
 
-        return Octree::NodeState::Branch;
+        return NodeState::Branch;
     }
 
-    Octree::NodeState parseNextStringToken(const std::string &text, std::size_t &pos)
+    NodeState parseNextStringToken(const std::string &text, std::size_t &pos)
     {
         if (pos >= text.size())
-            return Octree::NodeState::Empty;
+            return NodeState::Empty;
 
         switch (text[pos++])
         {
         case '1':
         case 'W':
         case 'w':
-            return Octree::NodeState::Filled;
+            return NodeState::Filled;
         case '(':
-            return Octree::NodeState::Branch;
+            return NodeState::Branch;
         default:
-            return Octree::NodeState::Empty;
+            return NodeState::Empty;
         }
     }
-
-    // -------------------------------------------------------------------
-    // Tipos de objeto
-    // -------------------------------------------------------------------
 
     enum class ObjectKind
     {
@@ -194,7 +154,6 @@ namespace
         "Cilindro",
         "String"};
 
-    // Icone textual simples para o outliner.
     const char *kindIcon(ObjectKind kind)
     {
         switch (kind)
@@ -215,30 +174,24 @@ namespace
     {
         float rgba[4] = {color.r, color.g, color.b, color.a};
 
-        if (ImGui::ColorEdit4(label, rgba))
-        {
-            color = Color(rgba[0], rgba[1], rgba[2], rgba[3]);
-            return true;
-        }
+        if (!ImGui::ColorEdit4(label, rgba))
+            return false;
 
-        return false;
+        color = Color(rgba[0], rgba[1], rgba[2], rgba[3]);
+        return true;
     }
-
-    // -------------------------------------------------------------------
-    // SceneObject (inalterado na logica; agora so com UI separada em
-    // secoes para serem chamadas pelo painel de Propriedades).
-    // -------------------------------------------------------------------
 
     struct SceneObject
     {
         std::string name = "Objeto";
-
         ObjectKind kind = ObjectKind::Sphere;
 
         Sphere sphere{5.0f};
         Block block{4.0f, 5.0f, 3.0f};
         Cylinder cylinder{3.0f, 5.0f};
         std::string text = "(WBWBWBWB";
+
+        AABB bounds{{-10.0f, -10.0f, -10.0f}, {10.0f, 10.0f, 10.0f}};
 
         Vec3f position{0.0f, 0.0f, 0.0f};
         Vec3f rotationDegrees{0.0f, 0.0f, 0.0f};
@@ -249,119 +202,48 @@ namespace
 
         bool hasTransform() const { return kind != ObjectKind::String; }
 
-        Rot3f rotator() const
+        AABB scaledBounds(const Vec3f &scale) const
         {
-            Rot3f rot = Rot3f::identity();
-            rot.rotateWorld({1.0f, 0.0f, 0.0f}, rotationDegrees[0] * kDegToRad);
-            rot.rotateWorld({0.0f, 1.0f, 0.0f}, rotationDegrees[1] * kDegToRad);
-            rot.rotateWorld({0.0f, 0.0f, 1.0f}, rotationDegrees[2] * kDegToRad);
-            return rot;
-        }
+            AABB scaled = bounds;
 
-        Vec3f worldToLocal(const Vec3f &world) const
-        {
-            const auto rot = rotator();
-            const auto q = rot.quaternion();
-            const Rot3f inverse{Quatf{-q[0], -q[1], -q[2], q[3]}};
-            return inverse.rotateVector(world - position);
-        }
-
-        Octree::NodeState classifyShape(const AABB &worldBounds) const
-        {
-            const Vec3f worldMin = worldBounds.minimum().to_vector();
-            const Vec3f worldMax = worldBounds.maximum().to_vector();
-
-            Vec3f localMin{};
-            Vec3f localMax{};
-            bool first = true;
-
-            for (int i = 0; i < 8; ++i)
+            for (int a = 0; a < 3; ++a)
             {
-                const Vec3f worldCorner{
-                    (i & 1) ? worldMax[0] : worldMin[0],
-                    (i & 2) ? worldMax[1] : worldMin[1],
-                    (i & 4) ? worldMax[2] : worldMin[2]};
-
-                const Vec3f local = worldToLocal(worldCorner);
-
-                if (first)
-                {
-                    localMin = local;
-                    localMax = local;
-                    first = false;
-                }
-                else
-                {
-                    for (int a = 0; a < 3; ++a)
-                    {
-                        localMin[a] = std::min(localMin[a], local[a]);
-                        localMax[a] = std::max(localMax[a], local[a]);
-                    }
-                }
+                scaled.minimum()[a] *= scale[a];
+                scaled.maximum()[a] *= scale[a];
             }
 
-            AABB localBounds;
-            localBounds.minimum() = Point3f{localMin[0], localMin[1], localMin[2]};
-            localBounds.maximum() = Point3f{localMax[0], localMax[1], localMax[2]};
-
-            switch (kind)
-            {
-            case ObjectKind::Sphere:
-                return classifySphere(sphere, localBounds);
-            case ObjectKind::Block:
-                return classifyBlock(block, localBounds);
-            case ObjectKind::Cylinder:
-                return classifyCylinder(cylinder, localBounds);
-            default:
-                return Octree::NodeState::Empty;
-            }
+            return scaled;
         }
 
-        Octree buildOctree(const Point3f &worldMin, const Point3f &worldMax, int maxDepth) const
+        Octree buildOctree(int maxDepth) const
         {
-            Octree tree(worldMin, worldMax);
+            const auto limit = static_cast<std::size_t>(maxDepth);
+
+            const auto capDepth = [limit](NodeState state, std::size_t depth)
+            {
+                return (depth >= limit && state == NodeState::Branch)
+                           ? NodeState::Filled
+                           : state;
+            };
+
+            Octree tree;
 
             if (kind == ObjectKind::String)
             {
                 std::size_t pos = 0;
 
-                tree.build(
-                    [this, maxDepth, &pos](const AABB &, std::size_t depth)
-                    {
-                        const auto result = parseNextStringToken(text, pos);
-
-                        if (depth >= static_cast<std::size_t>(maxDepth) &&
-                            result == Octree::NodeState::Branch)
-                        {
-                            return Octree::NodeState::Filled;
-                        }
-
-                        return result;
-                    });
-
-                return tree;
+                tree.build([&](const AABB &, std::size_t depth)
+                           { return capDepth(parseNextStringToken(text, pos), depth); });
             }
-
-            tree.build(
-                [this, maxDepth](const AABB &bounds, std::size_t depth)
-                {
-                    const auto result = classifyShape(bounds);
-
-                    if (depth >= static_cast<std::size_t>(maxDepth) &&
-                        result == Octree::NodeState::Branch)
-                    {
-                        return Octree::NodeState::Filled;
-                    }
-
-                    return result;
-                });
+            else
+            {
+                tree.build([&](const AABB &unitBox, std::size_t depth)
+                           { return capDepth(classifyShape(unitBox), depth); });
+            }
 
             return tree;
         }
 
-        // ---- Secoes de UI ------------------------------------------------
-
-        // Parametros da forma (inclui o seletor de tipo).
         bool drawShapeUI()
         {
             bool changed = false;
@@ -418,7 +300,6 @@ namespace
             return changed;
         }
 
-        // Transformacao (posicao + rotacao).
         bool drawTransformUI()
         {
             bool changed = false;
@@ -436,7 +317,6 @@ namespace
             return changed;
         }
 
-        // Cores.
         bool drawColorsUI()
         {
             bool changed = false;
@@ -445,11 +325,87 @@ namespace
             changed |= drawColorEdit("Vertice", vertexColor);
             return changed;
         }
-    };
 
-    // -------------------------------------------------------------------
-    // Tema escuro estilo
-    // -------------------------------------------------------------------
+    private:
+        Rot3f rotator() const
+        {
+            Rot3f rot = Rot3f::identity();
+
+            for (int a = 0; a < 3; ++a)
+            {
+                Vec3f axis{0.0f, 0.0f, 0.0f};
+                axis[a] = 1.0f;
+                rot.rotateWorld(axis, rotationDegrees[a] * kDegToRad);
+            }
+
+            return rot;
+        }
+
+        Vec3f worldToLocal(const Vec3f &world) const
+        {
+            const auto q = rotator().quaternion();
+            const Rot3f inverse{Quatf{-q[0], -q[1], -q[2], q[3]}};
+            return inverse.rotateVector(world - position);
+        }
+
+        Point3f unitToWorld(const Point3f &unit) const
+        {
+            const auto lo = bounds.minimum();
+            const auto hi = bounds.maximum();
+
+            const auto axis = [&](int a)
+            { return lo[a] + (unit[a] + 1.0f) * 0.5f * (hi[a] - lo[a]); };
+
+            return Point3f{axis(0), axis(1), axis(2)};
+        }
+
+        AABB unitToLocal(const AABB &unitBox) const
+        {
+            const Point3f lo = unitToWorld(unitBox.minimum());
+            const Point3f hi = unitToWorld(unitBox.maximum());
+
+            constexpr float inf = std::numeric_limits<float>::infinity();
+            Vec3f localMin{inf, inf, inf};
+            Vec3f localMax{-inf, -inf, -inf};
+
+            for (int i = 0; i < 8; ++i)
+            {
+                const Vec3f corner{
+                    (i & 1) ? hi[0] : lo[0],
+                    (i & 2) ? hi[1] : lo[1],
+                    (i & 4) ? hi[2] : lo[2]};
+
+                const Vec3f local = worldToLocal(corner);
+
+                for (int a = 0; a < 3; ++a)
+                {
+                    localMin[a] = std::min(localMin[a], local[a]);
+                    localMax[a] = std::max(localMax[a], local[a]);
+                }
+            }
+
+            return AABB{
+                Point3f{localMin[0], localMin[1], localMin[2]},
+                Point3f{localMax[0], localMax[1], localMax[2]}};
+        }
+
+        NodeState classifyShape(const AABB &unitBox) const
+        {
+            const AABB local = unitToLocal(unitBox);
+
+            switch (kind)
+            {
+            case ObjectKind::Sphere:
+                return classifySphere(sphere, local);
+            case ObjectKind::Block:
+                return classifyBlock(block, local);
+            case ObjectKind::Cylinder:
+                return classifyCylinder(cylinder, local);
+            default:
+                return NodeState::Empty;
+            }
+        }
+    };
 
     void applyStyle()
     {
@@ -501,9 +457,6 @@ namespace
 
 class Trabalho01 : public RendererGlfwOpengl
 {
-public:
-    Trabalho01() = default;
-
 protected:
     void onInit(int width, int height, const std::string &) override
     {
@@ -513,12 +466,11 @@ protected:
         m_width = width;
         m_height = height;
 
-        applyCameraProjection(); // antes: camera().setPerspective(kFovDegrees, ...)
+        applyCameraProjection();
 
         SceneObject first;
         first.name = "Esfera 1";
-        m_objects.push_back(first);
-        m_selectedIndex = 0;
+        addObject(std::move(first));
 
         rebuildMeshes();
     }
@@ -528,9 +480,7 @@ protected:
         shutdownImGui();
     }
 
-    void onWindowResize(
-        int width,
-        int height) override
+    void onWindowResize(int width, int height) override
     {
         m_width = width;
         m_height = height;
@@ -559,41 +509,88 @@ private:
 
     std::vector<SceneObject> m_objects;
     std::vector<Mesh3f> m_meshes;
+    std::vector<float> m_volumes;
 
     int m_selectedIndex = -1;
     bool m_needRebuild = false;
 
-    AABB m_world_bounds{{-10.0f, -10.0f, -10.0f}, {10.0f, 10.0f, 10.0f}};
-
+    AABB m_worldBounds{{-10.0f, -10.0f, -10.0f}, {10.0f, 10.0f, 10.0f}};
     Vec3f m_octreeScale{1.0f, 1.0f, 1.0f};
     int m_octreeDepth = 5;
-
-    double m_lastMouseX = 0.0;
-    double m_lastMouseY = 0.0;
 
     bool m_showFaces = true;
     bool m_showEdges = false;
     bool m_showVertices = false;
     bool m_showWorldBounds = true;
     Color m_worldBoundsColor = Color::White();
-    HoveredVariants::Variant m_hoveredPanel = HoveredVariants::Canvas{};
 
-    std::vector<float> m_volumes;
+    bool m_canvasHovered = true;
+    double m_lastMouseX = 0.0;
+    double m_lastMouseY = 0.0;
 
-    // ---- Membros - Camera ------------------------------------------
     float m_cameraFov = kFovDegrees;
     float m_cameraNear = kNearPlane;
     float m_cameraFar = kFarPlane;
-
-    float m_orbitSensitivity = kOrbitSensitivity; // ja existia como const
+    float m_orbitSensitivity = kOrbitSensitivity;
     float m_zoomSensitivity = 1.0f;
     float m_moveSpeed = 10.0f;
 
-    // ---- Câmera / input --------------------------------------------
+    bool hasSelection() const
+    {
+        return m_selectedIndex >= 0 &&
+               m_selectedIndex < static_cast<int>(m_objects.size());
+    }
+
+    float aspect() const
+    {
+        return (m_height > 0)
+                   ? static_cast<float>(m_width) / static_cast<float>(m_height)
+                   : 1.0f;
+    }
+
+    void addObject(SceneObject object)
+    {
+        object.bounds = m_worldBounds;
+        m_objects.push_back(std::move(object));
+        m_selectedIndex = static_cast<int>(m_objects.size()) - 1;
+    }
+
+    void duplicateObject(int index)
+    {
+        SceneObject copy = m_objects[index];
+        copy.name += " copia";
+
+        m_objects.insert(m_objects.begin() + index + 1, std::move(copy));
+        m_selectedIndex = index + 1;
+        m_needRebuild = true;
+    }
+
+    void removeObject(int index)
+    {
+        m_objects.erase(m_objects.begin() + index);
+
+        if (m_selectedIndex == index)
+        {
+            m_selectedIndex = m_objects.empty()
+                                  ? -1
+                                  : std::min(index, static_cast<int>(m_objects.size()) - 1);
+        }
+        else if (m_selectedIndex > index)
+        {
+            --m_selectedIndex;
+        }
+
+        m_needRebuild = true;
+    }
+
+    void applyCameraProjection()
+    {
+        camera().setPerspective(m_cameraFov, aspect(), m_cameraNear, m_cameraFar);
+    }
 
     void updateCameraOrbit()
     {
-        if (!std::holds_alternative<HoveredVariants::Canvas>(m_hoveredPanel))
+        if (!m_canvasHovered)
             return;
 
         const double dx = input().m_mouseX - m_lastMouseX;
@@ -605,8 +602,8 @@ private:
         if (input().rightMouse())
         {
             camera().orbit(
-                static_cast<float>(dx) * m_orbitSensitivity,  // <- membro
-                static_cast<float>(dy) * m_orbitSensitivity); // <- membro
+                static_cast<float>(dx) * m_orbitSensitivity,
+                static_cast<float>(dy) * m_orbitSensitivity);
         }
 
         if (input().scrollOffset() != 0.0)
@@ -618,10 +615,10 @@ private:
 
     void updateCameraMovement(float deltaTime)
     {
-        if (!std::holds_alternative<HoveredVariants::Canvas>(m_hoveredPanel))
+        if (!m_canvasHovered)
             return;
 
-        const float amount = m_moveSpeed * deltaTime; // <- membro
+        const float amount = m_moveSpeed * deltaTime;
 
         const auto forward = camera().rotation().forward();
         const auto right = camera().rotation().right();
@@ -641,85 +638,69 @@ private:
             camera().move(up * -amount);
     }
 
-    void applyCameraProjection()
+    void rebuildMeshes()
     {
-        const float aspect = (m_height > 0)
-                                 ? static_cast<float>(m_width) / static_cast<float>(m_height)
-                                 : 1.0f;
+        m_meshes.clear();
+        m_volumes.clear();
 
-        camera().setPerspective(m_cameraFov, aspect, m_cameraNear, m_cameraFar);
+        m_meshes.reserve(m_objects.size());
+        m_volumes.reserve(m_objects.size());
+
+        for (const auto &object : m_objects)
+        {
+            const Octree tree = object.buildOctree(m_octreeDepth);
+
+            m_volumes.push_back(tree.volume(object.bounds));
+
+            Mesh3f mesh = tree.toMesh(object.scaledBounds(m_octreeScale));
+
+            if (mesh.edges().empty())
+                mesh.buildEdgesFromFaces();
+
+            m_meshes.push_back(std::move(mesh));
+        }
     }
-
-    // ---- unionToString -----------------------------------------------------------
 
     std::string unionToString() const
     {
         if (m_objects.empty())
-        {
             return {};
-        }
 
-        const Point3f worldMin{
-            m_world_bounds.minimum()[0],
-            m_world_bounds.minimum()[1],
-            m_world_bounds.minimum()[2]};
+        Octree tree = m_objects.front().buildOctree(m_octreeDepth);
 
-        const Point3f worldMax{
-            m_world_bounds.maximum()[0],
-            m_world_bounds.maximum()[1],
-            m_world_bounds.maximum()[2]};
-
-        Octree tree =
-            m_objects.front().buildOctree(
-                worldMin,
-                worldMax,
-                m_octreeDepth);
-
-        for (std::size_t i = 1;
-             i < m_objects.size();
-             ++i)
-        {
-            tree.unite(
-                m_objects[i].buildOctree(
-                    worldMin,
-                    worldMax,
-                    m_octreeDepth));
-        }
+        for (std::size_t i = 1; i < m_objects.size(); ++i)
+            tree.unite(m_objects[i].buildOctree(m_octreeDepth));
 
         std::string result;
 
-        struct Visitor
-        {
-            std::string &output;
-
-            void operator()(
-                const AABB &,
-                std::size_t,
-                const Octree::Node &node) const
-            {
-                if (node.isFilled())
-                {
-                    output += 'W';
-                }
-                else if (node.isEmpty())
-                {
-                    output += 'B';
-                }
-                else
-                {
-                    output += '(';
-                }
-            }
-        };
-
-        Visitor visitor{result};
-
-        tree.read(visitor);
+        tree.read([&result](const AABB &, std::size_t, const Octree::Node &node)
+                  { result += node.isFilled() ? 'W' : node.isEmpty() ? 'B'
+                                                                     : '('; });
 
         return result;
     }
 
-    // ---- UI -----------------------------------------------------------
+    void drawScene(Drawer &drawer)
+    {
+        const Color transparent = Color::Transparent();
+
+        if (m_showWorldBounds)
+        {
+            Mesh3f boundsMesh = m_worldBounds.toMesh();
+            drawer.drawMesh(boundsMesh, transparent, m_worldBoundsColor, transparent);
+        }
+
+        for (std::size_t i = 0; i < m_objects.size() && i < m_meshes.size(); ++i)
+        {
+            const auto &object = m_objects[i];
+
+            drawer.drawMesh(
+                m_meshes[i],
+                m_showFaces ? object.faceColor : transparent,
+                m_showEdges ? object.edgeColor : transparent,
+                m_showVertices ? object.vertexColor : transparent);
+        }
+    }
 
     void renderUI()
     {
@@ -729,20 +710,7 @@ private:
         drawOutlinerPanel();
         drawPropertiesPanel();
 
-        ImGuiContext *ctx = ImGui::GetCurrentContext();
-        ImGuiWindow *w = ctx->HoveredWindow;
-
-        if (w == nullptr)
-        {
-            m_hoveredPanel = HoveredVariants::Canvas{};
-        }
-        else
-        {
-            while (w->ParentWindow)
-                w = w->ParentWindow;
-
-            m_hoveredPanel = HoveredVariants::ImGui{std::string(w->Name)};
-        }
+        m_canvasHovered = ImGui::GetCurrentContext()->HoveredWindow == nullptr;
 
         if (m_needRebuild)
         {
@@ -751,117 +719,87 @@ private:
         }
     }
 
-    // ---- Painel "Outliner" --------------------------------------------
-
     void drawOutlinerPanel()
     {
         ImGui::SetNextWindowSize(ImVec2(260.0f, 480.0f), ImGuiCond_FirstUseEver);
         ImGui::Begin("Outliner");
 
-        // Cabecalho: raiz "Cena"
         if (ImGui::TreeNodeEx("Cena",
                               ImGuiTreeNodeFlags_DefaultOpen |
                                   ImGuiTreeNodeFlags_SpanAvailWidth))
         {
-            // Botao "+ Adicionar" com popup de tipo
-            if (ImGui::Button("+ Adicionar Objeto", ImVec2(-1.0f, 0.0f)))
-            {
-                ImGui::OpenPopup("AddObjectPopup");
-            }
-
-            if (ImGui::BeginPopup("AddObjectPopup"))
-            {
-                for (int i = 0; i < static_cast<int>(kObjectKindLabels.size()); ++i)
-                {
-                    if (ImGui::MenuItem(kObjectKindLabels[i]))
-                    {
-                        SceneObject obj;
-                        obj.kind = static_cast<ObjectKind>(i);
-                        obj.name = std::string(kObjectKindLabels[i]) + " " +
-                                   std::to_string(m_objects.size() + 1);
-
-                        if (obj.kind == ObjectKind::String)
-                            obj.text = "(WBWBWBWB";
-
-                        m_objects.push_back(obj);
-                        m_selectedIndex = static_cast<int>(m_objects.size()) - 1;
-                        m_needRebuild = true;
-                    }
-                }
-                ImGui::EndPopup();
-            }
-
+            drawAddObjectButton();
             ImGui::Separator();
-
-            // Lista de objetos
-            ImGui::BeginChild("ObjectList", ImVec2(0.0f, 0.0f), false);
-
-            int pendingRemove = -1;
-            int pendingDuplicate = -1;
-
-            for (int i = 0; i < static_cast<int>(m_objects.size()); ++i)
-            {
-                SceneObject &obj = m_objects[i];
-
-                ImGui::PushID(i);
-
-                const bool isSelected = (m_selectedIndex == i);
-                const std::string label =
-                    std::string(kindIcon(obj.kind)) + "  " + obj.name;
-
-                if (ImGui::Selectable(label.c_str(), isSelected))
-                {
-                    m_selectedIndex = i;
-                }
-
-                if (ImGui::BeginPopupContextItem("object_ctx"))
-                {
-                    if (ImGui::MenuItem("Duplicar"))
-                        pendingDuplicate = i;
-                    if (ImGui::MenuItem("Remover"))
-                        pendingRemove = i;
-                    ImGui::EndPopup();
-                }
-
-                ImGui::PopID();
-            }
-
-            if (pendingDuplicate >= 0)
-            {
-                SceneObject copy = m_objects[pendingDuplicate];
-                copy.name += " copia";
-                m_objects.insert(m_objects.begin() + pendingDuplicate + 1, copy);
-                m_selectedIndex = pendingDuplicate + 1;
-                m_needRebuild = true;
-            }
-
-            if (pendingRemove >= 0)
-            {
-                m_objects.erase(m_objects.begin() + pendingRemove);
-
-                if (m_selectedIndex == pendingRemove)
-                {
-                    m_selectedIndex = m_objects.empty()
-                                          ? -1
-                                          : std::min(pendingRemove,
-                                                     static_cast<int>(m_objects.size()) - 1);
-                }
-                else if (m_selectedIndex > pendingRemove)
-                {
-                    --m_selectedIndex;
-                }
-
-                m_needRebuild = true;
-            }
-
-            ImGui::EndChild();
+            drawObjectList();
             ImGui::TreePop();
         }
 
         ImGui::End();
     }
 
-    // ---- Painel "Propriedades" ----------------------------------------
+    void drawAddObjectButton()
+    {
+        if (ImGui::Button("+ Adicionar Objeto", ImVec2(-1.0f, 0.0f)))
+            ImGui::OpenPopup("AddObjectPopup");
+
+        if (!ImGui::BeginPopup("AddObjectPopup"))
+            return;
+
+        for (int i = 0; i < static_cast<int>(kObjectKindLabels.size()); ++i)
+        {
+            if (!ImGui::MenuItem(kObjectKindLabels[i]))
+                continue;
+
+            SceneObject object;
+            object.kind = static_cast<ObjectKind>(i);
+            object.name = std::string(kObjectKindLabels[i]) + " " +
+                          std::to_string(m_objects.size() + 1);
+
+            addObject(std::move(object));
+            m_needRebuild = true;
+        }
+
+        ImGui::EndPopup();
+    }
+
+    void drawObjectList()
+    {
+        ImGui::BeginChild("ObjectList", ImVec2(0.0f, 0.0f), false);
+
+        int pendingRemove = -1;
+        int pendingDuplicate = -1;
+
+        for (int i = 0; i < static_cast<int>(m_objects.size()); ++i)
+        {
+            const SceneObject &object = m_objects[i];
+
+            ImGui::PushID(i);
+
+            const std::string label = std::string(kindIcon(object.kind)) + "  " + object.name;
+
+            if (ImGui::Selectable(label.c_str(), m_selectedIndex == i))
+                m_selectedIndex = i;
+
+            if (ImGui::BeginPopupContextItem("object_ctx"))
+            {
+                if (ImGui::MenuItem("Duplicar"))
+                    pendingDuplicate = i;
+                if (ImGui::MenuItem("Remover"))
+                    pendingRemove = i;
+                ImGui::EndPopup();
+            }
+
+            ImGui::PopID();
+        }
+
+        if (pendingDuplicate >= 0)
+            duplicateObject(pendingDuplicate);
+
+        if (pendingRemove >= 0)
+            removeObject(pendingRemove);
+
+        ImGui::EndChild();
+    }
 
     void drawPropertiesPanel()
     {
@@ -884,7 +822,7 @@ private:
                 ImGui::EndTabItem();
             }
 
-            if (ImGui::BeginTabItem("Camera")) // <-- nova aba
+            if (ImGui::BeginTabItem("Camera"))
             {
                 changed |= drawCameraSettingsUI();
                 ImGui::EndTabItem();
@@ -904,20 +842,15 @@ private:
         bool changed = false;
         auto &cam = camera();
 
-        // ---- Projecao --------------------------------------------------
         if (ImGui::CollapsingHeader("Projecao", ImGuiTreeNodeFlags_DefaultOpen))
         {
             bool projChanged = false;
             projChanged |= ImGui::SliderFloat(
                 "FOV (graus)", &m_cameraFov, 10.0f, 120.0f, "%.1f");
-
             projChanged |= ImGui::DragFloat(
-                "Near", &m_cameraNear, 0.001f,
-                0.001f, m_cameraFar - 0.01f, "%.3f");
-
+                "Near", &m_cameraNear, 0.001f, 0.001f, m_cameraFar - 0.01f, "%.3f");
             projChanged |= ImGui::DragFloat(
-                "Far", &m_cameraFar, 1.0f,
-                m_cameraNear + 0.01f, 10000.0f, "%.1f");
+                "Far", &m_cameraFar, 1.0f, m_cameraNear + 0.01f, 10000.0f, "%.1f");
 
             if (projChanged)
             {
@@ -925,22 +858,16 @@ private:
                 changed = true;
             }
 
-            ImGui::TextDisabled("Aspect: %.3f",
-                                (m_height > 0) ? static_cast<float>(m_width) / m_height : 1.0f);
+            ImGui::TextDisabled("Aspect: %.3f", aspect());
         }
 
-        // ---- Controle --------------------------------------------------
         if (ImGui::CollapsingHeader("Controle", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::SliderFloat("Sens. Orbita", &m_orbitSensitivity,
-                               0.01f, 2.0f, "%.2f");
-            ImGui::SliderFloat("Sens. Zoom", &m_zoomSensitivity,
-                               0.10f, 5.0f, "%.2f");
-            ImGui::SliderFloat("Vel. Movimento (WASD)", &m_moveSpeed,
-                               1.0f, 50.0f, "%.1f");
+            ImGui::SliderFloat("Sens. Orbita", &m_orbitSensitivity, 0.01f, 2.0f, "%.2f");
+            ImGui::SliderFloat("Sens. Zoom", &m_zoomSensitivity, 0.10f, 5.0f, "%.2f");
+            ImGui::SliderFloat("Vel. Movimento (WASD)", &m_moveSpeed, 1.0f, 50.0f, "%.1f");
         }
 
-        // ---- Estado atual ----------------------------------------------
         if (ImGui::CollapsingHeader("Estado", ImGuiTreeNodeFlags_DefaultOpen))
         {
             const auto p = cam.position();
@@ -953,7 +880,6 @@ private:
             ImGui::Text("Up:       %.3f, %.3f, %.3f", u[0], u[1], u[2]);
         }
 
-        // ---- Reset -----------------------------------------------------
         ImGui::Separator();
 
         if (ImGui::Button("Resetar camera", ImVec2(-1.0f, 0.0f)))
@@ -972,17 +898,24 @@ private:
         return changed;
     }
 
-    // ---- Secao "Cena" --------------------------------------------------
-
     bool drawSceneSettingsUI()
     {
         bool changed = false;
 
         if (ImGui::CollapsingHeader("Espaco Global", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            changed |= ImGui::DragFloat3("Minimo", m_world_bounds.minimum().data_ptr(), kDragSpeed);
-            changed |= ImGui::DragFloat3("Maximo", m_world_bounds.maximum().data_ptr(), kDragSpeed);
-            ImGui::TextDisabled("Bounds compartilhados por todas as octrees.");
+            bool boundsChanged = false;
+            boundsChanged |= ImGui::DragFloat3("Minimo", m_worldBounds.minimum().data_ptr(), kDragSpeed);
+            boundsChanged |= ImGui::DragFloat3("Maximo", m_worldBounds.maximum().data_ptr(), kDragSpeed);
+            ImGui::TextDisabled("Aplicado ao AABB de todos os objetos.");
+
+            if (boundsChanged)
+            {
+                for (auto &object : m_objects)
+                    object.bounds = m_worldBounds;
+
+                changed = true;
+            }
         }
 
         if (ImGui::CollapsingHeader("Octree", ImGuiTreeNodeFlags_DefaultOpen))
@@ -1018,26 +951,15 @@ private:
             ImGui::Text("Faces: %zu", totalFaces);
         }
 
-        if (ImGui::Button(
-                "Copiar Uniao para Area de Transferencia",
-                ImVec2(-1.0f, 0.0f)))
-        {
-            const std::string text =
-                unionToString();
-
-            ImGui::SetClipboardText(
-                text.c_str());
-        }
+        if (ImGui::Button("Copiar Uniao para Area de Transferencia", ImVec2(-1.0f, 0.0f)))
+            ImGui::SetClipboardText(unionToString().c_str());
 
         return changed;
     }
 
-    // ---- Secao "Objeto" ------------------------------------------------
-
     bool drawObjectSettingsUI()
     {
-        if (m_selectedIndex < 0 ||
-            m_selectedIndex >= static_cast<int>(m_objects.size()))
+        if (!hasSelection())
         {
             ImGui::Spacing();
             ImGui::TextDisabled("Nenhum objeto selecionado.");
@@ -1047,134 +969,35 @@ private:
             return false;
         }
 
-        SceneObject &obj = m_objects[m_selectedIndex];
+        SceneObject &object = m_objects[m_selectedIndex];
         bool changed = false;
 
-        // Cabecalho do objeto: icone + nome editavel
-        ImGui::Text("%s", kindIcon(obj.kind));
+        ImGui::Text("%s", kindIcon(object.kind));
         ImGui::SameLine();
-
-        char nameBuf[128];
-        std::snprintf(nameBuf, sizeof(nameBuf), "%s", obj.name.c_str());
-
-        if (ImGui::InputText("##name", nameBuf, sizeof(nameBuf)))
-            obj.name = nameBuf;
+        ImGui::InputText("##name", &object.name);
 
         ImGui::Separator();
         ImGui::Separator();
 
-        if (m_selectedIndex >= 0 &&
-            m_selectedIndex < static_cast<int>(m_volumes.size()))
+        if (m_selectedIndex < static_cast<int>(m_volumes.size()))
+            ImGui::Text("Volume: %.6f", m_volumes[m_selectedIndex]);
+
+        ImGui::Separator();
+
+        if (object.hasTransform() &&
+            ImGui::CollapsingHeader("Transformacao", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            ImGui::Text(
-                "Volume: %.6f",
-                m_volumes[m_selectedIndex]);
-        }
-        
-        ImGui::Separator();
-
-        if (obj.hasTransform())
-        {
-            if (ImGui::CollapsingHeader("Transformacao",
-                                        ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                changed |= obj.drawTransformUI();
-            }
+            changed |= object.drawTransformUI();
         }
 
         if (ImGui::CollapsingHeader("Forma", ImGuiTreeNodeFlags_DefaultOpen))
-        {
-            changed |= obj.drawShapeUI();
-        }
+            changed |= object.drawShapeUI();
 
         if (ImGui::CollapsingHeader("Cores", ImGuiTreeNodeFlags_DefaultOpen))
-        {
-            changed |= obj.drawColorsUI();
-        }
+            changed |= object.drawColorsUI();
 
         return changed;
     }
-
-    // ---- Renderizacao da cena -----------------------------------------
-
-    void drawScene(Drawer &drawer)
-    {
-        const Color transparent = Color::Transparent();
-
-        if (m_showWorldBounds)
-        {
-            Mesh3f boundsMesh = m_world_bounds.toMesh();
-
-            drawer.drawMesh(
-                boundsMesh,
-                transparent,
-                m_worldBoundsColor,
-                transparent);
-        }
-
-        for (std::size_t i = 0; i < m_objects.size() && i < m_meshes.size(); ++i)
-        {
-            const auto &object = m_objects[i];
-            Mesh3f &mesh = m_meshes[i];
-
-            if (mesh.edges().empty())
-                mesh.buildEdgesFromFaces();
-
-            drawer.drawMesh(
-                mesh,
-                m_showFaces ? object.faceColor : transparent,
-                m_showEdges ? object.edgeColor : transparent,
-                m_showVertices ? object.vertexColor : transparent);
-        }
-    }
-
-    // ---- Construcao das malhas -----------------------------------------
-
-    void rebuildMeshes()
-    {
-        m_meshes.clear();
-        m_volumes.clear();
-
-        m_meshes.reserve(m_objects.size());
-        m_volumes.reserve(m_objects.size());
-
-        const Point3f worldMin{
-            m_world_bounds.minimum()[0],
-            m_world_bounds.minimum()[1],
-            m_world_bounds.minimum()[2]};
-
-        const Point3f worldMax{
-            m_world_bounds.maximum()[0],
-            m_world_bounds.maximum()[1],
-            m_world_bounds.maximum()[2]};
-
-        for (const auto &object : m_objects)
-        {
-            Octree tree =
-                object.buildOctree(
-                    worldMin,
-                    worldMax,
-                    m_octreeDepth);
-
-            m_volumes.push_back(
-                tree.volume());
-
-            Mesh3f mesh =
-                tree
-                    .scaleBounds(m_octreeScale)
-                    .toMesh();
-
-            if (mesh.edges().empty())
-            {
-                mesh.buildEdgesFromFaces();
-            }
-
-            m_meshes.push_back(
-                std::move(mesh));
-        }
-    }
-
-    // ---- ImGui lifecycle ------------------------------------------------
 
     void initImGui()
     {
