@@ -1,7 +1,6 @@
 #pragma once
 
 #include "mesh.hpp"
-#include "point.hpp"
 #include "algebric_vector.hpp"
 
 #include <algorithm>
@@ -18,7 +17,7 @@ namespace geometry
         virtual ~BoundingVolume() = default;
 
         [[nodiscard]]
-        virtual Point3f center() const = 0;
+        virtual Vec3f center() const = 0;
 
         [[nodiscard]]
         virtual Vec3f size() const = 0;
@@ -40,41 +39,41 @@ namespace geometry
         AABB() = default;
 
         AABB(
-            const Point3f& minimum,
-            const Point3f& maximum)
+            const Vec3f& minimum,
+            const Vec3f& maximum)
             : m_minimum(minimum),
               m_maximum(maximum)
         {
         }
 
-        const Point3f& minimum() const {
+        const Vec3f& minimum() const {
             return m_minimum;
         }
 
-        Point3f& minimum() {
+        Vec3f& minimum() {
             return m_minimum;
         }
 
-        void minimum(Point3f set) {
+        void minimum(Vec3f set) {
             m_minimum = set;
         }
 
-        const Point3f& maximum() const {
+        const Vec3f& maximum() const {
             return m_maximum;
         }
 
-        Point3f& maximum() {
+        Vec3f& maximum() {
             return m_maximum;
         }
 
-        void maximum(Point3f set) {
+        void maximum(Vec3f set) {
             m_maximum = set;
         }
 
         [[nodiscard]]
-        Point3f center() const override
+        Vec3f center() const override
         {
-            return m_minimum.midpoint(m_maximum);
+            return (m_minimum + m_maximum)/2;
         }
 
         [[nodiscard]]
@@ -96,7 +95,7 @@ namespace geometry
 
         [[nodiscard]]
         bool contains(
-            const Point3f& point) const
+            const Vec3f& point) const
         {
             return
                 point[0] >= m_minimum[0] &&
@@ -124,7 +123,7 @@ namespace geometry
                 m_maximum[2] >= other.m_minimum[2];
         }
 
-        void expand(const Point3f& point)
+        void expand(const Vec3f& point)
         {
             for (std::size_t i = 0; i < 3; ++i)
             {
@@ -207,10 +206,10 @@ namespace geometry
                 return {};
             }
 
-            Point3f minimum =
+            Vec3f minimum =
                 vertices.front();
 
-            Point3f maximum =
+            Vec3f maximum =
                 vertices.front();
 
             for (const auto& vertex : vertices)
@@ -235,8 +234,8 @@ namespace geometry
         }
 
     private:
-        Point3f m_minimum{};
-        Point3f m_maximum{};
+        Vec3f m_minimum{};
+        Vec3f m_maximum{};
     };
 
 } // namespace geometry

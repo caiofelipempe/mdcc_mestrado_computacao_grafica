@@ -1,6 +1,5 @@
 #pragma once
 
-#include "point.hpp"
 #include "mesh.hpp"
 #include "color.hpp"
 
@@ -21,19 +20,19 @@ public:
     // -------------------------------------------------------------
 
     virtual void drawVertices(
-        const geometry::Point3f* points,
+        const geometry::Vec3f* points,
         std::size_t count,
         const Color& color,
         float size = 5.0f) = 0;
 
     virtual void drawLines(
-        const geometry::Point3f* points,
+        const geometry::Vec3f* points,
         std::size_t count,
         const Color& color,
         float width = 1.0f) = 0;
 
     virtual void drawFaces(
-        const geometry::Point3f* points,
+        const geometry::Vec3f* points,
         std::size_t count,
         const Color& color) = 0;
 
@@ -49,7 +48,7 @@ public:
     // -------------------------------------------------------------
 
     void drawVertex(
-        const geometry::Point3f& point,
+        const geometry::Vec3f& point,
         const Color& color,
         float size = 5.0f)
     {
@@ -61,12 +60,12 @@ public:
     }
 
     void drawLine(
-        const geometry::Point3f& a,
-        const geometry::Point3f& b,
+        const geometry::Vec3f& a,
+        const geometry::Vec3f& b,
         const Color& color,
         float width = 1.0f)
     {
-        const geometry::Point3f points[2]{
+        const geometry::Vec3f points[2]{
             a,
             b};
 
@@ -78,12 +77,12 @@ public:
     }
 
     void drawFace(
-        const geometry::Point3f& a,
-        const geometry::Point3f& b,
-        const geometry::Point3f& c,
+        const geometry::Vec3f& a,
+        const geometry::Vec3f& b,
+        const geometry::Vec3f& c,
         const Color& color)
     {
-        const geometry::Point3f points[3]{
+        const geometry::Vec3f points[3]{
             a,
             b,
             c};
@@ -121,7 +120,7 @@ public:
     // -------------------------------------------------------------
 
     void drawVertices(
-        const std::vector<geometry::Point3f>& points,
+        const std::vector<geometry::Vec3f>& points,
         const Color& color,
         float size = 5.0f)
     {
@@ -136,7 +135,7 @@ public:
     }
 
     void drawLines(
-        const std::vector<geometry::Point3f>& points,
+        const std::vector<geometry::Vec3f>& points,
         const Color& color,
         float width = 1.0f)
     {
@@ -151,7 +150,7 @@ public:
     }
 
     void drawFaces(
-        const std::vector<geometry::Point3f>& points,
+        const std::vector<geometry::Vec3f>& points,
         const Color& color)
     {
         if (!points.empty())
@@ -194,7 +193,7 @@ public:
 
     template <std::size_t N>
     void drawVertices(
-        const std::array<geometry::Point3f, N>& points,
+        const std::array<geometry::Vec3f, N>& points,
         const Color& color,
         float size = 5.0f)
     {
@@ -210,7 +209,7 @@ public:
 
     template <std::size_t N>
     void drawLines(
-        const std::array<geometry::Point3f, N>& points,
+        const std::array<geometry::Vec3f, N>& points,
         const Color& color,
         float width = 1.0f)
     {
@@ -226,7 +225,7 @@ public:
 
     template <std::size_t N>
     void drawFaces(
-        const std::array<geometry::Point3f, N>& points,
+        const std::array<geometry::Vec3f, N>& points,
         const Color& color)
     {
         if constexpr (N > 0)

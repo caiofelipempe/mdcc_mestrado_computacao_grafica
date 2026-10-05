@@ -12,15 +12,15 @@ namespace
         glColor4f(color.r, color.g, color.b, color.a);
     }
 
-    inline Point3f computeNormal(
-        const Point3f &a,
-        const Point3f &b,
-        const Point3f &c)
+    inline Vec3f computeNormal(
+        const Vec3f &a,
+        const Vec3f &b,
+        const Vec3f &c)
     {
-        auto u = b.to_vector() - a.to_vector();
-        auto v = c.to_vector() - a.to_vector();
+        auto u = b - a;
+        auto v = c - a;
         auto n = u.cross(v).normalized();
-        return Point3f({n[0], n[1], n[2]});
+        return Vec3f({n[0], n[1], n[2]});
     }
 }
 
@@ -170,7 +170,7 @@ void DrawerOpengl::frameEnd()
         glVertexPointer(
             3,
             GL_FLOAT,
-            sizeof(Point3f),
+            sizeof(Vec3f),
             batch.points[0].data_ptr());
 
         glDrawArrays(
@@ -188,7 +188,7 @@ void DrawerOpengl::frameEnd()
         glVertexPointer(
             3,
             GL_FLOAT,
-            sizeof(Point3f),
+            sizeof(Vec3f),
             batch.points[0].data_ptr());
 
         glDrawArrays(
@@ -203,7 +203,7 @@ void DrawerOpengl::frameEnd()
 }
 
 void DrawerOpengl::drawVertices(
-    const Point3f *points,
+    const Vec3f *points,
     std::size_t count,
     const Color &color,
     float size)
@@ -224,7 +224,7 @@ void DrawerOpengl::drawVertices(
 }
 
 void DrawerOpengl::drawLines(
-    const Point3f *points,
+    const Vec3f *points,
     std::size_t count,
     const Color &color,
     float width)
@@ -245,7 +245,7 @@ void DrawerOpengl::drawLines(
 }
 
 void DrawerOpengl::drawFaces(
-    const Point3f *points,
+    const Vec3f *points,
     std::size_t count,
     const Color &color)
 {
@@ -270,7 +270,7 @@ void DrawerOpengl::drawFaces(
         const auto &b = points[i + 1];
         const auto &c = points[i + 2];
 
-        Point3f norm = computeNormal(a, b, c);
+        Vec3f norm = computeNormal(a, b, c);
 
         batch.vertices.push_back({norm, a});
         batch.vertices.push_back({norm, b});
@@ -325,7 +325,7 @@ void DrawerOpengl::drawMeshes(
                 const auto &b = vertices[face.indices[1]];
                 const auto &c = vertices[face.indices[2]];
 
-                Point3f norm = computeNormal(a, b, c);
+                Vec3f norm = computeNormal(a, b, c);
 
                 batch.vertices.push_back({norm, a});
                 batch.vertices.push_back({norm, b});

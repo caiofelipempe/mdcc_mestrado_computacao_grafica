@@ -335,7 +335,7 @@ namespace
             return inverse.rotateVector(world - position);
         }
 
-        Point3f unitToWorld(const Point3f &unit) const
+        Vec3f unitToWorld(const Vec3f &unit) const
         {
             const auto lo = bounds.minimum();
             const auto hi = bounds.maximum();
@@ -343,13 +343,13 @@ namespace
             const auto axis = [&](int a)
             { return lo[a] + (unit[a] + 1.0f) * 0.5f * (hi[a] - lo[a]); };
 
-            return Point3f{axis(0), axis(1), axis(2)};
+            return Vec3f{axis(0), axis(1), axis(2)};
         }
 
         AABB unitToLocal(const AABB &unitBox) const
         {
-            const Point3f lo = unitToWorld(unitBox.minimum());
-            const Point3f hi = unitToWorld(unitBox.maximum());
+            const Vec3f lo = unitToWorld(unitBox.minimum());
+            const Vec3f hi = unitToWorld(unitBox.maximum());
 
             constexpr float inf = std::numeric_limits<float>::infinity();
             Vec3f localMin{inf, inf, inf};
@@ -372,8 +372,8 @@ namespace
             }
 
             return AABB{
-                Point3f{localMin[0], localMin[1], localMin[2]},
-                Point3f{localMax[0], localMax[1], localMax[2]}};
+                Vec3f{localMin[0], localMin[1], localMin[2]},
+                Vec3f{localMax[0], localMax[1], localMax[2]}};
         }
 
         Coverage classifyShape(const AABB &unitBox) const

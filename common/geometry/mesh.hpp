@@ -8,7 +8,6 @@
 #include <stdexcept>
 #include <cmath>
 
-#include "point.hpp"
 #include "algebric_vector.hpp"
 #include "rotator3.hpp"
 
@@ -42,11 +41,10 @@ namespace geometry
     {
     public:
         using ValueType = T;
-        using PointType = Point<T, N>;
         using VectorType = AlgebricVector<T, N>;
 
     private:
-        std::vector<PointType> m_vertices;
+        std::vector<VectorType> m_vertices;
         std::vector<Edge> m_edges;
         std::vector<Face> m_faces;
 
@@ -118,11 +116,11 @@ namespace geometry
                 std::move(unique);
         }
 
-        [[nodiscard]] const std::vector<PointType> &vertices() const noexcept { return m_vertices; }
+        [[nodiscard]] const std::vector<VectorType> &vertices() const noexcept { return m_vertices; }
         [[nodiscard]] const std::vector<Edge> &edges() const noexcept { return m_edges; }
         [[nodiscard]] const std::vector<Face> &faces() const noexcept { return m_faces; }
 
-        [[nodiscard]] std::vector<PointType> &vertices() noexcept { return m_vertices; }
+        [[nodiscard]] std::vector<VectorType> &vertices() noexcept { return m_vertices; }
         [[nodiscard]] std::vector<Edge> &edges() noexcept { return m_edges; }
         [[nodiscard]] std::vector<Face> &faces() noexcept { return m_faces; }
 
@@ -130,7 +128,7 @@ namespace geometry
         [[nodiscard]] std::size_t edgeCount() const noexcept { return m_edges.size(); }
         [[nodiscard]] std::size_t faceCount() const noexcept { return m_faces.size(); }
 
-        [[nodiscard]] std::size_t addVertex(const PointType &point)
+        [[nodiscard]] std::size_t addVertex(const VectorType &point)
         {
             m_vertices.push_back(point);
             return m_vertices.size() - 1;
@@ -247,7 +245,7 @@ namespace geometry
             for (auto &vertex : m_vertices)
             {
                 vertex =
-                    PointType(
+                    VectorType(
                         rotation.rotateVector(
                             vertex.to_vector()));
             }
@@ -273,7 +271,7 @@ namespace geometry
         template <std::size_t M = N>
             requires(M == 3)
         void transform(
-            const PointType &origin,
+            const VectorType &origin,
             const Rotator3<T> &rotation)
         {
             for (auto &vertex : m_vertices)
@@ -289,7 +287,7 @@ namespace geometry
             requires(M == 3)
         [[nodiscard]]
         Mesh transformed(
-            const PointType &origin,
+            const VectorType &origin,
             const Rotator3<T> &rotation) const
         {
             Mesh result = *this;

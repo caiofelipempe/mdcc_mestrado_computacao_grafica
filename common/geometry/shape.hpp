@@ -653,7 +653,7 @@ namespace geometry
 
         PolarConvexHullShape() = default;
 
-        explicit PolarConvexHullShape(const Point3f &incenter)
+        explicit PolarConvexHullShape(const Vec3f &incenter)
             : m_incenter(incenter)
         {
         }
@@ -663,12 +663,12 @@ namespace geometry
         //==========================================================================
 
         [[nodiscard]]
-        const Point3f &incenter() const
+        const Vec3f &incenter() const
         {
             return m_incenter;
         }
 
-        void setIncenter(const Point3f &incenter)
+        void setIncenter(const Vec3f &incenter)
         {
             m_incenter = incenter;
         }
@@ -711,7 +711,7 @@ namespace geometry
 
         [[nodiscard]]
         bool contains(
-            const Point3f &point,
+            const Vec3f &point,
             float tolerance = DefaultTolerance) const
         {
             const Vec3f local = point - m_incenter;
@@ -735,10 +735,10 @@ namespace geometry
         // Interseção de cada tripla de planos, mantida apenas se cair dentro
         // de todos os semiespaços.
         [[nodiscard]]
-        std::vector<Point3f> vertices(
+        std::vector<Vec3f> vertices(
             float tolerance = DefaultTolerance) const
         {
-            std::vector<Point3f> result;
+            std::vector<Vec3f> result;
 
             const std::size_t count = m_supportVectors.size();
 
@@ -753,7 +753,7 @@ namespace geometry
                 {
                     for (std::size_t k = j + 1; k < count; ++k)
                     {
-                        Point3f vertex;
+                        Vec3f vertex;
 
                         if (!intersectPlanes(i, j, k, vertex))
                         {
@@ -769,9 +769,9 @@ namespace geometry
                             std::any_of(
                                 result.begin(),
                                 result.end(),
-                                [&](const Point3f &existing)
+                                [&](const Vec3f &existing)
                                 {
-                                    return existing.distance_to(vertex) < tolerance;
+                                    return (existing - vertex).sqrNorm() < tolerance*tolerance;
                                 });
 
                         if (!duplicate)
@@ -851,8 +851,8 @@ namespace geometry
                 return {};
             }
 
-            Point3f min = verts.front();
-            Point3f max = verts.front();
+            Vec3f min = verts.front();
+            Vec3f max = verts.front();
 
             for (const auto &v : verts)
             {
@@ -923,7 +923,7 @@ namespace geometry
         // formam o polígono da face, ordenado CCW visto de fora.
         template <typename Visitor>
         void forEachFace(
-            const std::vector<Point3f> &verts,
+            const std::vector<Vec3f> &verts,
             float tolerance,
             Visitor &&visit) const
         {
@@ -962,9 +962,9 @@ namespace geometry
         static void sortFaceRing(
             std::vector<std::size_t> &ring,
             const Vec3f &normal,
-            const std::vector<Point3f> &verts)
+            const std::vector<Vec3f> &verts)
         {
-            const Point3f &anchor = verts[ring.front()];
+            const Vec3f &anchor = verts[ring.front()];
 
             Vec3f offset{};
 
@@ -973,7 +973,7 @@ namespace geometry
                 offset = offset + (verts[index] - anchor);
             }
 
-            const Point3f center =
+            const Vec3f center =
                 anchor + offset / static_cast<float>(ring.size());
 
             const Vec3f u = perpendicularTo(normal);
@@ -1012,7 +1012,7 @@ namespace geometry
             std::size_t ia,
             std::size_t ib,
             std::size_t ic,
-            Point3f &result) const
+            Vec3f &result) const
         {
             const Vec3f n1 = faceNormal(m_supportVectors[ia]);
             const Vec3f n2 = faceNormal(m_supportVectors[ib]);
@@ -1036,7 +1036,7 @@ namespace geometry
             return true;
         }
 
-        Point3f m_incenter;
+        Vec3f m_incenter;
         std::vector<SupportVector> m_supportVectors;
     };
 

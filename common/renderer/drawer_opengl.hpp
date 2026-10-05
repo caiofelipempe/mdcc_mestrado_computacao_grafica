@@ -19,19 +19,19 @@ public:
     void frameEnd() override;
 
     void drawVertices(
-        const geometry::Point3f* points,
+        const geometry::Vec3f* points,
         std::size_t count,
         const Color& color,
         float size = 5.0f) override;
 
     void drawLines(
-        const geometry::Point3f* points,
+        const geometry::Vec3f* points,
         std::size_t count,
         const Color& color,
         float width = 1.0f) override;
 
     void drawFaces(
-        const geometry::Point3f* points,
+        const geometry::Vec3f* points,
         std::size_t count,
         const Color& color) override;
 
@@ -46,22 +46,22 @@ private:
 
     struct FaceVertex
     {
-        geometry::Point3f normal;
-        geometry::Point3f position;
+        geometry::Vec3f normal;
+        geometry::Vec3f position;
     };
 
     struct BatchVertices
     {
         Color color;
         float size;
-        std::vector<geometry::Point3f> points;
+        std::vector<geometry::Vec3f> points;
     };
 
     struct BatchLines
     {
         Color color;
         float width;
-        std::vector<geometry::Point3f> points;
+        std::vector<geometry::Vec3f> points;
     };
 
     struct BatchFaces

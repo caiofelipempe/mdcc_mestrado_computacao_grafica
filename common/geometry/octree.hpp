@@ -32,7 +32,7 @@ namespace geometry
 
         [[nodiscard]] static AABB unitSpace()
         {
-            return AABB{Point3f{-1.0f, -1.0f, -1.0f}, Point3f{1.0f, 1.0f, 1.0f}};
+            return AABB{Vec3f{-1.0f, -1.0f, -1.0f}, Vec3f{1.0f, 1.0f, 1.0f}};
         }
 
         template <typename Classifier>
@@ -94,7 +94,7 @@ namespace geometry
                     const auto size = box.maximum() - box.minimum();
 
                     Mesh3f cube = Block(size[0], size[1], size[2]).toMesh();
-                    cube.translate(box.center().to_vector());
+                    cube.translate(box.center());
 
                     appendMesh(mesh, cube);
                 },
@@ -127,7 +127,7 @@ namespace geometry
             return combined(a, b, [](bool x, bool y)
                             { return x && !y; });
         }
-
+ 
         Octree &operator|=(const Octree &other) { return *this = *this | other; }
         Octree &operator&=(const Octree &other) { return *this = *this & other; }
         Octree &operator-=(const Octree &other) { return *this = *this - other; }
