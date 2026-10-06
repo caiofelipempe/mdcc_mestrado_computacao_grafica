@@ -39,6 +39,19 @@ namespace
     constexpr float kScaleMin = 0.01f;
     constexpr float kScaleMax = 100.0f;
 
+    // --- Operacoes ---
+    bool m_operationsTabActive = false;
+    int m_operationType = 0; // 0 = uniao, 1 = interseccao, 2 = diferenca
+    int m_operationObjectA = 0;
+    int m_operationObjectB = 1;
+    bool m_operationValid = false;
+    Mesh3f m_operationMesh;
+    float m_operationVolume = 0.0f;
+
+    Color m_operationFaceColor = Color::DarkGreen();
+    Color m_operationEdgeColor = Color::Yellow();
+    Color m_operationVertexColor = Color::Red();
+
     Vec3f furthestCorner(const AABB &box)
     {
         const auto min = box.minimum();
@@ -658,6 +671,8 @@ private:
 
             m_meshes.push_back(std::move(mesh));
         }
+
+        rebuildOperation();
     }
 
     std::string unionToString() const
@@ -683,6 +698,17 @@ private:
         {
             Mesh3f boundsMesh = m_worldBounds.toMesh();
             drawer.drawMesh(boundsMesh, transparent, m_worldBoundsColor, transparent);
+        }
+
+        // Modo operacoes: exibe APENAS o resultado da operacao.
+        if (m_operationsTabActive && m_operationValid)
+        {
+            drawer.drawMesh(
+                m_operationMesh,
+                m_showFaces ? m_operationFaceColor : transparent,
+                m_showEdges ? m_operationEdgeColor : transparent,
+                m_showVertices ? m_operationVertexColor : transparent);
+            return;
         }
 
         for (std::size_t i = 0; i < m_objects.size() && i < m_meshes.size(); ++i)
@@ -796,12 +822,120 @@ private:
         ImGui::EndChild();
     }
 
+    bool drawOperationsSettingsUI()
+    {
+        bool changed = false;
+
+        if (m_objects.size() < 2)
+        {
+            ImGui::Spacing();
+            ImGui::TextDisabled("Sao necessarios pelo menos 2 objetos");
+            ImGui::TextDisabled("para realizar operacoes booleanas.");
+            return false;
+        }
+
+        static const char *kOperations[] = {
+            "Uniao (A | B)",
+            "Intersecao (A & B)",
+            "Diferenca (A - B)"};
+
+        if (ImGui::Combo("Operacao", &m_operationType, kOperations, 3))
+            changed = true;
+
+        const int count = static_cast<int>(m_objects.size());
+        m_operationObjectA = std::clamp(m_operationObjectA, 0, count - 1);
+        m_operationObjectB = std::clamp(m_operationObjectB, 0, count - 1);
+
+        // Monta listas de nomes para os combos (precisam permanecer vivos durante a chamada).
+        std::vector<std::string> names;
+        names.reserve(m_objects.size());
+        for (const auto &obj : m_objects)
+            names.push_back(obj.name);
+
+        std::vector<const char *> namePtrs;
+        namePtrs.reserve(names.size());
+        for (const auto &s : names)
+            namePtrs.push_back(s.c_str());
+
+        if (ImGui::Combo("Objeto A", &m_operationObjectA,
+                         namePtrs.data(), static_cast<int>(namePtrs.size())))
+            changed = true;
+
+        if (ImGui::Combo("Objeto B", &m_operationObjectB,
+                         namePtrs.data(), static_cast<int>(namePtrs.size())))
+            changed = true;
+
+        ImGui::Separator();
+
+        if (m_operationValid)
+        {
+            ImGui::Text("Volume resultante: %.6f", m_operationVolume);
+
+            std::size_t verts = m_operationMesh.vertices().size();
+            std::size_t faces = m_operationMesh.faces().size();
+            ImGui::Text("Vertices: %zu | Faces: %zu", verts, faces);
+        }
+        else
+        {
+            ImGui::TextDisabled("Resultado indisponivel.");
+        }
+
+        if (ImGui::CollapsingHeader("Cores do Resultado",
+                                    ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            changed |= drawColorEdit("Face", m_operationFaceColor);
+            changed |= drawColorEdit("Aresta", m_operationEdgeColor);
+            changed |= drawColorEdit("Vertice", m_operationVertexColor);
+        }
+
+        return changed;
+    }
+
+    void rebuildOperation()
+    {
+        m_operationValid = false;
+        m_operationMesh = Mesh3f{};
+        m_operationVolume = 0.0f;
+
+        if (m_objects.size() < 2)
+            return;
+
+        const int a = std::clamp(m_operationObjectA, 0, static_cast<int>(m_objects.size()) - 1);
+        const int b = std::clamp(m_operationObjectB, 0, static_cast<int>(m_objects.size()) - 1);
+
+        const Octree treeA = m_objects[a].buildOctree(m_octreeDepth);
+        const Octree treeB = m_objects[b].buildOctree(m_octreeDepth);
+
+        const Octree result = [&]() -> Octree
+        {
+            switch (m_operationType)
+            {
+            case 1:
+                return treeA & treeB;
+            case 2:
+                return treeA - treeB;
+            default:
+                return treeA | treeB;
+            }
+        }();
+
+        m_operationVolume = result.volume(m_objects[a].bounds);
+
+        Mesh3f mesh = result.toMesh(m_objects[a].scaledBounds(m_octreeScale));
+        if (mesh.edges().empty())
+            mesh.buildEdgesFromFaces();
+
+        m_operationMesh = std::move(mesh);
+        m_operationValid = true;
+    }
+
     void drawPropertiesPanel()
     {
         ImGui::SetNextWindowSize(ImVec2(340.0f, 540.0f), ImGuiCond_FirstUseEver);
         ImGui::Begin("Propriedades");
 
         bool changed = false;
+        m_operationsTabActive = false;
 
         if (ImGui::BeginTabBar("PropertiesTabs"))
         {
@@ -820,6 +954,13 @@ private:
             if (ImGui::BeginTabItem("Camera"))
             {
                 changed |= drawCameraSettingsUI();
+                ImGui::EndTabItem();
+            }
+
+            if (ImGui::BeginTabItem("Operacoes"))
+            {
+                m_operationsTabActive = true;
+                changed |= drawOperationsSettingsUI();
                 ImGui::EndTabItem();
             }
 
