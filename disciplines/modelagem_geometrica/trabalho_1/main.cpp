@@ -36,6 +36,9 @@ namespace
 
     constexpr float kDegToRad = std::numbers::pi_v<float> / 180.0f;
 
+    constexpr float kScaleMin = 0.01f;
+    constexpr float kScaleMax = 100.0f;
+
     Vec3f furthestCorner(const AABB &box)
     {
         const auto min = box.minimum();
@@ -184,6 +187,7 @@ namespace
 
         Vec3f position{0.0f, 0.0f, 0.0f};
         Vec3f rotationDegrees{0.0f, 0.0f, 0.0f};
+        Vec3f scale{1.0f, 1.0f, 1.0f};
 
         Color faceColor = Color::DarkGreen();
         Color edgeColor = Color::Yellow();
@@ -191,14 +195,14 @@ namespace
 
         bool hasTransform() const { return kind != ObjectKind::String; }
 
-        AABB scaledBounds(const Vec3f &scale) const
+        AABB scaledBounds(const Vec3f &factor) const
         {
             AABB scaled = bounds;
 
             for (int a = 0; a < 3; ++a)
             {
-                scaled.minimum()[a] *= scale[a];
-                scaled.maximum()[a] *= scale[a];
+                scaled.minimum()[a] *= factor[a];
+                scaled.maximum()[a] *= factor[a];
             }
 
             return scaled;
@@ -293,11 +297,14 @@ namespace
 
             changed |= ImGui::DragFloat3("Posicao", position.data_ptr(), kDragSpeed);
             changed |= ImGui::DragFloat3("Rotacao (graus)", rotationDegrees.data_ptr(), 1.0f);
+            changed |= ImGui::DragFloat3(
+                "Escala", scale.data_ptr(), 0.01f, kScaleMin, kScaleMax);
 
             if (ImGui::SmallButton("Resetar"))
             {
                 position = Vec3f{0.0f, 0.0f, 0.0f};
                 rotationDegrees = Vec3f{0.0f, 0.0f, 0.0f};
+                scale = Vec3f{1.0f, 1.0f, 1.0f};
                 changed = true;
             }
 
@@ -332,7 +339,12 @@ namespace
         {
             const auto q = rotator().quaternion();
             const Rot3f inverse{Quatf{-q[0], -q[1], -q[2], q[3]}};
-            return inverse.rotateVector(world - position);
+            const Vec3f rotated = inverse.rotateVector(world - position);
+
+            return Vec3f{
+                rotated[0] / scale[0],
+                rotated[1] / scale[1],
+                rotated[2] / scale[2]};
         }
 
         Vec3f unitToWorld(const Vec3f &unit) const
