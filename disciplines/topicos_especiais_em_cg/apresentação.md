@@ -2,362 +2,448 @@
 marp: true
 theme: default
 paginate: true
-#header: 'Modelagem Geométrica'
-#footer: 'Trabalho 0'
+header: 'Modelagem Geométrica'
+footer: 'Trabalho 0'
 style: |
   section {
-    background-color: #fdf6e2;
-    color: #432818;
+    background-color: #111827;
+    color: #f9fafb;
     font-family: 'Georgia', serif;
     padding: 50px;
   }
+
   h1 {
-    color: #bb3e03;
-    border-bottom: 3px solid #ee9b00;
+    color: #22d3ee;
+    border-bottom: 3px solid #06b6d4;
   }
-  h2, h3 {
-    color: #9b2226; 
+
+  h2,
+  h3 {
+    color: #67e8f9;
   }
+
   footer {
     font-size: 0.5em;
-    color: #7f5539;
+    color: #94a3b8;
   }
+
+  header {
+    color: #94a3b8;
+  }
+
   .alerta {
-    background-color: #ffe8d6;
-    border-left: 6px solid #ca6702;
+    background-color: #1e293b;
+    border-left: 6px solid #22d3ee;
     padding: 20px;
     margin-top: 20px;
     border-radius: 8px;
   }
+---
+
+# Representação Geométrica
+
+Como representar um corpo rígido?
+
+Abordagens tradicionais:
+
+- Meshes
+- Convex Hulls
+- Esferas
+- Cápsulas
+- Caixas
+
+Proposta:
+
+Representar a geometria através de faces.
 
 ---
 
-# Levantamento de Temas de Pesquisa em Computação Gráfica
+# Face Como Vetor
 
-### Objetivo
+Cada face é representada por:
 
-Identificar temas de pesquisa com:
-
-- relevância científica;
-- potencial de inovação;
-- fundamentação matemática sólida;
-- viabilidade de implementação.
-
----
-
-# Motivação
-
-## Questão Central
-
-É possível substituir parte da pipeline tradicional
-
-```text
-Malha
-↓
-Triângulos
-↓
-Colisão
-↓
-Rasterização
-```
-
----
-
-## Questão Central
-
-por representações mais compactas e contínuas baseadas em:
-
-- funções;
-- primitivas analíticas;
-- geometria convexa;
-- representações implícitas.
-
----
-
-# Temas Investigados
-
-## Geometria Computacional
-
-- Continuous Collision Detection (CCD)
-- Support Functions
-- Signed Distance Functions (SDF)
-- Geometria Convexa
-- Swept Volumes
----
-
-# Temas Investigados
-
-## Renderização
-
-- Point-Based Rendering
-- Gaussian Splatting
-- Superquádricas
-- Sprites Dinâmicos
-
----
-
-# Simulação Física Moderna
-
-## Principais Tendências
-
-### Holz et al. (2025)
-
-- simulação multifísica;
-- corpos rígidos;
-- fluidos;
-- materiais deformáveis.
-
-### Bacher et al. (2025)
-
-- dinâmica baseada em quatérnions;
-- maior estabilidade;
-- restrições mais robustas.
-
-### Insight
-
-A tendência atual é aproximar física, geometria e otimização.
-
----
-
-# Continuous Collision Detection
-
-## Problema
-
-### Tunneling
-
-```text
-t
-
-O        |
-
-t + Δt
-
-         O|
-```
-
-A colisão ocorre entre frames.
-
----
-
-# Continuous Collision Detection
-
-## Estado da Arte
-
-Principais referências:
-
-- Redon et al. (2002)
-- Tang et al. (2009)
-- Coumans (2005)
-- Catto (2013)
-
-### Objetivo
-
-Determinar:
-
-```text
-Quando ocorre a colisão?
-```
-
-e não apenas:
-
-```text
-Existe colisão?
-```
-
----
-
-# Support Functions e GJK
-
-## Ideia Fundamental
-
-Para um corpo convexo:
-
-\[
-h(u)=\max_{x\in P}(u\cdot x)
-\]
-
-Pergunta respondida:
-
-> Qual é o ponto mais distante em uma determinada direção?
-
----
-
-# Support Functions e GJK
-
-## Por que isso é interessante?
-
-Muitas operações passam a depender apenas da função:
-
-\[
-h(u)
-\]
-
-sem necessidade de armazenar explicitamente todos os vértices.
-
-### Tendência Moderna
-
-```text
-Colisão
-=
-Otimização Convexa
-```
-
----
-
-# Signed Distance Functions (SDFs)
-
-## Conceito
-
-Uma única função fornece:
-
-- colisão;
-- distância mínima;
-- penetração;
-- normais.
-
-```text
-Objeto
-↓
-Função
-↓
-Geometria
-```
-
----
-
-# Representação Polar de Poliedros
-
-## Hipótese Principal
-
-Representar um poliedro por:
-
-```text
-Centro
-+
-Vetores Polares
-```
-
-ao invés de:
-
-```text
-Vértices
-Arestas
-Faces
-```
-
----
-
-# Representação Polar
-
-## Vetor Polar
-
-Para cada face:
-
-\[
-p_i = d_i n_i
-\]
+$$
+s = nd
+$$
 
 onde:
 
-- \(n_i\) é a normal;
-- \(d_i\) é a distância ao centro.
+- $n$ é a normal da face
+- $d$ é a distância da face à origem
 
-Cada vetor codifica:
+Armazenamos apenas:
 
-- orientação;
-- posição;
-- distância.
+$$
+s
+$$
+
+---
+
+# Exemplo
+
+Considere:
+
+$$
+s=(2,0,0)
+$$
+
+Temos:
+
+$$
+n=(1,0,0)
+$$
+
+$$
+d=2
+$$
+
+Logo a face está localizada em:
+
+$$
+x=2
+$$
+
+---
+
+# Face Como Restrição
+
+Cada face define:
+
+$$
+n \cdot x = d
+$$
+
+e o semiespaço:
+
+$$
+n \cdot x \le d
+$$
+
+Todo ponto que satisfaz a restrição pertence à região.
+
+---
+
+# Corpo Como Interseção
+
+Um corpo é definido por várias faces:
+
+$$
+s_1,s_2,\ldots,s_n
+$$
+
+Equivalentemente:
+
+$$
+B
+=
+\bigcap_i
+\left\{
+x :
+n_i\cdot x\le d_i
+\right\}
+$$
+
+O corpo surge da interseção das restrições.
+
+---
+
+# Exemplo: Quadrado
+
+Faces:
+
+$$
+(1,0)
+$$
+
+$$
+(-1,0)
+$$
+
+$$
+(0,1)
+$$
+
+$$
+(0,-1)
+$$
+
+---
+
+# Restrições
+
+As faces geram:
+
+$$
+x \le 1
+$$
+
+$$
+x \ge -1
+$$
+
+$$
+y \le 1
+$$
+
+$$
+y \ge -1
+$$
+
+---
+
+# Região Obtida
+
+```text
++---------+
+|         |
+|         |
+|         |
++---------+
+```
+
+Um quadrado centrado na origem.
 
 ---
 
 # Exemplo: Cubo
 
+Um cubo pode ser descrito por apenas seis faces:
+
 ```text
-(+r,0,0)
-(-r,0,0)
+(+X)
+(-X)
 
-(0,+r,0)
-(0,-r,0)
+(+Y)
+(-Y)
 
-(0,0,+r)
-(0,0,-r)
+(+Z)
+(-Z)
 ```
 
-Nenhum vértice é necessário.
+Sem necessidade de armazenar:
 
-### Possível vantagem
-
-Representação extremamente compacta.
+- vértices
+- arestas
+- triângulos
 
 ---
 
-# Questões de Pesquisa
+# Regiões Não Fechadas
 
-1. Um poliedro pode ser reconstruído apenas pelos vetores polares?
+Nem toda geometria precisa ser um poliedro fechado.
 
-2. É possível aproximar funções suporte diretamente?
-
-3. Podemos construir CCD sem vértices?
-
-4. Podemos gerar swept volumes diretamente dessa representação?
+A região pode permanecer aberta.
 
 ---
 
-# Gaussian Splatting
+# Chão Infinito
 
-## Tendência Atual
+Uma única face:
 
-Substituir:
+$$
+(0,1,0)
+$$
+
+define:
+
+$$
+y \le 1
+$$
+
+Visualmente:
 
 ```text
-Malhas
+      ar
+
+-------------------
+
+      chão
 ```
-
-por:
-
-```text
-Gaussianas
-```
-
-Cada gaussiana possui:
-
-- posição;
-- orientação;
-- escala;
-- cor.
 
 ---
 
-# Superquádricas e Elipsoides
+# Parede Infinita
 
-## Ideia
+Uma face:
 
-Substituir milhares de triângulos por poucas primitivas.
+$$
+(1,0,0)
+$$
+
+define:
+
+$$
+x \le 1
+$$
+
+Visualmente:
 
 ```text
-Cabeça  → Elipsoide
-Braço   → Cápsula
-Tronco  → Superquádrica
+|
+|
+| espaço
+|
+|
 ```
-
-### Aplicações
-
-- LOD natural;
-- animação simplificada;
-- sprites dinâmicos.
 
 ---
 
-# Proposta Desejado
+# Corredor Infinito
 
-## Tema de Mestrado
+Duas faces:
 
-### Detecção Contínua de Colisão Baseada em Representações Polares de Poliedros Convexos
+$$
+(1,0,0)
+$$
 
-Combina:
+$$
+(-1,0,0)
+$$
 
-- Geometria Convexa;
-- Support Functions;
-- CCD;
-- Swept Volumes;
-- Simulação Física.
+geram:
+
+$$
+-1 \le x \le 1
+$$
+
+Visualmente:
+
+```text
+|
+| corredor
+|
+| infinito
+|
+```
+
+---
+
+# Sala Sem Teto
+
+Cinco faces:
+
+```text
++X
+-X
+
++Y
+
++Z
+-Z
+```
+
+produzem:
+
+```text
+┌───────┐
+│       │
+│       │
+└───────┘
+
+aberta para cima
+```
+
+---
+
+# Estrutura de Dados
+
+```cpp
+struct ConvexRegion
+{
+    std::vector<Vec3> faces;
+};
+```
+
+Cada vetor armazena:
+
+```cpp
+face = normal * distância
+```
+
+---
+
+# Corpo Rígido
+
+```cpp
+struct RigidBody
+{
+    Motor motor;
+    Twist twist;
+
+    ConvexRegion region;
+};
+```
+
+---
+
+# Movimento da Geometria
+
+O motor move todas as faces:
+
+$$
+\pi_i(t)
+=
+M(t)\pi_iM^{-1}(t)
+$$
+
+Portanto:
+
+$$
+Region(t)
+=
+M(t)\,Region\,M^{-1}(t)
+$$
+
+---
+
+# Vantagens
+
+✅ Representação compacta
+
+✅ Não depende de mesh
+
+✅ Funciona para volumes fechados
+
+✅ Funciona para pisos infinitos
+
+✅ Funciona para paredes infinitas
+
+✅ Compatível com PGA
+
+---
+
+# Arquitetura Proposta
+
+```text
+Faces
+↓
+Região Convexa
+↓
+Motor
+↓
+Movimento Contínuo
+↓
+Distância
+↓
+TOI
+↓
+Colisão
+```
+
+---
+
+# Linha de Pesquisa
+
+```text
+PGA
+↓
+Motores
+↓
+Faces Convexas
+↓
+Regiões Geométricas
+↓
+CCD
+↓
+Geometric Physics Engine
+```
