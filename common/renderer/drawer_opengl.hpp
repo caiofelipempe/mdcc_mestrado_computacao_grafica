@@ -28,6 +28,10 @@ public:
     // ── Raytracer ────────────────────────────────────────────────────
     void traceFaces(const geometry::Vec3f *, std::size_t, const Color &) override;
     void traceMeshes(const geometry::Mesh3f *, std::size_t, const Color &) override;
+    void setRaytraceDivisor(int divisor) {
+        m_rtDivisor = (divisor < 1) ? 1 : divisor;
+    }
+    int raytraceDivisor() const { return m_rtDivisor; }
 
     // ── Config exposta ao usuário ────────────────────────────────────
     bool raytraceEnabled() const { return m_rtEnabled; }
@@ -44,6 +48,7 @@ private:
     RaytraceScene m_scene;
     bool m_rtEnabled = true;
     const Camera *m_camera = nullptr;
+    int m_rtDivisor = 2;
 
     std::vector<float> m_rasterDepth;
     std::vector<unsigned char> m_compositeRGBA;

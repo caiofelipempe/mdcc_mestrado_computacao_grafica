@@ -697,18 +697,28 @@ private:
         if (m_showWorldBounds)
         {
             Mesh3f boundsMesh = m_worldBounds.toMesh();
-            drawer.rastMeshes(&boundsMesh, 1, transparent,
-                              m_worldBoundsColor, transparent);
+
+            // Limites do mundo: RT (faces) — arestas ficam comentadas.
+            drawer.traceMeshes(&boundsMesh, 1, m_worldBoundsColor);
+
+            // drawer.rastMeshes(&boundsMesh, 1, transparent,
+            //                   m_worldBoundsColor, transparent);
         }
 
         // Modo operações: exibe APENAS o resultado da operação.
         if (m_operationsTabActive && m_operationValid)
         {
-            drawer.rastMeshes(
-                &m_operationMesh, 1,
-                m_showFaces ? m_operationFaceColor : transparent,
-                m_showEdges ? m_operationEdgeColor : transparent,
-                m_showVertices ? m_operationVertexColor : transparent);
+            // Antes: rastMeshes (faces + arestas + vértices)
+            // drawer.rastMeshes(
+            //     &m_operationMesh, 1,
+            //     m_showFaces    ? m_operationFaceColor   : transparent,
+            //     m_showEdges    ? m_operationEdgeColor   : transparent,
+            //     m_showVertices ? m_operationVertexColor : transparent);
+
+            // Depois: RT só nas faces
+            if (m_showFaces)
+                drawer.traceMeshes(&m_operationMesh, 1, m_operationFaceColor);
+
             return;
         }
 
@@ -716,11 +726,16 @@ private:
         {
             const auto &object = m_objects[i];
 
-            drawer.rastMeshes(
-                &m_meshes[i], 1,
-                m_showFaces ? object.faceColor : transparent,
-                m_showEdges ? object.edgeColor : transparent,
-                m_showVertices ? object.vertexColor : transparent);
+            // Antes: rastMeshes (faces + arestas + vértices)
+            // drawer.rastMeshes(
+            //     &m_meshes[i], 1,
+            //     m_showFaces    ? object.faceColor   : transparent,
+            //     m_showEdges    ? object.edgeColor   : transparent,
+            //     m_showVertices ? object.vertexColor : transparent);
+
+            // Depois: RT só nas faces
+            if (m_showFaces)
+                drawer.traceMeshes(&m_meshes[i], 1, object.faceColor);
         }
     }
 

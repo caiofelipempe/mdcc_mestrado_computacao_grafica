@@ -271,7 +271,11 @@ void DrawerOpengl::composeAndBlit()
     const int w = vp[2];
     const int h = vp[3];
 
-    if (w <= 0 || h <= 0) return;
+    if (w <= 0 || h <= 0)
+        return;
+
+    const int rtW = std::max(1, w / m_rtDivisor);
+    const int rtH = std::max(1, h / m_rtDivisor);
 
     const float n = m_camera->nearPlane();
     const float f = m_camera->farPlane();
@@ -280,27 +284,30 @@ void DrawerOpengl::composeAndBlit()
     glReadPixels(0, 0, w, h, GL_DEPTH_COMPONENT, GL_FLOAT, m_rasterDepth.data());
 
     m_scene.build();
-    m_scene.render(*m_camera, w, h);
+    m_scene.render(*m_camera, rtW, rtH);
 
-    const auto& rtRGB   = m_scene.color();
-    const auto& rtDepth = m_scene.depth();
+    const auto &rtRGB = m_scene.color();
+    const auto &rtDepth = m_scene.depth();
 
     m_compositeRGBA.assign(static_cast<std::size_t>(w) * h * 4, 0);
 
     for (int y = 0; y < h; ++y)
     {
-        const int rtY = h - 1 - y;
+        const int rtYfull = h - 1 - y;
+        const int rtY = rtYfull * rtH / h;
 
         for (int x = 0; x < w; ++x)
         {
+            const int rtX = x * rtW / w; // escala X pra RT
+
             const std::size_t fbIdx = static_cast<std::size_t>(y) * w + x;
-            const std::size_t rtIdx = static_cast<std::size_t>(rtY) * w + x;
-            const std::size_t dst   = fbIdx * 4;
+            const std::size_t rtIdx = static_cast<std::size_t>(rtY) * rtW + rtX;
+            const std::size_t dst = fbIdx * 4;
 
             const float z = m_rasterDepth[fbIdx];
             const float rasterDist = (z >= 1.0f)
-                ? 1e30f
-                : (n * f) / (f - z * (f - n));
+                                         ? 1e30f
+                                         : (n * f) / (f - z * (f - n));
 
             const float td = rtDepth[rtIdx];
 
@@ -348,10 +355,14 @@ void DrawerOpengl::composeAndBlit()
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
     glBegin(GL_QUADS);
-    glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0f, 0.0f);
-    glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0f, 0.0f);
-    glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0f, 1.0f);
-    glTexCoord2f(0.0f, 1.0f); glVertex2f(0.0f, 1.0f);
+    glTexCoord2f(0.0f, 0.0f);
+    glVertex2f(0.0f, 0.0f);
+    glTexCoord2f(1.0f, 0.0f);
+    glVertex2f(1.0f, 0.0f);
+    glTexCoord2f(1.0f, 1.0f);
+    glVertex2f(1.0f, 1.0f);
+    glTexCoord2f(0.0f, 1.0f);
+    glVertex2f(0.0f, 1.0f);
     glEnd();
 
     glDisable(GL_TEXTURE_2D);
