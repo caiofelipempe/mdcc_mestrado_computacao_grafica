@@ -1,4 +1,5 @@
 #include "drawer_opengl.hpp"
+#include "camera.hpp"
 
 #include <GL/glew.h>
 
@@ -7,38 +8,40 @@
 
 using namespace geometry;
 
-namespace {
-
-inline void setColor(const Color& c)
+namespace
 {
-    glColor4f(c.r, c.g, c.b, c.a);
-}
 
-inline bool computeNormal(const Vec3f& a, const Vec3f& b, const Vec3f& c,
-                          Vec3f& out)
-{
-    const Vec3f n = (b - a).cross(c - a);
-    if (n.sqrNorm() < 1e-20f)
-        return false;
-    out = n.normalized();
-    return true;
-}
+    inline void setColor(const Color &c)
+    {
+        glColor4f(c.r, c.g, c.b, c.a);
+    }
 
-struct FaceVertex
-{
-    Vec3f normal;
-    Vec3f position;
-};
+    inline bool computeNormal(const Vec3f &a, const Vec3f &b, const Vec3f &c,
+                              Vec3f &out)
+    {
+        const Vec3f n = (b - a).cross(c - a);
+        if (n.sqrNorm() < 1e-20f)
+            return false;
+        out = n.normalized();
+        return true;
+    }
+
+    struct FaceVertex
+    {
+        Vec3f normal;
+        Vec3f position;
+    };
 
 } // namespace
 
 // ─────────────────────────────────────────────────────────────────────
 //  Raster
 // ─────────────────────────────────────────────────────────────────────
-void DrawerOpengl::rastVertices(const Vec3f* points, std::size_t count,
-                                const Color& color, float size)
+void DrawerOpengl::rastVertices(const Vec3f *points, std::size_t count,
+                                const Color &color, float size)
 {
-    if (!points || count == 0 || color.a <= 0.0f) return;
+    if (!points || count == 0 || color.a <= 0.0f)
+        return;
 
     glDisable(GL_LIGHTING);
     glPointSize(size);
@@ -52,10 +55,11 @@ void DrawerOpengl::rastVertices(const Vec3f* points, std::size_t count,
     glEnable(GL_LIGHTING);
 }
 
-void DrawerOpengl::rastLines(const Vec3f* points, std::size_t count,
-                             const Color& color, float width)
+void DrawerOpengl::rastLines(const Vec3f *points, std::size_t count,
+                             const Color &color, float width)
 {
-    if (!points || count == 0 || color.a <= 0.0f) return;
+    if (!points || count == 0 || color.a <= 0.0f)
+        return;
 
     glDisable(GL_LIGHTING);
     glLineWidth(width);
@@ -69,10 +73,11 @@ void DrawerOpengl::rastLines(const Vec3f* points, std::size_t count,
     glEnable(GL_LIGHTING);
 }
 
-void DrawerOpengl::rastFaces(const Vec3f* points, std::size_t count,
-                             const Color& color)
+void DrawerOpengl::rastFaces(const Vec3f *points, std::size_t count,
+                             const Color &color)
 {
-    if (!points || count == 0 || color.a <= 0.0f) return;
+    if (!points || count == 0 || color.a <= 0.0f)
+        return;
 
     std::vector<FaceVertex> verts;
     verts.reserve(count * 3);
@@ -80,9 +85,9 @@ void DrawerOpengl::rastFaces(const Vec3f* points, std::size_t count,
     const std::size_t total = count * 3;
     for (std::size_t i = 0; i < total; i += 3)
     {
-        const Vec3f& a = points[i + 0];
-        const Vec3f& b = points[i + 1];
-        const Vec3f& c = points[i + 2];
+        const Vec3f &a = points[i + 0];
+        const Vec3f &b = points[i + 1];
+        const Vec3f &c = points[i + 2];
 
         Vec3f n;
         if (!computeNormal(a, b, c, n))
@@ -93,7 +98,8 @@ void DrawerOpengl::rastFaces(const Vec3f* points, std::size_t count,
         verts.push_back({n, c});
     }
 
-    if (verts.empty()) return;
+    if (verts.empty())
+        return;
 
     setColor(color);
 
@@ -112,20 +118,22 @@ void DrawerOpengl::rastFaces(const Vec3f* points, std::size_t count,
     glDisableClientState(GL_VERTEX_ARRAY);
 }
 
-void DrawerOpengl::rastMeshes(const Mesh3f* meshes, std::size_t count,
-                              const Color& faceColor,
-                              const Color& edgeColor,
-                              const Color& vertexColor)
+void DrawerOpengl::rastMeshes(const Mesh3f *meshes, std::size_t count,
+                              const Color &faceColor,
+                              const Color &edgeColor,
+                              const Color &vertexColor)
 {
-    if (!meshes || count == 0) return;
+    if (!meshes || count == 0)
+        return;
 
     for (std::size_t m = 0; m < count; ++m)
     {
-        const auto& V = meshes[m].vertices();
-        const auto& E = meshes[m].edges();
-        const auto& F = meshes[m].faces();
+        const auto &V = meshes[m].vertices();
+        const auto &E = meshes[m].edges();
+        const auto &F = meshes[m].faces();
 
-        if (V.empty()) continue;
+        if (V.empty())
+            continue;
 
         // ── Faces ────────────────────────────────────────────────────
         if (faceColor.a > 0.0f && !F.empty())
@@ -133,7 +141,7 @@ void DrawerOpengl::rastMeshes(const Mesh3f* meshes, std::size_t count,
             std::vector<Vec3f> tris;
             tris.reserve(F.size() * 3);
 
-            for (const auto& f : F)
+            for (const auto &f : F)
             {
                 tris.push_back(V[f.indices[0]]);
                 tris.push_back(V[f.indices[1]]);
@@ -148,7 +156,7 @@ void DrawerOpengl::rastMeshes(const Mesh3f* meshes, std::size_t count,
             std::vector<Vec3f> lines;
             lines.reserve(E.size() * 2);
 
-            for (const auto& e : E)
+            for (const auto &e : E)
             {
                 lines.push_back(V[e.v1]);
                 lines.push_back(V[e.v2]);
@@ -167,26 +175,28 @@ void DrawerOpengl::rastMeshes(const Mesh3f* meshes, std::size_t count,
 // ─────────────────────────────────────────────────────────────────────
 //  Raytracer — alimenta a cena
 // ─────────────────────────────────────────────────────────────────────
-void DrawerOpengl::traceFaces(const Vec3f* points, std::size_t count,
-                              const Color& color)
+void DrawerOpengl::traceFaces(const Vec3f *points, std::size_t count,
+                              const Color &color)
 {
-    if (!points || count == 0 || color.a <= 0.0f) return;
+    if (!points || count == 0 || color.a <= 0.0f)
+        return;
 
     const std::size_t total = count * 3;
     for (std::size_t i = 0; i < total; i += 3)
         m_scene.addTriangle(points[i + 0], points[i + 1], points[i + 2], color);
 }
 
-void DrawerOpengl::traceMeshes(const Mesh3f* meshes, std::size_t count,
-                               const Color& faceColor)
+void DrawerOpengl::traceMeshes(const Mesh3f *meshes, std::size_t count,
+                               const Color &faceColor)
 {
-    if (!meshes || count == 0 || faceColor.a <= 0.0f) return;
+    if (!meshes || count == 0 || faceColor.a <= 0.0f)
+        return;
 
     for (std::size_t m = 0; m < count; ++m)
     {
-        const auto& V = meshes[m].vertices();
-        const auto& F = meshes[m].faces();
-        for (const auto& f : F)
+        const auto &V = meshes[m].vertices();
+        const auto &F = meshes[m].faces();
+        for (const auto &f : F)
             m_scene.addTriangle(V[f.indices[0]], V[f.indices[1]],
                                 V[f.indices[2]], faceColor);
     }
@@ -223,44 +233,48 @@ void DrawerOpengl::frameBegin()
     glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
     glShadeModel(GL_SMOOTH);
 
-    GLfloat lightPos[]  = {20.0f, 20.0f, 20.0f, 1.0f};
-    GLfloat lightAmb[]  = { 0.20f, 0.20f, 0.20f, 1.0f};
-    GLfloat lightDif[]  = { 1.0f,  1.0f,  1.0f,  1.0f};
-    GLfloat lightSpec[] = { 1.0f,  1.0f,  1.0f,  1.0f};
-    GLfloat matSpec[]   = { 1.0f,  1.0f,  1.0f,  1.0f};
+    GLfloat lightPos[] = {20.0f, 20.0f, 20.0f, 1.0f};
+    GLfloat lightAmb[] = {0.20f, 0.20f, 0.20f, 1.0f};
+    GLfloat lightDif[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    GLfloat lightSpec[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    GLfloat matSpec[] = {1.0f, 1.0f, 1.0f, 1.0f};
     GLfloat shininess[] = {64.0f};
 
     glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
-    glLightfv(GL_LIGHT0, GL_AMBIENT,  lightAmb);
-    glLightfv(GL_LIGHT0, GL_DIFFUSE,  lightDif);
+    glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmb);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDif);
     glLightfv(GL_LIGHT0, GL_SPECULAR, lightSpec);
-    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR,  matSpec);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, matSpec);
     glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, shininess);
 
     glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
-void DrawerOpengl::frameEnd(const FrameContext& ctx)
+void DrawerOpengl::frameEnd()
 {
     glFlush();
 
     if (!m_rtEnabled || m_scene.empty() || !m_camera)
         return;
 
-    if (ctx.width <= 0 || ctx.height <= 0)
-        return;
-
-    composeAndBlit(ctx);
+    composeAndBlit();
 }
 
 // ─────────────────────────────────────────────────────────────────────
 //  Composição por profundidade
 // ─────────────────────────────────────────────────────────────────────
-void DrawerOpengl::composeAndBlit(const FrameContext& ctx)
+void DrawerOpengl::composeAndBlit()
 {
-    const int w = ctx.width;
-    const int h = ctx.height;
+    GLint vp[4];
+    glGetIntegerv(GL_VIEWPORT, vp);
+    const int w = vp[2];
+    const int h = vp[3];
+
+    if (w <= 0 || h <= 0) return;
+
+    const float n = m_camera->nearPlane();
+    const float f = m_camera->farPlane();
 
     m_rasterDepth.resize(static_cast<std::size_t>(w) * h);
     glReadPixels(0, 0, w, h, GL_DEPTH_COMPONENT, GL_FLOAT, m_rasterDepth.data());
@@ -272,9 +286,6 @@ void DrawerOpengl::composeAndBlit(const FrameContext& ctx)
     const auto& rtDepth = m_scene.depth();
 
     m_compositeRGBA.assign(static_cast<std::size_t>(w) * h * 4, 0);
-
-    const float n = ctx.nearPlane;
-    const float f = ctx.farPlane;
 
     for (int y = 0; y < h; ++y)
     {
@@ -320,9 +331,13 @@ void DrawerOpengl::composeAndBlit(const FrameContext& ctx)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0,
                  GL_RGBA, GL_UNSIGNED_BYTE, m_compositeRGBA.data());
 
-    glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
     glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
-    glMatrixMode(GL_MODELVIEW);  glPushMatrix(); glLoadIdentity();
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
 
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_LIGHTING);
@@ -333,10 +348,10 @@ void DrawerOpengl::composeAndBlit(const FrameContext& ctx)
     glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 
     glBegin(GL_QUADS);
-        glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0f, 0.0f);
-        glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0f, 0.0f);
-        glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0f, 1.0f);
-        glTexCoord2f(0.0f, 1.0f); glVertex2f(0.0f, 1.0f);
+    glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0f, 0.0f);
+    glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0f, 0.0f);
+    glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0f, 1.0f);
+    glTexCoord2f(0.0f, 1.0f); glVertex2f(0.0f, 1.0f);
     glEnd();
 
     glDisable(GL_TEXTURE_2D);
@@ -344,6 +359,8 @@ void DrawerOpengl::composeAndBlit(const FrameContext& ctx)
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_LIGHTING);
 
-    glMatrixMode(GL_PROJECTION); glPopMatrix();
-    glMatrixMode(GL_MODELVIEW);  glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    glPopMatrix();
 }

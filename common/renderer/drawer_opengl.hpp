@@ -14,14 +14,6 @@ class DrawerOpengl : public Rasterizer, public Raytracer
 {
     friend class RendererGlfwOpengl;
 
-    struct FrameContext
-    {
-        int width = 0;
-        int height = 0;
-        float nearPlane = 0.1f;
-        float farPlane = 1000.0f;
-    };
-
 public:
     DrawerOpengl();
     ~DrawerOpengl() override;
@@ -44,10 +36,10 @@ public:
 private:
     // ── Lifecycle — só o renderer ────────────────────────────────────
     void frameBegin();
-    void frameEnd(const FrameContext &ctx);
+    void frameEnd();
     void setCamera(const Camera *camera) { m_camera = camera; }
 
-    void composeAndBlit(const FrameContext &ctx);
+    void composeAndBlit();
 
     RaytraceScene m_scene;
     bool m_rtEnabled = true;
