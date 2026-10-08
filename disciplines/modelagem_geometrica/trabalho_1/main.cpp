@@ -504,7 +504,7 @@ protected:
         updateCameraMovement(deltaTime);
     }
 
-    void onRender(Drawer &drawer) override
+    void onRender(DrawerOpengl &drawer) override
     {
         drawScene(drawer);
     }
@@ -690,21 +690,22 @@ private:
         return tree.toString();
     }
 
-    void drawScene(Drawer &drawer)
+    void drawScene(DrawerOpengl &drawer)
     {
         const Color transparent = Color::Transparent();
 
         if (m_showWorldBounds)
         {
             Mesh3f boundsMesh = m_worldBounds.toMesh();
-            drawer.drawMesh(boundsMesh, transparent, m_worldBoundsColor, transparent);
+            drawer.rastMeshes(&boundsMesh, 1, transparent,
+                              m_worldBoundsColor, transparent);
         }
 
-        // Modo operacoes: exibe APENAS o resultado da operacao.
+        // Modo operações: exibe APENAS o resultado da operação.
         if (m_operationsTabActive && m_operationValid)
         {
-            drawer.drawMesh(
-                m_operationMesh,
+            drawer.rastMeshes(
+                &m_operationMesh, 1,
                 m_showFaces ? m_operationFaceColor : transparent,
                 m_showEdges ? m_operationEdgeColor : transparent,
                 m_showVertices ? m_operationVertexColor : transparent);
@@ -715,8 +716,8 @@ private:
         {
             const auto &object = m_objects[i];
 
-            drawer.drawMesh(
-                m_meshes[i],
+            drawer.rastMeshes(
+                &m_meshes[i], 1,
                 m_showFaces ? object.faceColor : transparent,
                 m_showEdges ? object.edgeColor : transparent,
                 m_showVertices ? object.vertexColor : transparent);

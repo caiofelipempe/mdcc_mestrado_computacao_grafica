@@ -1,8 +1,8 @@
-add_library(renderer STATIC
-    renderer_glfw_opengl.cpp
-    camera.cpp
-    drawer_opengl.cpp
+file(GLOB RENDERER_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/*.cpp"
 )
+
+add_library(renderer STATIC ${RENDERER_SOURCES})
 
 target_include_directories(renderer PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}

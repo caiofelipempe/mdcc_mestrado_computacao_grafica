@@ -8,7 +8,7 @@
 
 struct GLFWwindow;
 
-class RendererGlfwOpengl : public Renderer
+class RendererGlfwOpengl : public Renderer<DrawerOpengl>
 {
 public:
     RendererGlfwOpengl();
@@ -29,8 +29,7 @@ protected:
     virtual void onUpdate(
         float dt) override {};
 
-    virtual void onRender(
-        Drawer &drawer) override {};
+    virtual void onRender(DrawerOpengl &drawer) override {};
 
     virtual void onUI() override {};
 
@@ -77,7 +76,7 @@ private:
         int height);
 
     static void framebufferSizeCallback(GLFWwindow *, int, int);
-    
+
     void onFramebufferResize(int width, int height);
 
 private:

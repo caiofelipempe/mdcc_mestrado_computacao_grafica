@@ -961,7 +961,7 @@ protected:
     }
 
     void onRender(
-        Drawer&
+        DrawerOpengl&
     ) override
     {
         beginImGui();

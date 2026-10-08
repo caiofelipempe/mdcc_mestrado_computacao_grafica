@@ -7,6 +7,7 @@
 
 class Drawer;
 
+template <typename T>
 class Renderer
 {
 public:
@@ -44,7 +45,7 @@ protected:
     ) = 0;
 
     virtual void onRender(
-        Drawer& drawer
+        T& drawer
     ) = 0;
 
     virtual void onUI() = 0;

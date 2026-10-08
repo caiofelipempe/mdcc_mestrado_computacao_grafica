@@ -184,7 +184,11 @@ void RendererGlfwOpengl::run(const int w, const int h, const std::string &t)
             drawer.frameBegin();
             updateCamera();
             onRender(drawer);
-            drawer.frameEnd();
+            drawer.frameEnd(DrawerOpengl::FrameContext{
+                m_lastFbW,
+                m_lastFbH,
+                m_camera.nearPlane(),
+                m_camera.farPlane()});
             onUI();
 
             glfwSwapBuffers(m_window);

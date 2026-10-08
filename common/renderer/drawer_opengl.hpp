@@ -1,72 +1,59 @@
 #pragma once
 
-#include "drawer.hpp"
+#include "rasterizer.hpp"
+#include "raytracer.hpp"
+#include "raytrace_scene.hpp"
+
+#include <cstdint>
 #include <vector>
 
-class DrawerOpengl final :
-    public Drawer
+class Camera;
+class RendererGlfwOpengl;
+
+class DrawerOpengl : public Rasterizer, public Raytracer
 {
+    friend class RendererGlfwOpengl;
+
+    struct FrameContext
+    {
+        int width = 0;
+        int height = 0;
+        float nearPlane = 0.1f;
+        float farPlane = 1000.0f;
+    };
+
 public:
+    DrawerOpengl();
+    ~DrawerOpengl() override;
 
-    ~DrawerOpengl() override = default;
+    // ── Rasterizer ───────────────────────────────────────────────────
+    void rastFaces(const geometry::Vec3f *, std::size_t, const Color &) override;
+    void rastLines(const geometry::Vec3f *, std::size_t, const Color &, float) override;
+    void rastVertices(const geometry::Vec3f *, std::size_t, const Color &, float) override;
+    void rastMeshes(const geometry::Mesh3f *, std::size_t,
+                    const Color &, const Color &, const Color &) override;
 
-    using Drawer::drawVertices;
-    using Drawer::drawLines;
-    using Drawer::drawFaces;
-    using Drawer::drawMeshes;
+    // ── Raytracer ────────────────────────────────────────────────────
+    void traceFaces(const geometry::Vec3f *, std::size_t, const Color &) override;
+    void traceMeshes(const geometry::Mesh3f *, std::size_t, const Color &) override;
 
-    void frameBegin() override;
-    void frameEnd() override;
-
-    void drawVertices(
-        const geometry::Vec3f* points,
-        std::size_t count,
-        const Color& color,
-        float size = 5.0f) override;
-
-    void drawLines(
-        const geometry::Vec3f* points,
-        std::size_t count,
-        const Color& color,
-        float width = 1.0f) override;
-
-    void drawFaces(
-        const geometry::Vec3f* points,
-        std::size_t count,
-        const Color& color) override;
-
-    void drawMeshes(
-        const geometry::Mesh3f* meshes,
-        std::size_t count,
-        const Color& faceColor,
-        const Color& edgeColor,
-        const Color& vertexColor) override;
+    // ── Config exposta ao usuário ────────────────────────────────────
+    bool raytraceEnabled() const { return m_rtEnabled; }
+    void setRaytraceEnabled(bool v) { m_rtEnabled = v; }
 
 private:
+    // ── Lifecycle — só o renderer ────────────────────────────────────
+    void frameBegin();
+    void frameEnd(const FrameContext &ctx);
+    void setCamera(const Camera *camera) { m_camera = camera; }
 
-    struct FaceVertex
-    {
-        geometry::Vec3f normal;
-        geometry::Vec3f position;
-    };
+    void composeAndBlit(const FrameContext &ctx);
 
-    struct BatchVertices
-    {
-        Color color;
-        float size;
-        std::vector<geometry::Vec3f> points;
-    };
+    RaytraceScene m_scene;
+    bool m_rtEnabled = true;
+    const Camera *m_camera = nullptr;
 
-    struct BatchLines
-    {
-        Color color;
-        float width;
-        std::vector<geometry::Vec3f> points;
-    };
-
-    struct BatchFaces
-    {
-        Color color;
-        std::vector<FaceVertex> vertices;
-    };
+    std::vector<float> m_rasterDepth;
+    std::vector<unsigned char> m_compositeRGBA;
+    unsigned int m_tex = 0;
 };
