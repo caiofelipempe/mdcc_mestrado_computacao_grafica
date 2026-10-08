@@ -697,28 +697,18 @@ private:
         if (m_showWorldBounds)
         {
             Mesh3f boundsMesh = m_worldBounds.toMesh();
-
-            // Limites do mundo: RT (faces) — arestas ficam comentadas.
-            drawer.traceMeshes(&boundsMesh, 1, m_worldBoundsColor);
-
-            // drawer.rastMeshes(&boundsMesh, 1, transparent,
-            //                   m_worldBoundsColor, transparent);
+            drawer.rastMeshes(&boundsMesh, 1, transparent,
+                              m_worldBoundsColor, transparent);
         }
 
         // Modo operações: exibe APENAS o resultado da operação.
         if (m_operationsTabActive && m_operationValid)
         {
-            // Antes: rastMeshes (faces + arestas + vértices)
-            // drawer.rastMeshes(
-            //     &m_operationMesh, 1,
-            //     m_showFaces    ? m_operationFaceColor   : transparent,
-            //     m_showEdges    ? m_operationEdgeColor   : transparent,
-            //     m_showVertices ? m_operationVertexColor : transparent);
-
-            // Depois: RT só nas faces
-            if (m_showFaces)
-                drawer.traceMeshes(&m_operationMesh, 1, m_operationFaceColor);
-
+            drawer.rastMeshes(
+                &m_operationMesh, 1,
+                m_showFaces ? m_operationFaceColor : transparent,
+                m_showEdges ? m_operationEdgeColor : transparent,
+                m_showVertices ? m_operationVertexColor : transparent);
             return;
         }
 
@@ -726,16 +716,11 @@ private:
         {
             const auto &object = m_objects[i];
 
-            // Antes: rastMeshes (faces + arestas + vértices)
-            // drawer.rastMeshes(
-            //     &m_meshes[i], 1,
-            //     m_showFaces    ? object.faceColor   : transparent,
-            //     m_showEdges    ? object.edgeColor   : transparent,
-            //     m_showVertices ? object.vertexColor : transparent);
-
-            // Depois: RT só nas faces
-            if (m_showFaces)
-                drawer.traceMeshes(&m_meshes[i], 1, object.faceColor);
+            drawer.rastMeshes(
+                &m_meshes[i], 1,
+                m_showFaces ? object.faceColor : transparent,
+                m_showEdges ? object.edgeColor : transparent,
+                m_showVertices ? object.vertexColor : transparent);
         }
     }
 
