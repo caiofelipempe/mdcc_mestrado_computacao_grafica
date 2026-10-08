@@ -14,13 +14,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //  Ctor / Dtor
 // ─────────────────────────────────────────────────────────────────────────────
-RendererGlfwOpengl::RendererGlfwOpengl()  = default;
+RendererGlfwOpengl::RendererGlfwOpengl() = default;
 RendererGlfwOpengl::~RendererGlfwOpengl() = default;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  GLFW
 // ─────────────────────────────────────────────────────────────────────────────
-void RendererGlfwOpengl::initGLFW(const int w, const int h, const std::string& t) {
+void RendererGlfwOpengl::initGLFW(const int w, const int h, const std::string &t)
+{
     if (!glfwInit())
         throw std::runtime_error("Erro ao iniciar GLFW");
 
@@ -29,7 +30,8 @@ void RendererGlfwOpengl::initGLFW(const int w, const int h, const std::string& t
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
 
     m_window = glfwCreateWindow(w, h, t.c_str(), nullptr, nullptr);
-    if (!m_window) {
+    if (!m_window)
+    {
         glfwTerminate();
         throw std::runtime_error("Erro ao criar janela");
     }
@@ -37,7 +39,8 @@ void RendererGlfwOpengl::initGLFW(const int w, const int h, const std::string& t
     glfwMakeContextCurrent(m_window);
 
     glewExperimental = GL_TRUE;
-    if (glewInit() != GLEW_OK) {
+    if (glewInit() != GLEW_OK)
+    {
         glfwDestroyWindow(m_window);
         m_window = nullptr;
         glfwTerminate();
@@ -53,12 +56,15 @@ void RendererGlfwOpengl::initGLFW(const int w, const int h, const std::string& t
     glfwSwapInterval(1);
     glViewport(0, 0, w, h);
 
-    glfwSetWindowUserPointer   (m_window, this);
-    glfwSetKeyCallback         (m_window, keyCallback);
-    glfwSetMouseButtonCallback (m_window, mouseButtonCallback);
-    glfwSetCursorPosCallback   (m_window, cursorPosCallback);
-    glfwSetScrollCallback      (m_window, scrollCallback);
-    glfwSetWindowSizeCallback  (m_window, windowSizeCallback);
+    glfwSetWindowUserPointer(m_window, this);
+    glfwSetKeyCallback(m_window, keyCallback);
+    glfwSetMouseButtonCallback(m_window, mouseButtonCallback);
+    glfwSetCursorPosCallback(m_window, cursorPosCallback);
+    glfwSetScrollCallback(m_window, scrollCallback);
+    glfwSetWindowSizeCallback(m_window, windowSizeCallback);
+    glfwSetFramebufferSizeCallback(m_window, framebufferSizeCallback);
+    glfwGetFramebufferSize(m_window, &m_lastFbW, &m_lastFbH);
+    glViewport(0, 0, m_lastFbW, m_lastFbH);
 }
 
 void RendererGlfwOpengl::updateCamera()
@@ -72,8 +78,7 @@ void RendererGlfwOpengl::updateCamera()
             m_camera.fov(),
             m_camera.aspect(),
             m_camera.nearPlane(),
-            m_camera.farPlane()
-        );
+            m_camera.farPlane());
 
         m_camera.clearProjectionDirty();
     }
@@ -83,31 +88,32 @@ void RendererGlfwOpengl::updateCamera()
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
 
-        const auto& position =
+        const auto &position =
             m_camera.position();
 
-        const auto& target =
+        const auto &target =
             m_camera.target();
 
-        const auto& up =
+        const auto &up =
             m_camera.up();
 
         gluLookAt(
             position[0], position[1], position[2],
-            target[0],   target[1],   target[2],
-            up[0],       up[1],       up[2]
-        );
+            target[0], target[1], target[2],
+            up[0], up[1], up[2]);
 
         m_camera.clearViewDirty();
     }
 }
 
-void RendererGlfwOpengl::updateGamepad() {
-    auto& in = inputMutable();
+void RendererGlfwOpengl::updateGamepad()
+{
+    auto &in = inputMutable();
 
     in.m_gamepadConnected = glfwJoystickPresent(GLFW_JOYSTICK_1);
 
-    if (!in.m_gamepadConnected) {
+    if (!in.m_gamepadConnected)
+    {
         in.m_gamepadButtons.fill(false);
         in.m_gamepadAxes.fill(0.0f);
         return;
@@ -127,15 +133,19 @@ void RendererGlfwOpengl::updateGamepad() {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Loop principal
 // ─────────────────────────────────────────────────────────────────────────────
-void RendererGlfwOpengl::run(const int w, const int h, const std::string& t) {
+void RendererGlfwOpengl::run(const int w, const int h, const std::string &t)
+{
     initGLFW(w, h, t);
 
     // Garante shutdown correto mesmo se onInit/onUpdate/onRender lançarem.
-    struct ShutdownGuard {
-        RendererGlfwOpengl* self;
-        ~ShutdownGuard() {
+    struct ShutdownGuard
+    {
+        RendererGlfwOpengl *self;
+        ~ShutdownGuard()
+        {
             self->onShutdown();
-            if (self->m_window) {
+            if (self->m_window)
+            {
                 glfwDestroyWindow(self->m_window);
                 self->m_window = nullptr;
             }
@@ -150,16 +160,26 @@ void RendererGlfwOpengl::run(const int w, const int h, const std::string& t) {
     auto lastTime = clock::now();
     DrawerOpengl drawer;
 
-    while (!glfwWindowShouldClose(m_window)) {
+    while (!glfwWindowShouldClose(m_window))
+    {
         const auto frameBegin = clock::now();
         const float dt = std::chrono::duration<float>(frameBegin - lastTime).count();
         lastTime = frameBegin;
 
         glfwPollEvents();
         updateGamepad();
+        int fbW = 0, fbH = 0;
+
+        glfwGetFramebufferSize(m_window, &fbW, &fbH);
+        if (fbW != m_lastFbW || fbH != m_lastFbH)
+        {
+            onFramebufferResize(fbW, fbH);
+        }
+
         onUpdate(dt);
 
-        if (shouldRender()) {
+        if (shouldRender())
+        {
 
             drawer.frameBegin();
             updateCamera();
@@ -174,7 +194,8 @@ void RendererGlfwOpengl::run(const int w, const int h, const std::string& t) {
         // monitor. Esse sleep só tem efeito quando targetFPS() < taxa do
         // monitor; acima disso quem manda é o vsync, não o cap manual.
         const int fpsTarg = targetFPS();
-        if (fpsTarg > 0) {
+        if (fpsTarg > 0)
+        {
             const auto targetFrameTime = std::chrono::duration<float>(1.0f / static_cast<float>(fpsTarg));
             const auto frameDuration = clock::now() - frameBegin;
 
@@ -186,7 +207,8 @@ void RendererGlfwOpengl::run(const int w, const int h, const std::string& t) {
     }
 }
 
-void RendererGlfwOpengl::onWindowResize(int width, int height) {
+void RendererGlfwOpengl::onWindowResize(int width, int height)
+{
     glViewport(0, 0, width, height);
     m_camera.resize(width, height);
 }
@@ -194,33 +216,70 @@ void RendererGlfwOpengl::onWindowResize(int width, int height) {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Callbacks GLFW (estáticos)
 // ─────────────────────────────────────────────────────────────────────────────
-void RendererGlfwOpengl::keyCallback(GLFWwindow* window, int key, int, int action, int) {
-    auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
-    if (!self || key < 0 || key >= 512) return;
+void RendererGlfwOpengl::keyCallback(GLFWwindow *window, int key, int, int action, int)
+{
+    auto *self = static_cast<RendererGlfwOpengl *>(glfwGetWindowUserPointer(window));
+    if (!self || key < 0 || key >= 512)
+        return;
     self->inputMutable().m_keys[key] = (action != GLFW_RELEASE);
 }
 
-void RendererGlfwOpengl::mouseButtonCallback(GLFWwindow* window, int button, int action, int) {
-    auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
-    if (!self || button < 0 || button >= 8) return;
+void RendererGlfwOpengl::mouseButtonCallback(GLFWwindow *window, int button, int action, int)
+{
+    auto *self = static_cast<RendererGlfwOpengl *>(glfwGetWindowUserPointer(window));
+    if (!self || button < 0 || button >= 8)
+        return;
     self->inputMutable().m_mouseButtons[button] = (action == GLFW_PRESS);
 }
 
-void RendererGlfwOpengl::cursorPosCallback(GLFWwindow* window, double x, double y) {
-    auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
-    if (!self) return;
+void RendererGlfwOpengl::cursorPosCallback(GLFWwindow *window, double x, double y)
+{
+    auto *self = static_cast<RendererGlfwOpengl *>(glfwGetWindowUserPointer(window));
+    if (!self)
+        return;
     self->inputMutable().m_mouseX = x;
     self->inputMutable().m_mouseY = y;
 }
 
-void RendererGlfwOpengl::scrollCallback(GLFWwindow* window, double /*dx*/, double dy) {
-    auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
-    if (!self) return;
+void RendererGlfwOpengl::scrollCallback(GLFWwindow *window, double /*dx*/, double dy)
+{
+    auto *self = static_cast<RendererGlfwOpengl *>(glfwGetWindowUserPointer(window));
+    if (!self)
+        return;
     self->inputMutable().m_scrollOffset = dy;
 }
 
-void RendererGlfwOpengl::windowSizeCallback(GLFWwindow* window, int width, int height) {
-    auto* self = static_cast<RendererGlfwOpengl*>(glfwGetWindowUserPointer(window));
-    if (!self) return;
+void RendererGlfwOpengl::windowSizeCallback(GLFWwindow *window, int width, int height)
+{
+    auto *self = static_cast<RendererGlfwOpengl *>(glfwGetWindowUserPointer(window));
+    if (!self)
+        return;
     self->onWindowResize(width, height);
+}
+
+void RendererGlfwOpengl::framebufferSizeCallback(GLFWwindow *window, int /*w*/, int /*h*/)
+{
+    auto *self = static_cast<RendererGlfwOpengl *>(glfwGetWindowUserPointer(window));
+    if (!self)
+        return;
+
+    // Ignora o w/h do callback — no Windows ao maximizar eles podem vir
+    // desatualizados. Sempre consulte o framebuffer.
+    int fbW = 0, fbH = 0;
+    glfwGetFramebufferSize(window, &fbW, &fbH);
+    self->onFramebufferResize(fbW, fbH);
+}
+
+void RendererGlfwOpengl::onFramebufferResize(int width, int height)
+{
+    if (width <= 0)
+        width = 1;
+    if (height <= 0)
+        height = 1;
+
+    m_lastFbW = width;
+    m_lastFbH = height;
+
+    glViewport(0, 0, width, height);
+    m_camera.resize(width, height);
 }

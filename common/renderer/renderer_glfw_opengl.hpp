@@ -18,82 +18,76 @@ public:
     void run(
         int width,
         int height,
-        const std::string& title
-    ) override;
+        const std::string &title) override;
 
 protected:
     virtual void onInit(
         int initialWidth,
         int initialHeight,
-        const std::string& initialTitle
-    ) override {};
+        const std::string &initialTitle) override {};
 
     virtual void onUpdate(
-        float dt
-    ) override {};
+        float dt) override {};
 
     virtual void onRender(
-        Drawer& drawer
-    ) override {};
+        Drawer &drawer) override {};
 
     virtual void onUI() override {};
 
     virtual void onShutdown() override {};
 
-    virtual void onWindowResize(
-        int width,
-        int height
-    );
+    virtual void onWindowResize(int width, int height);
 
 private:
     void initGLFW(
         int width,
         int height,
-        const std::string& title
-    );
+        const std::string &title);
 
     void updateCamera();
 
     void updateGamepad();
 
     static void keyCallback(
-        GLFWwindow* window,
+        GLFWwindow *window,
         int key,
         int scancode,
         int action,
-        int mods
-    );
+        int mods);
 
     static void mouseButtonCallback(
-        GLFWwindow* window,
+        GLFWwindow *window,
         int button,
         int action,
-        int mods
-    );
+        int mods);
 
     static void cursorPosCallback(
-        GLFWwindow* window,
+        GLFWwindow *window,
         double x,
-        double y
-    );
+        double y);
 
     static void scrollCallback(
-        GLFWwindow* window,
+        GLFWwindow *window,
         double dx,
-        double dy
-    );
+        double dy);
 
     static void windowSizeCallback(
-        GLFWwindow* window,
+        GLFWwindow *window,
         int width,
-        int height
-    );
+        int height);
+
+    static void framebufferSizeCallback(GLFWwindow *, int, int);
+    
+    void onFramebufferResize(int width, int height);
 
 private:
-    GLFWwindow* m_window{};
+    GLFWwindow *m_window{};
+    int m_lastFbW = 0;
+    int m_lastFbH = 0;
 
 protected:
-    GLFWwindow* const window() {
+    GLFWwindow *const window()
+    {
         return m_window;
     }
 };
