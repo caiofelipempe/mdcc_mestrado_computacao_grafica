@@ -69,8 +69,4 @@ private:
         Color color;
         std::vector<FaceVertex> vertices;
     };
-
-    std::vector<BatchVertices> m_pendingVertices;
-    std::vector<BatchLines> m_pendingLines;
-    std::vector<BatchFaces> m_pendingFaces;
 };

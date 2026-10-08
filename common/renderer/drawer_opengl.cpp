@@ -3,6 +3,8 @@
 
 #include <GL/glew.h>
 
+#include <vector>
+
 using namespace geometry;
 
 namespace
@@ -24,6 +26,9 @@ namespace
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Frame
+// ─────────────────────────────────────────────────────────────────────────────
 void DrawerOpengl::frameBegin()
 {
     glEnable(GL_DEPTH_TEST);
@@ -41,186 +46,53 @@ void DrawerOpengl::frameBegin()
 
     glShadeModel(GL_SMOOTH);
 
-    GLfloat lightPosition[] =
-        {
-            20.0f,
-            20.0f,
-            20.0f,
-            1.0f};
+    GLfloat lightPosition[] = {20.0f, 20.0f, 20.0f, 1.0f};
+    GLfloat ambient[]       = { 0.20f,  0.20f,  0.20f, 1.0f};
+    GLfloat diffuse[]       = { 1.0f,   1.0f,   1.0f,  1.0f};
+    GLfloat specular[]      = { 1.0f,   1.0f,   1.0f,  1.0f};
 
-    GLfloat ambient[] =
-        {
-            0.20f,
-            0.20f,
-            0.20f,
-            1.0f};
+    glLightfv(GL_LIGHT0, GL_POSITION, lightPosition);
+    glLightfv(GL_LIGHT0, GL_AMBIENT,  ambient);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE,  diffuse);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
 
-    GLfloat diffuse[] =
-        {
-            1.0f,
-            1.0f,
-            1.0f,
-            1.0f};
+    GLfloat materialSpecular[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    GLfloat shininess[]        = {64.0f};
 
-    GLfloat specular[] =
-        {
-            1.0f,
-            1.0f,
-            1.0f,
-            1.0f};
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR,  materialSpecular);
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, shininess);
 
-    glLightfv(
-        GL_LIGHT0,
-        GL_POSITION,
-        lightPosition);
-
-    glLightfv(
-        GL_LIGHT0,
-        GL_AMBIENT,
-        ambient);
-
-    glLightfv(
-        GL_LIGHT0,
-        GL_DIFFUSE,
-        diffuse);
-
-    glLightfv(
-        GL_LIGHT0,
-        GL_SPECULAR,
-        specular);
-
-    GLfloat materialSpecular[] =
-        {
-            1.0f,
-            1.0f,
-            1.0f,
-            1.0f};
-
-    GLfloat shininess[] =
-        {
-            64.0f};
-
-    glMaterialfv(
-        GL_FRONT_AND_BACK,
-        GL_SPECULAR,
-        materialSpecular);
-
-    glMaterialfv(
-        GL_FRONT_AND_BACK,
-        GL_SHININESS,
-        shininess);
-
-    glClearColor(
-        0.05f,
-        0.05f,
-        0.05f,
-        1.0f);
-
-    glClear(
-        GL_COLOR_BUFFER_BIT |
-        GL_DEPTH_BUFFER_BIT);
-
-    m_pendingVertices.clear();
-    m_pendingLines.clear();
-    m_pendingFaces.clear();
+    glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 }
 
 void DrawerOpengl::frameEnd()
 {
-    glEnableClientState(GL_VERTEX_ARRAY);
-
-    // Renderiza todas as faces acumuladas com suporte a normais
-    if (!m_pendingFaces.empty())
-    {
-        glEnableClientState(GL_NORMAL_ARRAY);
-
-        for (const auto &batch : m_pendingFaces)
-        {
-            setColor(batch.color);
-
-            glNormalPointer(
-                GL_FLOAT,
-                sizeof(FaceVertex),
-                batch.vertices[0].normal.data_ptr());
-
-            glVertexPointer(
-                3,
-                GL_FLOAT,
-                sizeof(FaceVertex),
-                batch.vertices[0].position.data_ptr());
-
-            glDrawArrays(
-                GL_TRIANGLES,
-                0,
-                static_cast<GLsizei>(batch.vertices.size()));
-        }
-
-        glDisableClientState(GL_NORMAL_ARRAY);
-    }
-
-    // Desativa iluminação para renderizar linhas e pontos com cores sólidas
-    glDisable(GL_LIGHTING);
-
-    // Renderiza todas as linhas acumuladas
-    for (const auto &batch : m_pendingLines)
-    {
-        glLineWidth(batch.width);
-        setColor(batch.color);
-
-        glVertexPointer(
-            3,
-            GL_FLOAT,
-            sizeof(Vec3f),
-            batch.points[0].data_ptr());
-
-        glDrawArrays(
-            GL_LINES,
-            0,
-            static_cast<GLsizei>(batch.points.size()));
-    }
-
-    // Renderiza todos os vértices acumulados
-    for (const auto &batch : m_pendingVertices)
-    {
-        glPointSize(batch.size);
-        setColor(batch.color);
-
-        glVertexPointer(
-            3,
-            GL_FLOAT,
-            sizeof(Vec3f),
-            batch.points[0].data_ptr());
-
-        glDrawArrays(
-            GL_POINTS,
-            0,
-            static_cast<GLsizei>(batch.points.size()));
-    }
-
-    glDisableClientState(GL_VERTEX_ARRAY);
-
     glFlush();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Desenho imediato
+// ─────────────────────────────────────────────────────────────────────────────
 void DrawerOpengl::drawVertices(
     const Vec3f *points,
     std::size_t count,
     const Color &color,
     float size)
 {
-    if (!points ||
-        count == 0 ||
-        color.a <= 0.0f)
-    {
+    if (!points || count == 0 || color.a <= 0.0f)
         return;
-    }
 
-    BatchVertices batch;
-    batch.color = color;
-    batch.size = size;
-    batch.points.assign(points, points + count);
+    glDisable(GL_LIGHTING);
+    glPointSize(size);
+    setColor(color);
 
-    m_pendingVertices.push_back(std::move(batch));
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(3, GL_FLOAT, sizeof(Vec3f), points);
+    glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(count));
+    glDisableClientState(GL_VERTEX_ARRAY);
+
+    glEnable(GL_LIGHTING);
 }
 
 void DrawerOpengl::drawLines(
@@ -229,19 +101,19 @@ void DrawerOpengl::drawLines(
     const Color &color,
     float width)
 {
-    if (!points ||
-        count == 0 ||
-        color.a <= 0.0f)
-    {
+    if (!points || count == 0 || color.a <= 0.0f)
         return;
-    }
 
-    BatchLines batch;
-    batch.color = color;
-    batch.width = width;
-    batch.points.assign(points, points + (count * 2));
+    glDisable(GL_LIGHTING);
+    glLineWidth(width);
+    setColor(color);
 
-    m_pendingLines.push_back(std::move(batch));
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glVertexPointer(3, GL_FLOAT, sizeof(Vec3f), points);
+    glDrawArrays(GL_LINES, 0, static_cast<GLsizei>(count * 2));
+    glDisableClientState(GL_VERTEX_ARRAY);
+
+    glEnable(GL_LIGHTING);
 }
 
 void DrawerOpengl::drawFaces(
@@ -249,37 +121,58 @@ void DrawerOpengl::drawFaces(
     std::size_t count,
     const Color &color)
 {
-    if (!points ||
-        count == 0 ||
-        color.a <= 0.0f)
-    {
+    if (!points || count == 0 || color.a <= 0.0f)
         return;
-    }
 
-    BatchFaces batch;
-    batch.color = color;
-    batch.vertices.reserve(count * 3);
+    // Como as normais são por triângulo (flat), precisamos montar um buffer
+    // temporário contendo posição + normal intercaladas — não dá pra usar o
+    // array de entrada direto por causa do NORMAL_ARRAY.
+    std::vector<FaceVertex> verts;
+    verts.reserve(count * 3);
 
     const std::size_t totalPoints = count * 3;
 
-    for (std::size_t i = 0;
-         i < totalPoints;
-         i += 3)
+    for (std::size_t i = 0; i < totalPoints; i += 3)
     {
         const auto &a = points[i + 0];
         const auto &b = points[i + 1];
         const auto &c = points[i + 2];
 
-        Vec3f norm = computeNormal(a, b, c);
+        const Vec3f norm = computeNormal(a, b, c);
 
-        batch.vertices.push_back({norm, a});
-        batch.vertices.push_back({norm, b});
-        batch.vertices.push_back({norm, c});
+        verts.push_back({norm, a});
+        verts.push_back({norm, b});
+        verts.push_back({norm, c});
     }
 
-    m_pendingFaces.push_back(std::move(batch));
+    setColor(color);
+
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_NORMAL_ARRAY);
+
+    glNormalPointer(
+        GL_FLOAT,
+        sizeof(FaceVertex),
+        verts[0].normal.data_ptr());
+
+    glVertexPointer(
+        3,
+        GL_FLOAT,
+        sizeof(FaceVertex),
+        verts[0].position.data_ptr());
+
+    glDrawArrays(
+        GL_TRIANGLES,
+        0,
+        static_cast<GLsizei>(verts.size()));
+
+    glDisableClientState(GL_NORMAL_ARRAY);
+    glDisableClientState(GL_VERTEX_ARRAY);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Meshes — reaproveita os três métodos acima
+// ─────────────────────────────────────────────────────────────────────────────
 void DrawerOpengl::drawMeshes(
     const Mesh3f *meshes,
     std::size_t count,
@@ -288,72 +181,51 @@ void DrawerOpengl::drawMeshes(
     const Color &vertexColor)
 {
     if (!meshes || count == 0)
-    {
         return;
-    }
 
     for (std::size_t m = 0; m < count; ++m)
     {
-        const auto &mesh =
-            meshes[m];
+        const auto &mesh = meshes[m];
 
-        const auto &vertices =
-            mesh.vertices();
-
-        const auto &edges =
-            mesh.edges();
-
-        const auto &faces =
-            mesh.faces();
+        const auto &vertices = mesh.vertices();
+        const auto &edges    = mesh.edges();
+        const auto &faces    = mesh.faces();
 
         if (vertices.empty())
-        {
             continue;
-        }
 
-        // Faces
-        if (faceColor.a > 0.0f &&
-            !faces.empty())
+        // ── Faces ────────────────────────────────────────────────────────
+        if (faceColor.a > 0.0f && !faces.empty())
         {
-            BatchFaces batch;
-            batch.color = faceColor;
-            batch.vertices.reserve(faces.size() * 3);
+            std::vector<Vec3f> tris;
+            tris.reserve(faces.size() * 3);
 
             for (const auto &face : faces)
             {
-                const auto &a = vertices[face.indices[0]];
-                const auto &b = vertices[face.indices[1]];
-                const auto &c = vertices[face.indices[2]];
-
-                Vec3f norm = computeNormal(a, b, c);
-
-                batch.vertices.push_back({norm, a});
-                batch.vertices.push_back({norm, b});
-                batch.vertices.push_back({norm, c});
+                tris.push_back(vertices[face.indices[0]]);
+                tris.push_back(vertices[face.indices[1]]);
+                tris.push_back(vertices[face.indices[2]]);
             }
 
-            m_pendingFaces.push_back(std::move(batch));
+            drawFaces(tris.data(), faces.size(), faceColor);
         }
 
-        // Arestas
-        if (edgeColor.a > 0.0f &&
-            !edges.empty())
+        // ── Arestas ──────────────────────────────────────────────────────
+        if (edgeColor.a > 0.0f && !edges.empty())
         {
-            BatchLines batch;
-            batch.color = edgeColor;
-            batch.width = 1.0f;
-            batch.points.reserve(edges.size() * 2);
+            std::vector<Vec3f> lines;
+            lines.reserve(edges.size() * 2);
 
             for (const auto &edge : edges)
             {
-                batch.points.push_back(vertices[edge.v1]);
-                batch.points.push_back(vertices[edge.v2]);
+                lines.push_back(vertices[edge.v1]);
+                lines.push_back(vertices[edge.v2]);
             }
 
-            m_pendingLines.push_back(std::move(batch));
+            drawLines(lines.data(), edges.size(), edgeColor, 1.0f);
         }
 
-        // Vértices
+        // ── Vértices ─────────────────────────────────────────────────────
         if (vertexColor.a > 0.0f)
         {
             drawVertices(
