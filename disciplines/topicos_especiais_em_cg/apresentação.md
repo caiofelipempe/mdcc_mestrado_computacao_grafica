@@ -2,42 +2,48 @@
 marp: true
 theme: default
 paginate: true
-header: 'Modelagem Geométrica'
-footer: 'Trabalho 0'
+math: katex
 style: |
   section {
     background-color: #111827;
     color: #f9fafb;
     font-family: 'Georgia', serif;
+    font-size: 26px;
     padding: 50px;
   }
-
   h1 {
     color: #22d3ee;
     border-bottom: 3px solid #06b6d4;
+    padding-bottom: 6px;
   }
-
-  h2,
-  h3 {
-    color: #67e8f9;
-  }
-
-  footer {
-    font-size: 0.5em;
-    color: #94a3b8;
-  }
-
-  header {
-    color: #94a3b8;
-  }
-
-  .alerta {
+  h2, h3 { color: #67e8f9; }
+  strong { color: #fbbf24; }
+  footer { font-size: 0.5em; color: #94a3b8; }
+  header { color: #94a3b8; }
+  blockquote {
     background-color: #1e293b;
     border-left: 6px solid #22d3ee;
-    padding: 20px;
-    margin-top: 20px;
+    padding: 12px 20px;
     border-radius: 8px;
+    color: #e2e8f0;
   }
+  table { font-size: 0.78em; margin: 0 auto; }
+  th { background-color: #0e7490; color: #f9fafb; }
+  td { background-color: #1e293b; }
+  code { color: #67e8f9; background-color: #1e293b; }
+  pre { background-color: #0b1220; border-radius: 8px; }
+  section.titulo { text-align: center; justify-content: center; }
+  section.titulo h1 { border-bottom: none; font-size: 1.8em; }
+  section.denso { font-size: 22px; }
+  section.refs { font-size: 19px; }
+---
+
+<!-- _class: titulo -->
+
+# Topicos Especiais em CG
+
+## Colisão contínua de corpos rígidos representados por faces
+
 ---
 
 # Representação Geométrica
@@ -76,6 +82,263 @@ Armazenamos apenas:
 $$
 s
 $$
+
+---
+
+# Faces, Não Pontos
+
+Em uma mesh tradicional armazenamos:
+
+```text
+vértices
+↓
+arestas
+↓
+faces
+```
+
+Em algebra Geométrica:
+
+```text
+faces
+↓
+arestas
+↓
+vértices
+```
+
+As faces tornam-se o elemento fundamental.
+
+---
+
+# Interpretação de um Vetor
+
+O vetor
+
+$$
+s = nd
+$$
+
+não representa um ponto do sólido.
+
+Ele representa uma face.
+
+```text
+Origem
+  │
+  │─────► s
+  │
+```
+
+A direção define a orientação da face.
+
+O comprimento define sua distância à origem.
+
+---
+
+# De Vetor Para Plano
+
+Dado:
+
+$$
+s
+$$
+
+extraímos:
+
+$$
+n=\frac{s}{|s|}
+$$
+
+$$
+d=|s|
+$$
+
+Obtendo a equação:
+
+$$
+n\cdot x=d
+$$
+
+Assim cada vetor gera um plano.
+
+---
+
+# Exemplo
+
+Considere:
+
+$$
+s=(2,0,0)
+$$
+
+Então:
+
+$$
+n=(1,0,0)
+$$
+
+$$
+d=2
+$$
+
+Plano gerado:
+
+$$
+x=2
+$$
+
+---
+
+# Arestas Surgem Naturalmente
+
+Em 3D,
+
+a interseção de dois planos gera uma reta.
+
+$$
+\pi_1 \cap \pi_2
+\rightarrow
+L
+$$
+
+```text
+Plano 1
+    ╲
+     ╲
+      ╲
+       ╲
+        ╳──── reta
+       ╱
+      ╱
+Plano 2
+```
+
+Não armazenamos arestas.
+
+As arestas surgem da geometria.
+
+---
+
+# Vértices Surgem Naturalmente
+
+Em 3D,
+
+a interseção de três planos gera um ponto.
+
+$$
+\pi_1
+\cap
+\pi_2
+\cap
+\pi_3
+=
+P
+$$
+
+```text
+3 faces
+↓
+1 vértice
+```
+
+Não armazenamos vértices.
+
+Eles são reconstruídos quando necessário.
+
+---
+
+# Exemplo: Canto de um Cubo
+
+Considere:
+
+$$
+x=1
+$$
+
+$$
+y=1
+$$
+
+$$
+z=1
+$$
+
+A interseção produz:
+
+$$
+(1,1,1)
+$$
+
+que é um vértice do cubo.
+
+---
+
+# Construção de um Cubo
+
+Faces:
+
+$$
+x=1
+$$
+
+$$
+x=-1
+$$
+
+$$
+y=1
+$$
+
+$$
+y=-1
+$$
+
+$$
+z=1
+$$
+
+$$
+z=-1
+$$
+
+---
+
+# O Que é Armazenado?
+
+Mesh tradicional:
+
+```text
+Vértices
+Arestas
+Triângulos
+```
+
+Proposta:
+
+```text
+Faces
+```
+
+Todo o resto é derivado.
+
+---
+
+# Filosofia da Representação
+
+Na representação tradicional:
+
+```text
+Pontos geram faces
+```
+
+Nesta proposta:
+
+```text
+Faces geram pontos
+```
+
+A geometria passa a ser descrita por restrições espaciais em vez de amostras da superfície.
 
 ---
 
