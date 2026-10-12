@@ -1,8 +1,8 @@
-add_executable(modelagem_geometrica
+add_executable(modelagem_geometrica_trabalho1
     main.cpp
 )
 
-target_link_libraries(modelagem_geometrica
+target_link_libraries(modelagem_geometrica_trabalho1
     PRIVATE
         renderer
         geometry
