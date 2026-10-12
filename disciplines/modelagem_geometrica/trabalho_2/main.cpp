@@ -105,8 +105,6 @@ namespace
 
     /* ================= MODELO DA CENA ================= */
 
-    // Modelo editavel pela UI. A cada mudanca ele e convertido em uma arvore
-    // CsgNode (imutavel) por buildCsg().
     struct SceneNode;
     using NodePtr = std::unique_ptr<SceneNode>;
 
@@ -234,7 +232,6 @@ namespace
         return nullptr;
     }
 
-    // Slot (unique_ptr) que guarda `target`, ou nullptr.
     NodePtr *findSlot(NodePtr &slot, const SceneNode *target)
     {
         if (!slot)
@@ -249,8 +246,6 @@ namespace
         return findSlot(slot->right, target);
     }
 
-    // Remove `target` (e sua subarvore). Se ele tem um pai, o irmao ocupa o
-    // lugar do pai.
     bool removeNode(NodePtr &slot, const SceneNode *target)
     {
         if (!slot)
@@ -271,7 +266,7 @@ namespace
                 continue;
 
             NodePtr sibling = std::move(child == &slot->left ? slot->right : slot->left);
-            slot = std::move(sibling); // destroi o no de operacao e `target`
+            slot = std::move(sibling);
             return true;
         }
 
@@ -286,8 +281,6 @@ namespace
         float volume = 0.0f;
     };
 
-    // Amostra `contains` em uma grade resolution^3 sobre `bounds` e gera a
-    // superficie dos voxels internos (so as faces voltadas para voxels vazios).
     Voxelized voxelize(const CsgNode &csg, const AABB &bounds, int resolution)
     {
         const long m = resolution;
@@ -330,7 +323,6 @@ namespace
         Voxelized result;
         Mesh3f &mesh = result.mesh;
 
-        // Um vertice por canto da grade, compartilhado entre as faces.
         constexpr auto none = std::numeric_limits<std::size_t>::max();
         std::vector<std::size_t> ids((n + 1) * (n + 1) * (n + 1), none);
 
@@ -364,7 +356,6 @@ namespace
                             if (isFilled(neighbor))
                                 continue;
 
-                            // Quad no plano da face; (u, v, axis) e dextrogiro.
                             const int u = (axis + 1) % 3;
                             const int v = (axis + 2) % 3;
 
@@ -382,7 +373,7 @@ namespace
                             std::size_t i0 = vertex(c0), i1 = vertex(c1);
                             std::size_t i2 = vertex(c2), i3 = vertex(c3);
 
-                            if (s < 0) // normal para -axis: inverte o enrolamento
+                            if (s < 0)
                                 std::swap(i1, i3);
 
                             mesh.addFace(i0, i1, i2);
@@ -549,15 +540,14 @@ private:
         return node;
     }
 
-    // Troca o no selecionado por (selecionado `op` nova primitiva).
-    void combineSelected(CsgOp op, ShapeKind kind)
+    void combineNode(SceneNode *target, CsgOp op, ShapeKind kind)
     {
-        NodePtr *slot = m_selected ? findSlot(m_root, m_selected) : nullptr;
+        NodePtr *slot = target ? findSlot(m_root, target) : nullptr;
         if (!slot)
             return;
 
         auto primitive = makePrimitive(kind);
-        primitive->position = Vec3f{2.0f, 0.0f, 0.0f}; // deslocada para o efeito ficar visivel
+        primitive->position = Vec3f{2.0f, 0.0f, 0.0f};
         SceneNode *added = primitive.get();
 
         auto node = std::make_unique<SceneNode>();
@@ -573,13 +563,13 @@ private:
         m_needRebuild = true;
     }
 
-    void removeSelected()
+    void removeNodeTarget(SceneNode *target)
     {
-        if (!m_selected)
+        if (!target)
             return;
 
-        removeNode(m_root, m_selected);
-        m_selected = m_root.get();
+        removeNode(m_root, target);
+        m_selected = m_root ? m_root.get() : nullptr;
         m_needRebuild = true;
     }
 
@@ -699,13 +689,32 @@ private:
 
     void drawOutlinerPanel()
     {
-        ImGui::SetNextWindowSize(ImVec2(280.0f, 480.0f), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Outliner");
+        ImGui::SetNextWindowSize(ImVec2(300.0f, 500.0f), ImGuiCond_FirstUseEver);
+        ImGui::Begin("Outliner (Arvore CSG)");
 
         if (!m_root)
-            drawNewRootButton();
+        {
+            if (ImGui::Button("+ Nova Primitiva Raiz", ImVec2(-1.0f, 0.0f)))
+                ImGui::OpenPopup("NewRootPopup");
+
+            if (ImGui::BeginPopup("NewRootPopup"))
+            {
+                for (std::size_t i = 0; i < kShapeLabels.size(); ++i)
+                {
+                    if (ImGui::MenuItem(kShapeLabels[i]))
+                    {
+                        m_root = makePrimitive(static_cast<ShapeKind>(i));
+                        m_selected = m_root.get();
+                        m_needRebuild = true;
+                    }
+                }
+                ImGui::EndPopup();
+            }
+        }
         else
-            drawEditButtons();
+        {
+            ImGui::TextDisabled("Dica: Clique com o botao direito em um no para adicionar operacoes ou remove-lo.");
+        }
 
         ImGui::Separator();
 
@@ -713,59 +722,6 @@ private:
             drawNodeTree(*m_root, "");
 
         ImGui::End();
-    }
-
-    void drawNewRootButton()
-    {
-        if (ImGui::Button("+ Primitiva", ImVec2(-1.0f, 0.0f)))
-            ImGui::OpenPopup("NewRootPopup");
-
-        if (!ImGui::BeginPopup("NewRootPopup"))
-            return;
-
-        for (std::size_t i = 0; i < kShapeLabels.size(); ++i)
-        {
-            if (!ImGui::MenuItem(kShapeLabels[i]))
-                continue;
-
-            m_root = makePrimitive(static_cast<ShapeKind>(i));
-            m_selected = m_root.get();
-            m_needRebuild = true;
-        }
-
-        ImGui::EndPopup();
-    }
-
-    void drawEditButtons()
-    {
-        ImGui::BeginDisabled(m_selected == nullptr);
-
-        if (ImGui::Button("+ Combinar selecionado com...", ImVec2(-1.0f, 0.0f)))
-            ImGui::OpenPopup("CombinePopup");
-
-        if (ImGui::BeginPopup("CombinePopup"))
-        {
-            for (std::size_t op = 0; op < kOperationLabels.size(); ++op)
-            {
-                if (!ImGui::BeginMenu(kOperationLabels[op]))
-                    continue;
-
-                for (std::size_t kind = 0; kind < kShapeLabels.size(); ++kind)
-                {
-                    if (ImGui::MenuItem(kShapeLabels[kind]))
-                        combineSelected(static_cast<CsgOp>(op), static_cast<ShapeKind>(kind));
-                }
-
-                ImGui::EndMenu();
-            }
-
-            ImGui::EndPopup();
-        }
-
-        if (ImGui::Button("Remover selecionado", ImVec2(-1.0f, 0.0f)))
-            removeSelected();
-
-        ImGui::EndDisabled();
     }
 
     void drawNodeTree(SceneNode &node, const char *role)
@@ -789,6 +745,54 @@ private:
 
         if (ImGui::IsItemClicked())
             m_selected = &node;
+
+        // Menu de contexto estilo Blender para cada no na arvore
+        if (ImGui::BeginPopupContextItem("NodeContextMenu"))
+        {
+            m_selected = &node;
+
+            if (node.operation)
+            {
+                int currentOp = static_cast<int>(node.op);
+                if (ImGui::Combo("Mudar Operacao", &currentOp, kOperationLabels.data(),
+                                 static_cast<int>(kOperationLabels.size())))
+                {
+                    node.op = static_cast<CsgOp>(currentOp);
+                    m_needRebuild = true;
+                }
+                ImGui::Separator();
+            }
+
+            if (ImGui::BeginMenu("Adicionar Operacao..."))
+            {
+                for (std::size_t op = 0; op < kOperationLabels.size(); ++op)
+                {
+                    if (ImGui::BeginMenu(kOperationLabels[op]))
+                    {
+                        for (std::size_t kind = 0; kind < kShapeLabels.size(); ++kind)
+                        {
+                            if (ImGui::MenuItem(kShapeLabels[kind]))
+                            {
+                                combineNode(&node, static_cast<CsgOp>(op), static_cast<ShapeKind>(kind));
+                            }
+                        }
+                        ImGui::EndMenu();
+                    }
+                }
+                ImGui::EndMenu();
+            }
+
+            if (ImGui::MenuItem("Remover No"))
+            {
+                removeNodeTarget(&node);
+                ImGui::EndPopup();
+                ImGui::TreePop();
+                ImGui::PopID();
+                return;
+            }
+
+            ImGui::EndPopup();
+        }
 
         if (open)
         {
@@ -847,7 +851,7 @@ private:
             ImGui::Spacing();
             ImGui::TextDisabled("Nenhum no selecionado.");
             ImGui::Spacing();
-            ImGui::TextWrapped("Selecione um no no Outliner para editar suas propriedades.");
+            ImGui::TextWrapped("Selecione um no na arvore do Outliner para editar suas propriedades.");
             return false;
         }
 
