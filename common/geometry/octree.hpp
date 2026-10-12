@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mesh.hpp"
+#include "shape_to_mesh.hpp"
 #include "bounding_volume.hpp"
 
 #include <array>
@@ -93,7 +94,7 @@ namespace geometry
 
                     const auto size = box.maximum() - box.minimum();
 
-                    Mesh3f cube = Block(size[0], size[1], size[2]).toMesh();
+                    Mesh3f cube = geometry::toMesh(Block(size[0], size[1], size[2]));
                     cube.translate(box.center());
 
                     appendMesh(mesh, cube);
@@ -127,7 +128,7 @@ namespace geometry
             return combined(a, b, [](bool x, bool y)
                             { return x && !y; });
         }
- 
+
         Octree &operator|=(const Octree &other) { return *this = *this | other; }
         Octree &operator&=(const Octree &other) { return *this = *this & other; }
         Octree &operator-=(const Octree &other) { return *this = *this - other; }
