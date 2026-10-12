@@ -273,123 +273,6 @@ namespace
         return removeNode(slot->left, target) || removeNode(slot->right, target);
     }
 
-    /* ================= MALHA ================= */
-
-    struct Voxelized
-    {
-        Mesh3f mesh;
-        float volume = 0.0f;
-    };
-
-    Voxelized voxelize(const CsgNode &csg, const AABB &bounds, int resolution)
-    {
-        const long m = resolution;
-        const auto n = static_cast<std::size_t>(resolution);
-        const float fn = static_cast<float>(resolution);
-
-        const Vec3f lo = bounds.minimum();
-        const Vec3f hi = bounds.maximum();
-        const Vec3f step{(hi[0] - lo[0]) / fn, (hi[1] - lo[1]) / fn, (hi[2] - lo[2]) / fn};
-
-        std::vector<char> filled(n * n * n, 0);
-
-        const auto cell = [m](long x, long y, long z)
-        { return static_cast<std::size_t>((z * m + y) * m + x); };
-
-        std::size_t count = 0;
-
-        for (long z = 0; z < m; ++z)
-            for (long y = 0; y < m; ++y)
-                for (long x = 0; x < m; ++x)
-                {
-                    const Vec3f center{lo[0] + (static_cast<float>(x) + 0.5f) * step[0],
-                                       lo[1] + (static_cast<float>(y) + 0.5f) * step[1],
-                                       lo[2] + (static_cast<float>(z) + 0.5f) * step[2]};
-
-                    if (csg.contains(center))
-                    {
-                        filled[cell(x, y, z)] = 1;
-                        ++count;
-                    }
-                }
-
-        const auto isFilled = [&](const std::array<long, 3> &p)
-        {
-            return p[0] >= 0 && p[1] >= 0 && p[2] >= 0 &&
-                   p[0] < m && p[1] < m && p[2] < m &&
-                   filled[cell(p[0], p[1], p[2])] != 0;
-        };
-
-        Voxelized result;
-        Mesh3f &mesh = result.mesh;
-
-        constexpr auto none = std::numeric_limits<std::size_t>::max();
-        std::vector<std::size_t> ids((n + 1) * (n + 1) * (n + 1), none);
-
-        const auto vertex = [&](const std::array<long, 3> &c)
-        {
-            auto &id = ids[static_cast<std::size_t>((c[2] * (m + 1) + c[1]) * (m + 1) + c[0])];
-
-            if (id == none)
-            {
-                id = mesh.addVertex({lo[0] + static_cast<float>(c[0]) * step[0],
-                                     lo[1] + static_cast<float>(c[1]) * step[1],
-                                     lo[2] + static_cast<float>(c[2]) * step[2]});
-            }
-
-            return id;
-        };
-
-        for (long z = 0; z < m; ++z)
-            for (long y = 0; y < m; ++y)
-                for (long x = 0; x < m; ++x)
-                {
-                    const std::array<long, 3> p{x, y, z};
-                    if (!isFilled(p))
-                        continue;
-
-                    for (int axis = 0; axis < 3; ++axis)
-                        for (const int s : {-1, 1})
-                        {
-                            auto neighbor = p;
-                            neighbor[axis] += s;
-                            if (isFilled(neighbor))
-                                continue;
-
-                            const int u = (axis + 1) % 3;
-                            const int v = (axis + 2) % 3;
-
-                            auto c0 = p;
-                            if (s > 0)
-                                c0[axis] += 1;
-
-                            auto c1 = c0;
-                            c1[u] += 1;
-                            auto c3 = c0;
-                            c3[v] += 1;
-                            auto c2 = c1;
-                            c2[v] += 1;
-
-                            std::size_t i0 = vertex(c0), i1 = vertex(c1);
-                            std::size_t i2 = vertex(c2), i3 = vertex(c3);
-
-                            if (s < 0)
-                                std::swap(i1, i3);
-
-                            mesh.addFace(i0, i1, i2);
-                            mesh.addFace(i0, i2, i3);
-
-                            mesh.addEdge(i0, i1);
-                            mesh.addEdge(i1, i2);
-                            mesh.addEdge(i2, i3);
-                            mesh.addEdge(i3, i0);
-                        }
-                }
-
-        result.volume = static_cast<float>(count) * step[0] * step[1] * step[2];
-        return result;
-    }
-
     void applyStyle()
     {
         ImGuiStyle &style = ImGui::GetStyle();
@@ -466,12 +349,16 @@ protected:
     {
         m_width = width;
         m_height = height;
+        rebuildMesh();
     }
 
     void onUpdate(float deltaTime) override
     {
         updateCameraOrbit();
         updateCameraMovement(deltaTime);
+        
+        // Reconstrói a cada frame para recalcular os raios a partir da posição atual da câmera
+        rebuildMesh();
     }
 
     void onRender(DrawerOpengl &drawer) override
@@ -496,10 +383,9 @@ private:
     Mesh3f m_mesh;
     Mesh3f m_boundsMesh;
     float m_volume = 0.0f;
-    bool m_needRebuild = false;
 
     AABB m_worldBounds{{-10.0f, -10.0f, -10.0f}, {10.0f, 10.0f, 10.0f}};
-    int m_resolution = 48;
+    int m_raycastResolutionScale = 4; // Controla a densidade dos quads na tela
 
     bool m_showFaces = true;
     bool m_showEdges = false;
@@ -560,7 +446,7 @@ private:
 
         *slot = std::move(node);
         m_selected = added;
-        m_needRebuild = true;
+        rebuildMesh();
     }
 
     void removeNodeTarget(SceneNode *target)
@@ -570,7 +456,7 @@ private:
 
         removeNode(m_root, target);
         m_selected = m_root ? m_root.get() : nullptr;
-        m_needRebuild = true;
+        rebuildMesh();
     }
 
     /* ================= CAMERA ================= */
@@ -630,7 +516,7 @@ private:
             camera().move(up * -amount);
     }
 
-    /* ================= MALHA / CENA ================= */
+    /* ================= GERAÇÃO POR RAYCAST DE QUADDS ================= */
 
     void rebuildMesh()
     {
@@ -641,9 +527,66 @@ private:
         {
             const CsgPtr csg = buildCsg(*m_root);
 
-            Voxelized voxels = voxelize(*csg, m_worldBounds, m_resolution);
-            m_mesh = std::move(voxels.mesh);
-            m_volume = voxels.volume;
+            int w = std::max(1, m_width / m_raycastResolutionScale);
+            int h = std::max(1, m_height / m_raycastResolutionScale);
+
+            const float fovRad = m_cameraFov * kDegToRad;
+            const float tanHalfFov = std::tan(fovRad * 0.5f);
+            const float aspectVal = aspect();
+
+            const Vec3f origin = camera().position();
+            const Vec3f forward = camera().rotation().forward();
+            const Vec3f right = camera().rotation().right();
+            const Vec3f up = camera().rotation().up();
+
+            float quadSize = (2.0f * tanHalfFov * camera().distance()) / static_cast<float>(h);
+            float halfQ = quadSize * 0.5f;
+
+            int hitCount = 0;
+
+            for (long y = 0; y < h; ++y)
+            {
+                const float py = (1.0f - 2.0f * (static_cast<float>(y) + 0.5f) / static_cast<float>(h)) * tanHalfFov;
+
+                for (long x = 0; x < w; ++x)
+                {
+                    const float px = (2.0f * (static_cast<float>(x) + 0.5f) / static_cast<float>(w) - 1.0f) * aspectVal * tanHalfFov;
+
+                    const Vec3f dir = (forward + right * px + up * py).normalized();
+
+                    std::optional<float> tOpt = csg->raytest(origin, dir);
+                    if (tOpt.has_value() && tOpt.value() >= 0.0f)
+                    {
+                        float t = tOpt.value();
+                        Vec3f hitPoint = origin + dir * t;
+
+                        // Cria os 4 vértices do quad orientados em direção à câmera usando right e up
+                        Vec3f p0 = hitPoint - right * halfQ - up * halfQ;
+                        Vec3f p1 = hitPoint + right * halfQ - up * halfQ;
+                        Vec3f p2 = hitPoint + right * halfQ + up * halfQ;
+                        Vec3f p3 = hitPoint - right * halfQ + up * halfQ;
+
+                        std::size_t i0 = m_mesh.addVertex(p0);
+                        std::size_t i1 = m_mesh.addVertex(p1);
+                        std::size_t i2 = m_mesh.addVertex(p2);
+                        std::size_t i3 = m_mesh.addVertex(p3);
+
+                        // Adiciona as faces do quad
+                        m_mesh.addFace(i0, i1, i2);
+                        m_mesh.addFace(i0, i2, i3);
+
+                        // Opcional: adicionar arestas se necessário
+                        m_mesh.addEdge(i0, i1);
+                        m_mesh.addEdge(i1, i2);
+                        m_mesh.addEdge(i2, i3);
+                        m_mesh.addEdge(i3, i0);
+
+                        hitCount++;
+                    }
+                }
+            }
+
+            m_volume = static_cast<float>(hitCount) * (quadSize * quadSize * quadSize);
         }
 
         const Vec3f size = m_worldBounds.maximum() - m_worldBounds.minimum();
@@ -679,12 +622,6 @@ private:
         drawPropertiesPanel();
 
         m_canvasHovered = ImGui::GetCurrentContext()->HoveredWindow == nullptr;
-
-        if (m_needRebuild)
-        {
-            rebuildMesh();
-            m_needRebuild = false;
-        }
     }
 
     void drawOutlinerPanel()
@@ -705,7 +642,7 @@ private:
                     {
                         m_root = makePrimitive(static_cast<ShapeKind>(i));
                         m_selected = m_root.get();
-                        m_needRebuild = true;
+                        rebuildMesh();
                     }
                 }
                 ImGui::EndPopup();
@@ -746,7 +683,6 @@ private:
         if (ImGui::IsItemClicked())
             m_selected = &node;
 
-        // Menu de contexto estilo Blender para cada no na arvore
         if (ImGui::BeginPopupContextItem("NodeContextMenu"))
         {
             m_selected = &node;
@@ -758,7 +694,7 @@ private:
                                  static_cast<int>(kOperationLabels.size())))
                 {
                     node.op = static_cast<CsgOp>(currentOp);
-                    m_needRebuild = true;
+                    rebuildMesh();
                 }
                 ImGui::Separator();
             }
@@ -813,33 +749,28 @@ private:
         ImGui::SetNextWindowSize(ImVec2(340.0f, 540.0f), ImGuiCond_FirstUseEver);
         ImGui::Begin("Propriedades");
 
-        bool changed = false;
-
         if (ImGui::BeginTabBar("PropertiesTabs"))
         {
             if (ImGui::BeginTabItem("Cena"))
             {
-                changed |= drawSceneSettingsUI();
+                drawSceneSettingsUI();
                 ImGui::EndTabItem();
             }
 
             if (ImGui::BeginTabItem("No"))
             {
-                changed |= drawNodeSettingsUI();
+                drawNodeSettingsUI();
                 ImGui::EndTabItem();
             }
 
             if (ImGui::BeginTabItem("Camera"))
             {
-                changed |= drawCameraSettingsUI();
+                drawCameraSettingsUI();
                 ImGui::EndTabItem();
             }
 
             ImGui::EndTabBar();
         }
-
-        if (changed)
-            m_needRebuild = true;
 
         ImGui::End();
     }
@@ -883,6 +814,9 @@ private:
                 changed = true;
             }
 
+            if (changed)
+                rebuildMesh();
+
             return changed;
         }
 
@@ -892,6 +826,9 @@ private:
         if (ImGui::CollapsingHeader("Forma", ImGuiTreeNodeFlags_DefaultOpen))
             changed |= node.drawShapeUI();
 
+        if (changed)
+            rebuildMesh();
+
         return changed;
     }
 
@@ -899,17 +836,17 @@ private:
     {
         bool changed = false;
 
-        if (ImGui::CollapsingHeader("Espaco de Amostragem", ImGuiTreeNodeFlags_DefaultOpen))
+        if (ImGui::CollapsingHeader("Espaço de Amostragem", ImGuiTreeNodeFlags_DefaultOpen))
         {
             changed |= ImGui::DragFloat3("Minimo", m_worldBounds.minimum().data_ptr(), kDragSpeed);
             changed |= ImGui::DragFloat3("Maximo", m_worldBounds.maximum().data_ptr(), kDragSpeed);
             ImGui::TextDisabled("Regiao em que o CSG e amostrado.");
         }
 
-        if (ImGui::CollapsingHeader("Malha", ImGuiTreeNodeFlags_DefaultOpen))
+        if (ImGui::CollapsingHeader("Raycast de Quads", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            changed |= ImGui::SliderInt("Resolucao", &m_resolution, 8, 96);
-            ImGui::TextDisabled("Celulas por eixo; a malha e a superficie dos voxels.");
+            changed |= ImGui::SliderInt("Escala de Resolucao", &m_raycastResolutionScale, 1, 8);
+            ImGui::TextDisabled("Controla a densidade dos quads gerados a cada frame.");
         }
 
         if (ImGui::CollapsingHeader("Exibicao", ImGuiTreeNodeFlags_DefaultOpen))
@@ -928,10 +865,13 @@ private:
 
         if (ImGui::CollapsingHeader("Estatisticas"))
         {
-            ImGui::Text("Volume (voxels): %.6f", m_volume);
+            ImGui::Text("Volume aprox: %.6f", m_volume);
             ImGui::Text("Vertices: %zu", m_mesh.vertices().size());
             ImGui::Text("Faces: %zu", m_mesh.faces().size());
         }
+
+        if (changed)
+            rebuildMesh();
 
         return changed;
     }
@@ -994,6 +934,9 @@ private:
             changed = true;
         }
 
+        if (changed)
+            rebuildMesh();
+
         return changed;
     }
 
@@ -1032,5 +975,5 @@ private:
 int main()
 {
     Trabalho02 app;
-    app.run(1280, 720, "Modelador Geometrico - CSG");
+    app.run(1280, 720, "Modelador Geometrico - CSG Raycast Quads");
 }
