@@ -523,130 +523,101 @@ private:
         m_mesh = Mesh3f{};
         m_volume = 0.0f;
 
-        const Vec3f boundsSize = m_worldBounds.maximum() - m_worldBounds.minimum();
-        m_boundsMesh = geometry::toMesh(Block(boundsSize[0], boundsSize[1], boundsSize[2]));
-        m_boundsMesh.translate(m_worldBounds.center());
-
-        if (!m_root)
-            return;
-
-        const CsgPtr csg = buildCsg(*m_root);
-
-        const int w = std::max(1, m_width / m_raycastResolutionScale);
-        const int h = std::max(1, m_height / m_raycastResolutionScale);
-
-        const float tanHalfFov = std::tan(m_cameraFov * kDegToRad * 0.5f);
-        const float aspectVal = aspect();
-
-        const Vec3f origin = camera().position();
-        const Vec3f forward = camera().rotation().forward();
-        const Vec3f right = camera().rotation().right();
-        const Vec3f up = camera().rotation().up();
-
-        const float viewHeight = 2.0f * tanHalfFov;
-        const float viewWidth = viewHeight * aspectVal;
-
-        // Tamanho de um pixel projetado a uma unidade de distância
-        const float pixelSizeX = viewWidth / static_cast<float>(w);
-        const float pixelSizeY = viewHeight / static_cast<float>(h);
-
-        // Direção do raio por uma posição contínua na tela (fx, fy em coordenadas de pixel)
-        auto dirAtF = [&](float fx, float fy)
+        if (m_root)
         {
-            const float py = (1.0f - 2.0f * fy / static_cast<float>(h)) * tanHalfFov;
-            const float px = (2.0f * fx / static_cast<float>(w) - 1.0f) * aspectVal * tanHalfFov;
-            return (forward + right * px + up * py).normalized();
-        };
+            const CsgPtr csg = buildCsg(*m_root);
 
-        // Direção do raio que passa pelo centro do pixel (x, y)
-        auto dirAt = [&](long x, long y)
-        {
-            return dirAtF(static_cast<float>(x) + 0.5f, static_cast<float>(y) + 0.5f);
-        };
+            const int w = std::max(1, m_width / m_raycastResolutionScale);
+            const int h = std::max(1, m_height / m_raycastResolutionScale);
 
-        int hitCount = 0;
+            const float tanHalfFov = std::tan(m_cameraFov * kDegToRad * 0.5f);
+            const float aspectVal = aspect();
 
-        for (long y = 0; y < h; ++y)
-        {
-            for (long x = 0; x < w; ++x)
+            const Vec3f origin = camera().position();
+            const Vec3f forward = camera().rotation().forward();
+            const Vec3f right = camera().rotation().right();
+            const Vec3f up = camera().rotation().up();
+
+            const float quadSize = (2.0f * tanHalfFov * camera().distance()) / static_cast<float>(h);
+            const float halfQ = quadSize * 0.5f;
+
+            auto dirAt = [&](long x, long y)
             {
-                const Vec3f dir = dirAt(x, y);
+                const float py = (1.0f - 2.0f * (static_cast<float>(y) + 0.5f) / static_cast<float>(h)) * tanHalfFov;
+                const float px = (2.0f * (static_cast<float>(x) + 0.5f) / static_cast<float>(w) - 1.0f) * aspectVal * tanHalfFov;
+                return (forward + right * px + up * py).normalized();
+            };
 
-                const std::optional<float> tOpt = csg->raytest(origin, dir);
-                if (!tOpt.has_value() || *tOpt < 0.0f)
-                    continue;
+            int hitCount = 0;
 
-                const float t = *tOpt;
-                const Vec3f hitPoint = origin + dir * t;
-
-                // Normal estimada pelos raios dos pixels vizinhos
-                Vec3f normal{0.0f, 0.0f, 0.0f};
-
-                const Vec3f dX = dirAt(x + 1, y);
-                const Vec3f dY = dirAt(x, y + 1);
-                const std::optional<float> tX = csg->raytest(origin, dX);
-                const std::optional<float> tY = csg->raytest(origin, dY);
-
-                // Só confia nos vizinhos se estiverem na mesma superfície (sem salto de profundidade)
-                const float tol = 0.05f * t;
-                if (tX && tY && std::abs(*tX - t) < tol && std::abs(*tY - t) < tol)
+            for (long y = 0; y < h; ++y)
+            {
+                for (long x = 0; x < w; ++x)
                 {
-                    const Vec3f ex = origin + dX * *tX - hitPoint;
-                    const Vec3f ey = origin + dY * *tY - hitPoint;
-                    normal = ey.cross(ex);
-                }
+                    const Vec3f dir = dirAt(x, y);
 
-                // Fallback em silhuetas/bordas
-                if (normal.sqrNorm() < 1e-12f)
-                    normal = dir * -1.0f;
+                    const std::optional<float> tOpt = csg->raytest(origin, dir);
+                    if (!tOpt.has_value() || *tOpt < 0.0f)
+                        continue;
 
-                normal = normal.normalized();
+                    const float t = *tOpt;
+                    const Vec3f hitPoint = origin + dir * t;
 
-                // Garante normal voltada para a câmera (= para fora da superfície visível)
-                if (normal.dot(dir) > 0.0f)
-                    normal = normal * -1.0f;
+                    // Normal da superfície estimada pelos raios dos pixels vizinhos
+                    Vec3f normal{0.0f, 0.0f, 0.0f};
 
-                // Projeta os 4 cantos do pixel no plano tangente (hitPoint, normal)
-                const float planeD = (hitPoint - origin).dot(normal);
+                    const Vec3f dX = dirAt(x + 1, y);
+                    const Vec3f dY = dirAt(x, y + 1);
+                    const std::optional<float> tX = csg->raytest(origin, dX);
+                    const std::optional<float> tY = csg->raytest(origin, dY);
 
-                auto cornerOnPlane = [&](float fx, float fy)
-                {
-                    const Vec3f cd = dirAtF(fx, fy);
-                    float denom = cd.dot(normal);    // < 0, pois a normal aponta para a câmera
-                    denom = std::min(denom, -0.05f); // evita explosão em ângulos rasantes
-                    return origin + cd * (planeD / denom);
-                };
+                    const float tol = 0.05f * t;
+                    if (tX && tY && std::abs(*tX - t) < tol && std::abs(*tY - t) < tol)
+                    {
+                        const Vec3f ex = origin + dX * *tX - hitPoint;
+                        const Vec3f ey = origin + dY * *tY - hitPoint;
+                        normal = ey.cross(ex);
+                    }
 
-                const float fx = static_cast<float>(x);
-                const float fy = static_cast<float>(y);
+                    if (normal.sqrNorm() < 1e-12f)
+                        normal = dir * -1.0f; // fallback em silhuetas
 
-                const Vec3f p0 = cornerOnPlane(fx, fy);               // topo-esquerda
-                const Vec3f p1 = cornerOnPlane(fx + 1.0f, fy);        // topo-direita
-                const Vec3f p2 = cornerOnPlane(fx + 1.0f, fy + 1.0f); // baixo-direita
-                const Vec3f p3 = cornerOnPlane(fx, fy + 1.0f);        // baixo-esquerda
+                    normal = normal.normalized();
 
-                const std::size_t i0 = m_mesh.addVertex(p0);
-                const std::size_t i1 = m_mesh.addVertex(p1);
-                const std::size_t i2 = m_mesh.addVertex(p2);
-                const std::size_t i3 = m_mesh.addVertex(p3);
+                    if (normal.dot(dir) > 0.0f)
+                        normal = normal * -1.0f;
 
-                // O drawer recalcula a normal pelo winding: garante que ela coincida com `normal`
-                if ((p1 - p0).cross(p2 - p0).dot(normal) >= 0.0f)
-                {
+                    // Quad sempre voltado para a câmera
+                    const Vec3f p0 = hitPoint - right * halfQ - up * halfQ;
+                    const Vec3f p1 = hitPoint + right * halfQ - up * halfQ;
+                    const Vec3f p2 = hitPoint + right * halfQ + up * halfQ;
+                    const Vec3f p3 = hitPoint - right * halfQ + up * halfQ;
+
+                    const std::size_t i0 = m_mesh.addVertex(p0);
+                    const std::size_t i1 = m_mesh.addVertex(p1);
+                    const std::size_t i2 = m_mesh.addVertex(p2);
+                    const std::size_t i3 = m_mesh.addVertex(p3);
+
                     m_mesh.addFace(i0, i1, i2);
+                    m_mesh.faces().back().lightNormal = normal;
                     m_mesh.addFace(i0, i2, i3);
-                }
-                else
-                {
-                    m_mesh.addFace(i0, i2, i1);
-                    m_mesh.addFace(i0, i3, i2);
-                }
+                    m_mesh.faces().back().lightNormal = normal;
 
-                ++hitCount;
+                    m_mesh.addEdge(i0, i1);
+                    m_mesh.addEdge(i1, i2);
+                    m_mesh.addEdge(i2, i3);
+                    m_mesh.addEdge(i3, i0);
+
+                    ++hitCount;
+                }
             }
+
+            m_volume = static_cast<float>(hitCount) * (quadSize * quadSize * quadSize);
         }
 
-        m_volume = static_cast<float>(hitCount) * (pixelSizeX * pixelSizeY);
+        const Vec3f size = m_worldBounds.maximum() - m_worldBounds.minimum();
+        m_boundsMesh = geometry::toMesh(Block(size[0], size[1], size[2]));
+        m_boundsMesh.translate(m_worldBounds.center());
     }
 
     void drawScene(DrawerOpengl &drawer)

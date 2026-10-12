@@ -32,6 +32,29 @@ namespace
         Vec3f position;
     };
 
+    // Desenha triângulos já com normal por vértice (flat por face)
+    void drawTriangles(const std::vector<FaceVertex> &verts, const Color &color)
+    {
+        if (verts.empty())
+            return;
+
+        setColor(color);
+
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glEnableClientState(GL_NORMAL_ARRAY);
+
+        glNormalPointer(GL_FLOAT, sizeof(FaceVertex),
+                        verts[0].normal.data_ptr());
+
+        glVertexPointer(3, GL_FLOAT, sizeof(FaceVertex),
+                        verts[0].position.data_ptr());
+
+        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(verts.size()));
+
+        glDisableClientState(GL_NORMAL_ARRAY);
+        glDisableClientState(GL_VERTEX_ARRAY);
+    }
+
 } // namespace
 
 // ─────────────────────────────────────────────────────────────────────
@@ -98,24 +121,7 @@ void DrawerOpengl::rastFaces(const Vec3f *points, std::size_t count,
         verts.push_back({n, c});
     }
 
-    if (verts.empty())
-        return;
-
-    setColor(color);
-
-    glEnableClientState(GL_VERTEX_ARRAY);
-    glEnableClientState(GL_NORMAL_ARRAY);
-
-    glNormalPointer(GL_FLOAT, sizeof(FaceVertex),
-                    verts[0].normal.data_ptr());
-
-    glVertexPointer(3, GL_FLOAT, sizeof(FaceVertex),
-                    verts[0].position.data_ptr());
-
-    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(verts.size()));
-
-    glDisableClientState(GL_NORMAL_ARRAY);
-    glDisableClientState(GL_VERTEX_ARRAY);
+    drawTriangles(verts, color);
 }
 
 void DrawerOpengl::rastMeshes(const Mesh3f *meshes, std::size_t count,
@@ -138,16 +144,28 @@ void DrawerOpengl::rastMeshes(const Mesh3f *meshes, std::size_t count,
         // ── Faces ────────────────────────────────────────────────────
         if (faceColor.a > 0.0f && !F.empty())
         {
-            std::vector<Vec3f> tris;
-            tris.reserve(F.size() * 3);
+            std::vector<FaceVertex> verts;
+            verts.reserve(F.size() * 3);
 
             for (const auto &f : F)
             {
-                tris.push_back(V[f.indices[0]]);
-                tris.push_back(V[f.indices[1]]);
-                tris.push_back(V[f.indices[2]]);
+                const Vec3f &a = V[f.indices[0]];
+                const Vec3f &b = V[f.indices[1]];
+                const Vec3f &c = V[f.indices[2]];
+
+                // Usa a lightNormal da face; se for zero, calcula pelo winding
+                Vec3f n;
+                if (f.lightNormal.sqrNorm() > 1e-20f)
+                    n = f.lightNormal.normalized();
+                else if (!computeNormal(a, b, c, n))
+                    continue;
+
+                verts.push_back({n, a});
+                verts.push_back({n, b});
+                verts.push_back({n, c});
             }
-            rastFaces(tris.data(), F.size(), faceColor);
+
+            drawTriangles(verts, faceColor);
         }
 
         // ── Arestas ──────────────────────────────────────────────────

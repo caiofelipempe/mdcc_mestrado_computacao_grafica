@@ -20,8 +20,8 @@ namespace geometry
     struct Face
     {
         std::array<std::size_t, 3> indices;
+        Vec3f lightNormal = {0., 0., 0.};
 
-        // Igualdade ignora a ordem dos índices.
         [[nodiscard]] bool operator==(const Face &other) const
         {
             auto a = indices, b = other.indices;
@@ -78,10 +78,10 @@ namespace geometry
         {
             m_edges.clear();
 
-            for (const auto &[idx] : m_faces)
+            for (const auto &face : m_faces)
                 for (std::size_t i = 0; i < 3; ++i)
                 {
-                    const auto a = idx[i], b = idx[(i + 1) % 3];
+                    const auto a = face.indices[i], b = face.indices[(i + 1) % 3];
                     m_edges.push_back({std::min(a, b), std::max(a, b)});
                 }
 
@@ -124,7 +124,7 @@ namespace geometry
 
         [[nodiscard]] bool validFace(const Face &f) const noexcept
         {
-            const auto &[i] = f;
+            const auto &i = f.indices;
             return i[0] < m_vertices.size() && i[1] < m_vertices.size() && i[2] < m_vertices.size() &&
                    i[0] != i[1] && i[1] != i[2] && i[0] != i[2];
         }
