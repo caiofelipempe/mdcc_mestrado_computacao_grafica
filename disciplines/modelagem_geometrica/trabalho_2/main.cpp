@@ -556,36 +556,15 @@ private:
                 {
                     const Vec3f dir = dirAt(x, y);
 
-                    const std::optional<float> tOpt = csg->raytest(origin, dir);
-                    if (!tOpt.has_value() || *tOpt < 0.0f)
+                    const std::optional<RayHit> hit = csg->raycast(origin, dir);
+                    if (!hit)
                         continue;
 
-                    const float t = *tOpt;
-                    const Vec3f hitPoint = origin + dir * t;
+                    const Vec3f hitPoint = origin + dir * hit->tEnter;
 
-                    // Normal da superfície estimada pelos raios dos pixels vizinhos
-                    Vec3f normal{0.0f, 0.0f, 0.0f};
-
-                    const Vec3f dX = dirAt(x + 1, y);
-                    const Vec3f dY = dirAt(x, y + 1);
-                    const std::optional<float> tX = csg->raytest(origin, dX);
-                    const std::optional<float> tY = csg->raytest(origin, dY);
-
-                    const float tol = 0.05f * t;
-                    if (tX && tY && std::abs(*tX - t) < tol && std::abs(*tY - t) < tol)
-                    {
-                        const Vec3f ex = origin + dX * *tX - hitPoint;
-                        const Vec3f ey = origin + dY * *tY - hitPoint;
-                        normal = ey.cross(ex);
-                    }
-
-                    if (normal.sqrNorm() < 1e-12f)
-                        normal = dir * -1.0f; // fallback em silhuetas
-
-                    normal = normal.normalized();
-
-                    if (normal.dot(dir) > 0.0f)
-                        normal = normal * -1.0f;
+                    // Normal externa exata do CSG; zero só se a câmera estiver dentro do sólido
+                    Vec3f normal = hit->normalEnter;
+                    normal = normal.sqrNorm() < 1e-12f ? dir * -1.0f : normal.normalized();
 
                     // Quad sempre voltado para a câmera
                     const Vec3f p0 = hitPoint - right * halfQ - up * halfQ;
