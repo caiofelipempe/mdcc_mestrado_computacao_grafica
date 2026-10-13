@@ -538,8 +538,8 @@ private:
             const Vec3f right = camera().rotation().right();
             const Vec3f up = camera().rotation().up();
 
-            const float quadSize = (2.0f * tanHalfFov * camera().distance()) / static_cast<float>(h);
-            const float halfQ = quadSize * 0.5f;
+            const float pixelW = (2.0f * tanHalfFov * aspectVal) / static_cast<float>(w);
+            const float pixelH = (2.0f * tanHalfFov) / static_cast<float>(h);
 
             auto dirAt = [&](long x, long y)
             {
@@ -547,8 +547,6 @@ private:
                 const float px = (2.0f * (static_cast<float>(x) + 0.5f) / static_cast<float>(w) - 1.0f) * aspectVal * tanHalfFov;
                 return (forward + right * px + up * py).normalized();
             };
-
-            int hitCount = 0;
 
             for (long y = 0; y < h; ++y)
             {
@@ -562,15 +560,21 @@ private:
 
                     const Vec3f hitPoint = origin + dir * hit->tEnter;
 
-                    // Normal externa exata do CSG; zero só se a câmera estiver dentro do sólido
+                    const float cosF = dir.dot(forward);
+                    const float zIn = hit->tEnter * cosF;
+                    const float zOut = hit->tExit * cosF;
+
+                    const float halfW = 0.5f * pixelW * zIn;
+                    const float halfH = 0.5f * pixelH * zIn;
+
                     Vec3f normal = hit->normalEnter;
                     normal = normal.sqrNorm() < 1e-12f ? dir * -1.0f : normal.normalized();
 
                     // Quad sempre voltado para a câmera
-                    const Vec3f p0 = hitPoint - right * halfQ - up * halfQ;
-                    const Vec3f p1 = hitPoint + right * halfQ - up * halfQ;
-                    const Vec3f p2 = hitPoint + right * halfQ + up * halfQ;
-                    const Vec3f p3 = hitPoint - right * halfQ + up * halfQ;
+                    const Vec3f p0 = hitPoint - right * halfW - up * halfH;
+                    const Vec3f p1 = hitPoint + right * halfW - up * halfH;
+                    const Vec3f p2 = hitPoint + right * halfW + up * halfH;
+                    const Vec3f p3 = hitPoint - right * halfW + up * halfH;
 
                     const std::size_t i0 = m_mesh.addVertex(p0);
                     const std::size_t i1 = m_mesh.addVertex(p1);
@@ -587,11 +591,10 @@ private:
                     m_mesh.addEdge(i2, i3);
                     m_mesh.addEdge(i3, i0);
 
-                    ++hitCount;
+                    // Volume do tronco de frustum deste pixel entre a entrada e a saída
+                    m_volume += pixelW * pixelH * (zOut * zOut * zOut - zIn * zIn * zIn) / 3.0f;
                 }
             }
-
-            m_volume = static_cast<float>(hitCount) * (quadSize * quadSize * quadSize);
         }
 
         const Vec3f size = m_worldBounds.maximum() - m_worldBounds.minimum();
