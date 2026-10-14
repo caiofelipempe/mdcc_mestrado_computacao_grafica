@@ -44,15 +44,3 @@
 | Relatividade Numérica | LEHNER, L. Numerical Relativity: A Review | https://arxiv.org/abs/gr-qc/0106072 |
 | Relatividade + GA | DORAN, C.; LASENBY, A.; GULL, S. Gravity, Gauge Theories and Geometric Algebra | https://arxiv.org/abs/gr-qc/0405033 |
 | Relatividade + GA | HESTENES, D. Gauge Theory Gravity with Geometric Calculus | https://davidhestenes.net/geocalc/pdf/GTG.w.GC.FP.pdf |
-
-# Leituras que mais se conectam a um tema de mestrado
-
-1. Geometric Algebra for Physicists
-2. New Foundations for Classical Mechanics
-3. Geometry, Kinematics and Rigid Body Mechanics in Cayley-Klein Geometries
-4. Projective Geometric Algebra: A New Framework for Doing Euclidean Geometry
-5. Geometric Numerical Integration
-6. Gravity, Gauge Theories and Geometric Algebra
-
-Esses seis trabalhos já formam praticamente uma linha de pesquisa completa:
-PGA → Corpos Rígidos → Integração Numérica → Simulação Física → Relatividade → Motor Físico Geométrico.

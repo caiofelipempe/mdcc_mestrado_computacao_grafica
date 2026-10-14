@@ -34,13 +34,11 @@ style: |
   pre { background-color: #0b1220; border-radius: 8px; }
   section.titulo { text-align: center; justify-content: center; }
   section.titulo h1 { border-bottom: none; font-size: 1.8em; }
-  section.denso { font-size: 22px; }
-  section.refs { font-size: 19px; }
 ---
 
 <!-- _class: titulo -->
 
-# Topicos Especiais em CG
+# Tópicos Especiais em CG
 
 ## Colisão contínua de corpos rígidos representados por faces
 
@@ -64,30 +62,30 @@ Representar a geometria através de faces.
 
 ---
 
-# Face Como Vetor
+# Face Como Plano
 
 Cada face é representada por:
 
 $$
-s = nd
+\pi=(w,x,y,z)
 $$
 
 onde:
 
-- $n$ é a normal da face
-- $d$ é a distância da face à origem
+- $x,y,z$ definem a orientação da face
+- $w$ define sua posição
 
-Armazenamos apenas:
+Equação do plano:
 
 $$
-s
+w+xX+yY+zZ=0
 $$
 
 ---
 
 # Faces, Não Pontos
 
-Em uma mesh tradicional armazenamos:
+Em uma mesh tradicional:
 
 ```text
 vértices
@@ -97,7 +95,7 @@ arestas
 faces
 ```
 
-Em algebra Geométrica:
+Nesta proposta:
 
 ```text
 faces
@@ -111,56 +109,20 @@ As faces tornam-se o elemento fundamental.
 
 ---
 
-# Interpretação de um Vetor
+# Interpretação de um Plano
 
-O vetor
-
-$$
-s = nd
-$$
-
-não representa um ponto do sólido.
-
-Ele representa uma face.
-
-```text
-Origem
-  │
-  │─────► s
-  │
-```
-
-A direção define a orientação da face.
-
-O comprimento define sua distância à origem.
-
----
-
-# De Vetor Para Plano
-
-Dado:
+O elemento
 
 $$
-s
+\pi=(w,x,y,z)
 $$
 
-extraímos:
+não representa um ponto.
 
-$$
-n=\frac{s}{|s|}
-$$
+Ele representa uma face infinita.
 
-$$
-d=|s|
-$$
-
-Obtendo a equação:
-
-$$
-n\cdot x=d
-$$
-
-Assim cada vetor gera um plano.
+- $(x,y,z)$ define a normal
+- $w$ desloca o plano
 
 ---
 
@@ -169,32 +131,63 @@ Assim cada vetor gera um plano.
 Considere:
 
 $$
-s=(2,0,0)
+\pi=(-2,1,0,0)
 $$
 
-Então:
+Temos:
 
 $$
-n=(1,0,0)
+-2 + X = 0
 $$
 
-$$
-d=2
-$$
-
-Plano gerado:
+Logo:
 
 $$
-x=2
+X=2
 $$
 
 ---
 
+# De Plano Para Equação
+
+Dado:
+
+$$
+\pi=(w,x,y,z)
+$$
+
+obtemos diretamente:
+
+$$
+w+xX+yY+zZ=0
+$$
+
+O plano já está completamente descrito.
+
+---
+
+# Interseção de Planos
+
+Em 3D:
+
+- dois planos → reta
+- três planos → ponto
+
+Assim:
+
+```text
+faces
+↓
+arestas
+↓
+vértices
+```
+
+surgem naturalmente.
+
+---
+
 # Arestas Surgem Naturalmente
-
-Em 3D,
-
-a interseção de dois planos gera uma reta.
 
 $$
 \pi_1 \cap \pi_2
@@ -216,15 +209,9 @@ Plano 2
 
 Não armazenamos arestas.
 
-As arestas surgem da geometria.
-
 ---
 
 # Vértices Surgem Naturalmente
-
-Em 3D,
-
-a interseção de três planos gera um ponto.
 
 $$
 \pi_1
@@ -244,8 +231,6 @@ $$
 
 Não armazenamos vértices.
 
-Eles são reconstruídos quando necessário.
-
 ---
 
 # Exemplo: Canto de um Cubo
@@ -253,15 +238,15 @@ Eles são reconstruídos quando necessário.
 Considere:
 
 $$
-x=1
+-1+X=0
 $$
 
 $$
-y=1
+-1+Y=0
 $$
 
 $$
-z=1
+-1+Z=0
 $$
 
 A interseção produz:
@@ -270,8 +255,6 @@ $$
 (1,1,1)
 $$
 
-que é um vértice do cubo.
-
 ---
 
 # Construção de um Cubo
@@ -279,27 +262,27 @@ que é um vértice do cubo.
 Faces:
 
 $$
-x=1
+(-1,1,0,0)
 $$
 
 $$
-x=-1
+(-1,-1,0,0)
 $$
 
 $$
-y=1
+(-1,0,1,0)
 $$
 
 $$
-y=-1
+(-1,0,-1,0)
 $$
 
 $$
-z=1
+(-1,0,0,1)
 $$
 
 $$
-z=-1
+(-1,0,0,-1)
 $$
 
 ---
@@ -317,7 +300,7 @@ Triângulos
 Proposta:
 
 ```text
-Faces
+Planos
 ```
 
 Todo o resto é derivado.
@@ -326,72 +309,44 @@ Todo o resto é derivado.
 
 # Filosofia da Representação
 
-Na representação tradicional:
+Tradicional:
 
 ```text
 Pontos geram faces
 ```
 
-Nesta proposta:
+Proposta:
 
 ```text
 Faces geram pontos
 ```
 
-A geometria passa a ser descrita por restrições espaciais em vez de amostras da superfície.
-
----
-
-# Exemplo
-
-Considere:
-
-$$
-s=(2,0,0)
-$$
-
-Temos:
-
-$$
-n=(1,0,0)
-$$
-
-$$
-d=2
-$$
-
-Logo a face está localizada em:
-
-$$
-x=2
-$$
+A geometria passa a ser descrita por restrições espaciais.
 
 ---
 
 # Face Como Restrição
 
-Cada face define:
+Cada plano define:
 
 $$
-n \cdot x = d
+w+xX+yY+zZ=0
 $$
 
-e o semiespaço:
+e um semiespaço:
 
 $$
-n \cdot x \le d
+w+xX+yY+zZ \le 0
 $$
-
-Todo ponto que satisfaz a restrição pertence à região.
 
 ---
 
 # Corpo Como Interseção
 
-Um corpo é definido por várias faces:
+Um corpo é definido por:
 
 $$
-s_1,s_2,\ldots,s_n
+\pi_1,\pi_2,\ldots,\pi_n
 $$
 
 Equivalentemente:
@@ -401,12 +356,10 @@ B
 =
 \bigcap_i
 \left\{
-x :
-n_i\cdot x\le d_i
+X :
+w_i+x_iX+y_iY+z_iZ \le 0
 \right\}
 $$
-
-O corpo surge da interseção das restrições.
 
 ---
 
@@ -415,41 +368,41 @@ O corpo surge da interseção das restrições.
 Faces:
 
 $$
-(1,0)
+(-1,1,0,0)
 $$
 
 $$
-(-1,0)
+(-1,-1,0,0)
 $$
 
 $$
-(0,1)
+(-1,0,1,0)
 $$
 
 $$
-(0,-1)
+(-1,0,-1,0)
 $$
 
 ---
 
 # Restrições
 
-As faces geram:
+As faces produzem:
 
 $$
-x \le 1
-$$
-
-$$
-x \ge -1
+-1+X\le0
 $$
 
 $$
-y \le 1
+-1-X\le0
 $$
 
 $$
-y \ge -1
+-1+Y\le0
+$$
+
+$$
+-1-Y\le0
 $$
 
 ---
@@ -464,30 +417,49 @@ $$
 +---------+
 ```
 
-Um quadrado centrado na origem.
+Quadrado centrado na origem.
 
 ---
 
 # Exemplo: Cubo
 
-Um cubo pode ser descrito por apenas seis faces:
+Faces:
 
-```text
-(+X)
-(-X)
+$$
+(-1,1,0,0)
+$$
 
-(+Y)
-(-Y)
+$$
+(-1,-1,0,0)
+$$
 
-(+Z)
-(-Z)
-```
+$$
+(-1,0,1,0)
+$$
 
-Sem necessidade de armazenar:
+$$
+(-1,0,-1,0)
+$$
+
+$$
+(-1,0,0,1)
+$$
+
+$$
+(-1,0,0,-1)
+$$
+
+---
+
+# Sem Triangulação
+
+Não armazenamos:
 
 - vértices
 - arestas
 - triângulos
+
+Apenas planos.
 
 ---
 
@@ -495,89 +467,71 @@ Sem necessidade de armazenar:
 
 Nem toda geometria precisa ser um poliedro fechado.
 
-A região pode permanecer aberta.
+Podemos representar regiões infinitas.
 
 ---
 
 # Chão Infinito
 
-Uma única face:
+Plano:
 
 $$
-(0,1,0)
+(0,0,1,0)
 $$
 
-define:
+Equação:
 
 $$
-y \le 1
+Y=0
 $$
 
-Visualmente:
+Semiespaço:
 
-```text
-      ar
-
--------------------
-
-      chão
-```
+$$
+Y\le0
+$$
 
 ---
 
 # Parede Infinita
 
-Uma face:
+Plano:
 
 $$
-(1,0,0)
+(-1,1,0,0)
 $$
 
-define:
+Equação:
 
 $$
-x \le 1
+X=1
 $$
 
-Visualmente:
+Semiespaço:
 
-```text
-|
-|
-| espaço
-|
-|
-```
+$$
+X\le1
+$$
 
 ---
 
 # Corredor Infinito
 
-Duas faces:
+Planos:
 
 $$
-(1,0,0)
+(-1,1,0,0)
 $$
 
 $$
-(-1,0,0)
+(-1,-1,0,0)
 $$
 
-geram:
+Produzem:
 
 $$
--1 \le x \le 1
+-1\le X\le1
 $$
-
-Visualmente:
-
-```text
-|
-| corredor
-|
-| infinito
-|
-```
 
 ---
 
@@ -588,14 +542,12 @@ Cinco faces:
 ```text
 +X
 -X
-
 +Y
-
 +Z
 -Z
 ```
 
-produzem:
+Produzem:
 
 ```text
 ┌───────┐
@@ -611,16 +563,18 @@ aberta para cima
 # Estrutura de Dados
 
 ```cpp
+struct Plane
+{
+    float w;
+    float x;
+    float y;
+    float z;
+};
+
 struct ConvexRegion
 {
-    std::vector<Vec3> faces;
+    std::vector<Plane> faces;
 };
-```
-
-Cada vetor armazena:
-
-```cpp
-face = normal * distância
 ```
 
 ---
@@ -641,7 +595,7 @@ struct RigidBody
 
 # Movimento da Geometria
 
-O motor move todas as faces:
+Cada plano move-se por:
 
 $$
 \pi_i(t)
@@ -663,22 +617,22 @@ $$
 
 ✅ Representação compacta
 
-✅ Não depende de mesh
-
-✅ Funciona para volumes fechados
-
-✅ Funciona para pisos infinitos
-
-✅ Funciona para paredes infinitas
+✅ Sem triangulação
 
 ✅ Compatível com PGA
+
+✅ Regiões infinitas
+
+✅ Regiões abertas
+
+✅ Corpo definido por restrições
 
 ---
 
 # Arquitetura Proposta
 
 ```text
-Faces
+Planos
 ↓
 Região Convexa
 ↓
@@ -694,19 +648,3 @@ Colisão
 ```
 
 ---
-
-# Linha de Pesquisa
-
-```text
-PGA
-↓
-Motores
-↓
-Faces Convexas
-↓
-Regiões Geométricas
-↓
-CCD
-↓
-Geometric Physics Engine
-```
