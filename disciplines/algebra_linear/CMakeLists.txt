@@ -1,6 +1,7 @@
 add_executable(algebra_linear
     main.cpp
-    utils.hpp
+    linear_system_solver.cpp
+    linear_system_solver.hpp
 )
 
 target_link_libraries(algebra_linear

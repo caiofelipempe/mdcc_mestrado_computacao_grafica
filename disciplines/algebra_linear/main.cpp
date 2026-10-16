@@ -1,1100 +1,232 @@
-#include "renderer_glfw_opengl.hpp"
-#include "input.h"
-#include "utils.hpp"
-
-#include <imgui.h>
-#include <imgui_impl_glfw.h>
-#include <imgui_impl_opengl3.h>
-
-#include <GLFW/glfw3.h>
-#include <GL/glu.h>
-
+#include "linear_system_solver.hpp"
+#include <iostream>
+#include <random>
 #include <iomanip>
-#include <algebric_vector.hpp>
-#include <chrono>
 
-// ============================================================
-// CLASSE BASE - ATIVIDADE (ABSTRATA)
-// ============================================================
-class Activity {
-public:
-    virtual ~Activity() = default;
-    
-    virtual const char* getTitle() const = 0;
-    virtual void render() = 0;
-};
-
-// ============================================================
-// CLASSE ATIVIDADE MATRIZ - HERDA DE ATIVIDADE
-// ============================================================
-class MatrixActivity : public Activity {
-public:
-    virtual ~MatrixActivity() = default;
-    
-    // Metodos especificos para matriz
-    virtual void onMatrixModified() = 0;
-    virtual std::vector<std::vector<double>>& getMatrix() = 0;
-    virtual std::vector<double>& getVectorB() = 0;
-    virtual int getSize() const = 0;
-    virtual void setSize(int newSize) = 0;
-    
-    // Metodos para resolucao
-    virtual bool solveGauss(std::vector<double>& x) const = 0;
-    virtual void solveSystem() = 0;
-};
-
-// ============================================================
-// CLASSE ATIVIDADE 1 - PIVOTEAMENTO TOTAL
-// ============================================================
-class TotalPivotActivity : public MatrixActivity {
-private:
-    int matrixSize = 3;
-    std::vector<std::vector<double>> matrix;
-    std::vector<double> vectorB;
-    
-    std::vector<double> solution;
-    bool hasSolution = false;
-    bool solutionComputed = false;
-    double maxError = 0.0;
-    double elapsedTimeMs = 0.0;
-
-public:
-    TotalPivotActivity() {
-        initExampleSystem();
-    }
-
-    const char* getTitle() const override {
-        return "Atividade 1 - Pivotamento Total";
-    }
-
-    std::vector<std::vector<double>>& getMatrix() override {
-        return matrix;
-    }
-
-    std::vector<double>& getVectorB() override {
-        return vectorB;
-    }
-
-    int getSize() const override {
-        return matrixSize;
-    }
-
-    void setSize(int newSize) override {
-        if (newSize >= 2 && newSize <= 20) {
-            matrixSize = newSize;
-            Utils::identityMatrix(matrix, matrixSize);
-            vectorB.assign(matrixSize, 0.0);
-            clearSolution();
-        }
-    }
-
-    void onMatrixModified() override {
-        clearSolution();
-    }
-
-    void render() override {
-        ImGui::BeginChild("ScrollTotal1", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
-        
-        ImGui::TextColored(ImVec4(0.0f, 0.7f, 1.0f, 1.0f), "%s", getTitle());
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        
-        renderControls();
-        renderMatrixAndVector();
-        renderButtons();
-        renderResult();
-        
-        ImGui::EndChild();
-    }
-
-    bool solveGauss(std::vector<double>& x) const override {
-        return Utils::solveTotalPivot(matrix, vectorB, x);
-    }
-
-    void solveSystem() override {
-        // Inicia a medicao de tempo
-        auto start = std::chrono::high_resolution_clock::now();
-        
-        hasSolution = Utils::solveTotalPivot(matrix, vectorB, solution);
-        solutionComputed = true;
-        
-        // Finaliza a medicao de tempo
-        auto end = std::chrono::high_resolution_clock::now();
-        elapsedTimeMs = std::chrono::duration<double, std::milli>(end - start).count();
-        
-        if (hasSolution) {
-            maxError = Utils::computeError(matrix, vectorB, solution);
-        }
-    }
-
-private:
-    void initExampleSystem() {
-        matrixSize = 3;
-        matrix = {
-            {2.0, 1.0, -1.0},
-            {-3.0, -1.0, 2.0},
-            {-2.0, 1.0, 2.0}
-        };
-        vectorB = {8.0, -11.0, -3.0};
-        elapsedTimeMs = 0.0;
-    }
-
-    void clearSolution() {
-        solutionComputed = false;
-        hasSolution = false;
-        solution.clear();
-        maxError = 0.0;
-        elapsedTimeMs = 0.0;
-    }
-
-    void renderControls() {
-        ImGui::Text("Tamanho da Matriz:");
-        ImGui::SameLine();
-        
-        if (ImGui::Button("-##size1")) {
-            if (matrixSize > 2) {
-                setSize(matrixSize - 1);
-            }
-        }
-        ImGui::SameLine();
-        ImGui::Text("%d", matrixSize);
-        ImGui::SameLine();
-        if (ImGui::Button("+##size1")) {
-            if (matrixSize < 20) {
-                setSize(matrixSize + 1);
-            }
-        }
-        ImGui::SameLine();
-        ImGui::Spacing();
-        ImGui::SameLine();
-        
-        if (ImGui::Button("Gerar Sistema Aleatorio")) {
-            generateRandomSystem();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Resetar Exemplo")) {
-            initExampleSystem();
-            clearSolution();
-        }
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-    }
-
-    void generateRandomSystem() {
-        Utils::generateRandomSystem(matrix, vectorB, matrixSize);
-        clearSolution();
-    }
-
-    void renderMatrixAndVector() {
-        float fieldWidth = 70.0f;
-        
-        if (matrixSize > 10) {
-            fieldWidth = 50.0f;
-        } else if (matrixSize > 6) {
-            fieldWidth = 60.0f;
-        }
-        
-        ImGui::Text("Matriz A (Coeficientes):");
-        
-        for (int i = 0; i < matrixSize; ++i) {
-            ImGui::Text("  Linha %d:", i + 1);
-            ImGui::SameLine();
-            
-            for (int j = 0; j < matrixSize; ++j) {
-                ImGui::PushID(i * matrixSize + j + 1000);
-                ImGui::SetNextItemWidth(fieldWidth);
-                std::string label = "##A" + std::to_string(i) + std::to_string(j);
-                if (ImGui::InputDouble(label.c_str(), &matrix[i][j], 0.0, 0.0, "%.2f")) {
-                    onMatrixModified();
-                }
-                ImGui::PopID();
-                
-                if (j < matrixSize - 1) {
-                    ImGui::SameLine();
-                }
-            }
-        }
-        
-        ImGui::Spacing();
-        
-        ImGui::Text("Vetor b (Termos Independentes):");
-        ImGui::SameLine();
-        for (int i = 0; i < matrixSize; ++i) {
-            ImGui::PushID(i + 2000);
-            ImGui::SetNextItemWidth(fieldWidth);
-            std::string label = "b[" + std::to_string(i) + "]";
-            if (ImGui::InputDouble(label.c_str(), &vectorB[i], 0.0, 0.0, "%.2f")) {
-                onMatrixModified();
-            }
-            ImGui::PopID();
-            
-            if (i < matrixSize - 1) {
-                ImGui::SameLine();
-            }
-        }
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-    }
-
-    void renderButtons() {
-        if (ImGui::Button("Resolver Sistema")) {
-            solveSystem();
-        }
-        
-        if (solutionComputed) {
-            ImGui::SameLine();
-            if (ImGui::Button("Limpar Resultado")) {
-                clearSolution();
-            }
-        }
-        ImGui::Spacing();
-    }
-
-    void renderResult() {
-        if (!solutionComputed) {
-            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), 
-                "Clique em 'Resolver Sistema' para calcular a solucao.");
-            return;
-        }
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        
-        ImGui::TextColored(ImVec4(0.0f, 0.5f, 1.0f, 1.0f), "RESULTADO");
-        ImGui::Spacing();
-        
-        // Exibe o tempo de resolucao
-        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.0f, 1.0f), 
-            "Tempo de resolucao: %.3f ms", elapsedTimeMs);
-        ImGui::Spacing();
-        
-        if (hasSolution) {
-            ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), 
-                "Sistema resolvido com sucesso!");
-            ImGui::Spacing();
-            
-            ImGui::Text("Vetor Solucao X:");
-            
-            if (ImGui::BeginTable("ResultTable1", 2, 
-                ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedSame)) {
-                
-                ImGui::TableSetupColumn("Variavel", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-                ImGui::TableSetupColumn("Valor", ImGuiTableColumnFlags_WidthStretch);
-                ImGui::TableHeadersRow();
-
-                for (int i = 0; i < matrixSize; ++i) {
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-                    ImGui::Text("x%d", i + 1);
-                    ImGui::TableSetColumnIndex(1);
-                    ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "%.8f", solution[i]);
-                }
-                ImGui::EndTable();
-            }
-            
-            ImGui::Spacing();
-            ImGui::Text("Verificacao: A*x ~= b");
-            
-            if (maxError < 1e-6) {
-                ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), 
-                    "Solucao verificada! Erro maximo: %.2e", maxError);
-            } else {
-                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), 
-                    "Atencao: Erro residual maximo = %.6f", maxError);
-            }
-            
-        } else {
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), 
-                "O sistema nao possui solucao unica!");
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), 
-                "Motivo: Matriz singular ou indeterminada.");
-        }
-    }
-};
-
-// ============================================================
-// CLASSE ATIVIDADE 2 - PIVOTEAMENTO PARCIAL
-// ============================================================
-class PartialPivotActivity : public MatrixActivity {
-private:
-    int matrixSize = 3;
-    std::vector<std::vector<double>> matrix;
-    std::vector<double> vectorB;
-    
-    std::vector<double> solution;
-    bool hasSolution = false;
-    bool solutionComputed = false;
-    double maxError = 0.0;
-    double elapsedTimeMs = 0.0;
-
-public:
-    PartialPivotActivity() {
-        initExampleSystem();
-    }
-
-    const char* getTitle() const override {
-        return "Atividade 2 - Pivotamento Parcial";
-    }
-
-    std::vector<std::vector<double>>& getMatrix() override {
-        return matrix;
-    }
-
-    std::vector<double>& getVectorB() override {
-        return vectorB;
-    }
-
-    int getSize() const override {
-        return matrixSize;
-    }
-
-    void setSize(int newSize) override {
-        if (newSize >= 2 && newSize <= 20) {
-            matrixSize = newSize;
-            Utils::identityMatrix(matrix, matrixSize);
-            vectorB.assign(matrixSize, 0.0);
-            clearSolution();
-        }
-    }
-
-    void onMatrixModified() override {
-        clearSolution();
-    }
-
-    void render() override {
-        ImGui::BeginChild("ScrollPartial", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
-        
-        ImGui::TextColored(ImVec4(0.0f, 0.7f, 1.0f, 1.0f), "%s", getTitle());
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        
-        renderControls();
-        renderMatrixAndVector();
-        renderButtons();
-        renderResult();
-        
-        ImGui::EndChild();
-    }
-
-    bool solveGauss(std::vector<double>& x) const override {
-        return Utils::solvePartialPivot(matrix, vectorB, x);
-    }
-
-    void solveSystem() override {
-        // Inicia a medicao de tempo
-        auto start = std::chrono::high_resolution_clock::now();
-        
-        hasSolution = Utils::solvePartialPivot(matrix, vectorB, solution);
-        solutionComputed = true;
-        
-        // Finaliza a medicao de tempo
-        auto end = std::chrono::high_resolution_clock::now();
-        elapsedTimeMs = std::chrono::duration<double, std::milli>(end - start).count();
-        
-        if (hasSolution) {
-            maxError = Utils::computeError(matrix, vectorB, solution);
-        }
-    }
-
-private:
-    void initExampleSystem() {
-        matrixSize = 3;
-        matrix = {
-            {2.0, 1.0, -1.0},
-            {-3.0, -1.0, 2.0},
-            {-2.0, 1.0, 2.0}
-        };
-        vectorB = {8.0, -11.0, -3.0};
-        elapsedTimeMs = 0.0;
-    }
-
-    void clearSolution() {
-        solutionComputed = false;
-        hasSolution = false;
-        solution.clear();
-        maxError = 0.0;
-        elapsedTimeMs = 0.0;
-    }
-
-    void renderControls() {
-        ImGui::Text("Tamanho da Matriz:");
-        ImGui::SameLine();
-        
-        if (ImGui::Button("-##size2")) {
-            if (matrixSize > 2) {
-                setSize(matrixSize - 1);
-            }
-        }
-        ImGui::SameLine();
-        ImGui::Text("%d", matrixSize);
-        ImGui::SameLine();
-        if (ImGui::Button("+##size2")) {
-            if (matrixSize < 20) {
-                setSize(matrixSize + 1);
-            }
-        }
-        ImGui::SameLine();
-        ImGui::Spacing();
-        ImGui::SameLine();
-        
-        if (ImGui::Button("Gerar Sistema Aleatorio")) {
-            generateRandomSystem();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Resetar Exemplo")) {
-            initExampleSystem();
-            clearSolution();
-        }
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-    }
-
-    void generateRandomSystem() {
-        Utils::generateRandomSystem(matrix, vectorB, matrixSize);
-        clearSolution();
-    }
-
-    void renderMatrixAndVector() {
-        float fieldWidth = 70.0f;
-        
-        if (matrixSize > 10) {
-            fieldWidth = 50.0f;
-        } else if (matrixSize > 6) {
-            fieldWidth = 60.0f;
-        }
-        
-        ImGui::Text("Matriz A (Coeficientes):");
-        
-        for (int i = 0; i < matrixSize; ++i) {
-            ImGui::Text("  Linha %d:", i + 1);
-            ImGui::SameLine();
-            
-            for (int j = 0; j < matrixSize; ++j) {
-                ImGui::PushID(i * matrixSize + j + 3000);
-                ImGui::SetNextItemWidth(fieldWidth);
-                std::string label = "##A" + std::to_string(i) + std::to_string(j);
-                if (ImGui::InputDouble(label.c_str(), &matrix[i][j], 0.0, 0.0, "%.2f")) {
-                    onMatrixModified();
-                }
-                ImGui::PopID();
-                
-                if (j < matrixSize - 1) {
-                    ImGui::SameLine();
-                }
-            }
-        }
-        
-        ImGui::Spacing();
-        
-        ImGui::Text("Vetor b (Termos Independentes):");
-        ImGui::SameLine();
-        for (int i = 0; i < matrixSize; ++i) {
-            ImGui::PushID(i + 4000);
-            ImGui::SetNextItemWidth(fieldWidth);
-            std::string label = "b[" + std::to_string(i) + "]";
-            if (ImGui::InputDouble(label.c_str(), &vectorB[i], 0.0, 0.0, "%.2f")) {
-                onMatrixModified();
-            }
-            ImGui::PopID();
-            
-            if (i < matrixSize - 1) {
-                ImGui::SameLine();
-            }
-        }
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-    }
-
-    void renderButtons() {
-        if (ImGui::Button("Resolver Sistema")) {
-            solveSystem();
-        }
-        
-        if (solutionComputed) {
-            ImGui::SameLine();
-            if (ImGui::Button("Limpar Resultado")) {
-                clearSolution();
-            }
-        }
-        ImGui::Spacing();
-    }
-
-    void renderResult() {
-        if (!solutionComputed) {
-            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), 
-                "Clique em 'Resolver Sistema' para calcular a solucao.");
-            return;
-        }
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        
-        ImGui::TextColored(ImVec4(0.0f, 0.5f, 1.0f, 1.0f), "RESULTADO");
-        ImGui::Spacing();
-        
-        // Exibe o tempo de resolucao
-        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.0f, 1.0f), 
-            "Tempo de resolucao: %.3f ms", elapsedTimeMs);
-        ImGui::Spacing();
-        
-        if (hasSolution) {
-            ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), 
-                "Sistema resolvido com sucesso!");
-            ImGui::Spacing();
-            
-            ImGui::Text("Vetor Solucao X:");
-            
-            if (ImGui::BeginTable("ResultTable2", 2, 
-                ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedSame)) {
-                
-                ImGui::TableSetupColumn("Variavel", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-                ImGui::TableSetupColumn("Valor", ImGuiTableColumnFlags_WidthStretch);
-                ImGui::TableHeadersRow();
-
-                for (int i = 0; i < matrixSize; ++i) {
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-                    ImGui::Text("x%d", i + 1);
-                    ImGui::TableSetColumnIndex(1);
-                    ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "%.8f", solution[i]);
-                }
-                ImGui::EndTable();
-            }
-            
-            ImGui::Spacing();
-            ImGui::Text("Verificacao: A*x ~= b");
-            
-            if (maxError < 1e-6) {
-                ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), 
-                    "Solucao verificada! Erro maximo: %.2e", maxError);
-            } else {
-                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), 
-                    "Atencao: Erro residual maximo = %.6f", maxError);
-            }
-            
-        } else {
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), 
-                "O sistema nao possui solucao unica!");
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), 
-                "Motivo: Matriz singular ou indeterminada.");
-        }
-    }
-};
-
-// ============================================================
-// CLASSE ATIVIDADE 3 - GAUSS-JORDAN
-// ============================================================
-class GaussJordanActivity : public MatrixActivity {
-private:
-    int matrixSize = 3;
-    std::vector<std::vector<double>> matrix;
-    std::vector<double> vectorB;
-    
-    std::vector<double> solution;
-    bool hasSolution = false;
-    bool solutionComputed = false;
-    double maxError = 0.0;
-    double elapsedTimeMs = 0.0;
-    
-    // Tipo de pivotacao (parcial ou total)
-    bool useTotalPivot = false;
-
-public:
-    GaussJordanActivity() {
-        initExampleSystem();
-    }
-
-    const char* getTitle() const override {
-        return "Atividade 3 - Gauss-Jordan";
-    }
-
-    std::vector<std::vector<double>>& getMatrix() override {
-        return matrix;
-    }
-
-    std::vector<double>& getVectorB() override {
-        return vectorB;
-    }
-
-    int getSize() const override {
-        return matrixSize;
-    }
-
-    void setSize(int newSize) override {
-        if (newSize >= 2 && newSize <= 20) {
-            matrixSize = newSize;
-            Utils::identityMatrix(matrix, matrixSize);
-            vectorB.assign(matrixSize, 0.0);
-            clearSolution();
-        }
-    }
-
-    void onMatrixModified() override {
-        clearSolution();
-    }
-
-    void render() override {
-        ImGui::BeginChild("ScrollGaussJordan", ImVec2(0, 0), true, ImGuiWindowFlags_HorizontalScrollbar);
-        
-        ImGui::TextColored(ImVec4(0.0f, 0.7f, 1.0f, 1.0f), "%s", getTitle());
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        
-        renderPivotControls();
-        renderControls();
-        renderMatrixAndVector();
-        renderButtons();
-        renderResult();
-        
-        ImGui::EndChild();
-    }
-
-    bool solveGauss(std::vector<double>& x) const override {
-        Utils::PivotType pivotType = useTotalPivot ? 
-            Utils::PivotType::TOTAL : Utils::PivotType::PARTIAL;
-        return Utils::solveGaussJordan(matrix, vectorB, x, pivotType);
-    }
-
-    void solveSystem() override {
-        // Inicia a medicao de tempo
-        auto start = std::chrono::high_resolution_clock::now();
-        
-        Utils::PivotType pivotType = useTotalPivot ? 
-            Utils::PivotType::TOTAL : Utils::PivotType::PARTIAL;
-        
-        hasSolution = Utils::solveGaussJordan(matrix, vectorB, solution, pivotType);
-        solutionComputed = true;
-        
-        // Finaliza a medicao de tempo
-        auto end = std::chrono::high_resolution_clock::now();
-        elapsedTimeMs = std::chrono::duration<double, std::milli>(end - start).count();
-        
-        if (hasSolution) {
-            maxError = Utils::computeError(matrix, vectorB, solution);
-        }
-    }
-
-private:
-    void initExampleSystem() {
-        matrixSize = 3;
-        matrix = {
-            {2.0, 1.0, -1.0},
-            {-3.0, -1.0, 2.0},
-            {-2.0, 1.0, 2.0}
-        };
-        vectorB = {8.0, -11.0, -3.0};
-        useTotalPivot = false;
-        elapsedTimeMs = 0.0;
-    }
-
-    void clearSolution() {
-        solutionComputed = false;
-        hasSolution = false;
-        solution.clear();
-        maxError = 0.0;
-        elapsedTimeMs = 0.0;
-    }
-
-    void renderPivotControls() {
-        ImGui::Text("Tipo de Pivotacao:");
-        ImGui::SameLine();
-        
-        if (ImGui::RadioButton("Parcial", !useTotalPivot)) {
-            useTotalPivot = false;
-            clearSolution();
-        }
-        ImGui::SameLine();
-        if (ImGui::RadioButton("Total", useTotalPivot)) {
-            useTotalPivot = true;
-            clearSolution();
-        }
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-    }
-
-    void renderControls() {
-        ImGui::Text("Tamanho da Matriz:");
-        ImGui::SameLine();
-        
-        if (ImGui::Button("-##size3")) {
-            if (matrixSize > 2) {
-                setSize(matrixSize - 1);
-            }
-        }
-        ImGui::SameLine();
-        ImGui::Text("%d", matrixSize);
-        ImGui::SameLine();
-        if (ImGui::Button("+##size3")) {
-            if (matrixSize < 20) {
-                setSize(matrixSize + 1);
-            }
-        }
-        ImGui::SameLine();
-        ImGui::Spacing();
-        ImGui::SameLine();
-        
-        if (ImGui::Button("Gerar Sistema Aleatorio")) {
-            generateRandomSystem();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Resetar Exemplo")) {
-            initExampleSystem();
-            clearSolution();
-        }
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-    }
-
-    void generateRandomSystem() {
-        Utils::generateRandomSystem(matrix, vectorB, matrixSize);
-        clearSolution();
-    }
-
-    void renderMatrixAndVector() {
-        float fieldWidth = 70.0f;
-        
-        if (matrixSize > 10) {
-            fieldWidth = 50.0f;
-        } else if (matrixSize > 6) {
-            fieldWidth = 60.0f;
-        }
-        
-        ImGui::Text("Matriz A (Coeficientes):");
-        
-        for (int i = 0; i < matrixSize; ++i) {
-            ImGui::Text("  Linha %d:", i + 1);
-            ImGui::SameLine();
-            
-            for (int j = 0; j < matrixSize; ++j) {
-                ImGui::PushID(i * matrixSize + j + 5000);
-                ImGui::SetNextItemWidth(fieldWidth);
-                std::string label = "##A" + std::to_string(i) + std::to_string(j);
-                if (ImGui::InputDouble(label.c_str(), &matrix[i][j], 0.0, 0.0, "%.2f")) {
-                    onMatrixModified();
-                }
-                ImGui::PopID();
-                
-                if (j < matrixSize - 1) {
-                    ImGui::SameLine();
-                }
-            }
-        }
-        
-        ImGui::Spacing();
-        
-        ImGui::Text("Vetor b (Termos Independentes):");
-        ImGui::SameLine();
-        for (int i = 0; i < matrixSize; ++i) {
-            ImGui::PushID(i + 6000);
-            ImGui::SetNextItemWidth(fieldWidth);
-            std::string label = "b[" + std::to_string(i) + "]";
-            if (ImGui::InputDouble(label.c_str(), &vectorB[i], 0.0, 0.0, "%.2f")) {
-                onMatrixModified();
-            }
-            ImGui::PopID();
-            
-            if (i < matrixSize - 1) {
-                ImGui::SameLine();
-            }
-        }
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-    }
-
-    void renderButtons() {
-        if (ImGui::Button("Resolver Sistema (Gauss-Jordan)")) {
-            solveSystem();
-        }
-        
-        if (solutionComputed) {
-            ImGui::SameLine();
-            if (ImGui::Button("Limpar Resultado")) {
-                clearSolution();
-            }
-        }
-        ImGui::Spacing();
-    }
-
-    void renderResult() {
-        if (!solutionComputed) {
-            ImGui::TextColored(ImVec4(0.5f, 0.5f, 0.5f, 1.0f), 
-                "Clique em 'Resolver Sistema (Gauss-Jordan)' para calcular a solucao.");
-            return;
-        }
-        
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-        
-        ImGui::TextColored(ImVec4(0.0f, 0.5f, 1.0f, 1.0f), "RESULTADO");
-        ImGui::Spacing();
-        
-        // Exibe o tempo de resolucao
-        ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.0f, 1.0f), 
-            "Tempo de resolucao: %.3f ms", elapsedTimeMs);
-        ImGui::Spacing();
-        
-        if (hasSolution) {
-            ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), 
-                "Sistema resolvido com sucesso usando Gauss-Jordan!");
-            ImGui::Spacing();
-            
-            ImGui::Text("Vetor Solucao X:");
-            
-            if (ImGui::BeginTable("ResultTable3", 2, 
-                ImGuiTableFlags_Borders | ImGuiTableFlags_SizingFixedSame)) {
-                
-                ImGui::TableSetupColumn("Variavel", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-                ImGui::TableSetupColumn("Valor", ImGuiTableColumnFlags_WidthStretch);
-                ImGui::TableHeadersRow();
-
-                for (int i = 0; i < matrixSize; ++i) {
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-                    ImGui::Text("x%d", i + 1);
-                    ImGui::TableSetColumnIndex(1);
-                    ImGui::TextColored(ImVec4(0.0f, 0.8f, 1.0f, 1.0f), "%.8f", solution[i]);
-                }
-                ImGui::EndTable();
-            }
-            
-            ImGui::Spacing();
-            ImGui::Text("Verificacao: A*x ~= b");
-            
-            if (maxError < 1e-6) {
-                ImGui::TextColored(ImVec4(0.2f, 0.8f, 0.2f, 1.0f), 
-                    "Solucao verificada! Erro maximo: %.2e", maxError);
-            } else {
-                ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), 
-                    "Atencao: Erro residual maximo = %.6f", maxError);
-            }
-            
-        } else {
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), 
-                "O sistema nao possui solucao unica!");
-            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.0f, 1.0f), 
-                "Motivo: Matriz singular ou indeterminada.");
-        }
-    }
-};
-
-// ============================================================
-// CLASSE PRINCIPAL - GERENCIA AS ATIVIDADES
-// ============================================================
-class AlgebraLinear : public RendererGlfwOpengl
+int main()
 {
-public:
+    // Configura fluxo de saída para console com formatação decimal limpa
+    std::cout << std::fixed << std::setprecision(4);
 
-    AlgebraLinear()
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<double> dist(-5.0, 5.0);
+
+    std::vector<int> tamanhos = {3, 4, 5, 10};
+
+    std::cout << "====================================================\n";
+    std::cout << " INICIANDO TESTES, MATRIZES E RESULTADOS (01 - 12)\n";
+    std::cout << "====================================================\n\n";
+
+    for (int n : tamanhos)
     {
-        activities.emplace_back(
-            std::make_unique<TotalPivotActivity>()
-        );
+        std::string separator = "\n====================================================\n";
+        std::string header = separator + " >>> TAMANHO DAS MATRIZES: N = " + std::to_string(n) + " <<<\n" + separator + "\n";
+        
+        std::cout << header;
 
-        activities.emplace_back(
-            std::make_unique<PartialPivotActivity>()
-        );
+        // Geração de matrizes e vetores aleatórios
+        LinearSystemSolver::Matrix A(n, LinearSystemSolver::Vector(n));
+        LinearSystemSolver::Matrix A_sym(n, LinearSystemSolver::Vector(n));
+        LinearSystemSolver::Vector b(n);
+        LinearSystemSolver::Vector x0(n, 1.0);
+        
+        LinearSystemSolver::Vector x_reg(n);
+        LinearSystemSolver::Vector y_reg(n);
 
-        activities.emplace_back(
-            std::make_unique<GaussJordanActivity>()
-        );
-    }
-
-protected:
-
-    void onInit(
-        int,
-        int,
-        const std::string&
-    ) override
-    {
-        initImGui();
-
-        std::srand(
-            static_cast<unsigned>(
-                std::time(nullptr)
-            )
-        );
-
-        activityNames.clear();
-
-        for (const auto& activity : activities)
+        for (int i = 0; i < n; ++i)
         {
-            activityNames.push_back(
-                activity->getTitle()
-            );
-        }
-    }
-
-    void onShutdown() override
-    {
-        shutdownImGui();
-    }
-
-    void onWindowResize(
-        int,
-        int
-    ) override
-    {
-    }
-
-    void onUpdate(
-        float
-    ) override
-    {
-    }
-
-    void onRender(
-        DrawerOpengl&
-    ) override
-    {
-        beginImGui();
-
-        drawMainWindow();
-
-        endImGui();
-    }
-
-private:
-
-    void drawMainWindow()
-    {
-        ImGuiViewport* viewport =
-            ImGui::GetMainViewport();
-
-        ImGui::SetNextWindowPos(
-            viewport->Pos
-        );
-
-        ImGui::SetNextWindowSize(
-            viewport->Size
-        );
-
-        ImGui::Begin(
-            "Calculadora de Sistemas Lineares",
-            nullptr,
-            ImGuiWindowFlags_NoTitleBar |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoCollapse
-        );
-
-        ImGui::Text(
-            "Selecione a Atividade:"
-        );
-
-        ImGui::SetNextItemWidth(
-            500.0f
-        );
-
-        if (!activityNames.empty())
-        {
-            ImGui::Combo(
-                "##SeletorAtividade",
-                &selectedActivity,
-                activityNames.data(),
-                static_cast<int>(
-                    activityNames.size()
-                )
-            );
+            b[i] = dist(gen);
+            x_reg[i] = static_cast<double>(i + 1);
+            y_reg[i] = 2.0 * x_reg[i] + dist(gen) * 0.1;
+            for (int j = 0; j < n; ++j)
+            {
+                A[i][j] = dist(gen);
+            }
         }
 
-        ImGui::Spacing();
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        if (
-            selectedActivity >= 0 &&
-            selectedActivity <
-            static_cast<int>(
-                activities.size()
-            )
-        )
+        // Matriz simétrica positiva definida para Cholesky e Autovalores
+        for (int i = 0; i < n; ++i)
         {
-            activities[
-                selectedActivity
-            ]->render();
+            for (int j = 0; j <= i; ++j)
+            {
+                double val = dist(gen);
+                A_sym[i][j] = val;
+                A_sym[j][i] = val;
+            }
+            A_sym[i][i] += 25.0; // Garante dominância diagonal positiva
         }
 
-        ImGui::End();
+        // Impressão da Matriz Original A
+        std::cout << "--- Matriz Original A (" << n << "x" << n << ") ---\n";
+        for (int i = 0; i < n; ++i)
+        {
+            for (int j = 0; j < n; ++j)
+            {
+                std::cout << std::setw(9) << A[i][j] << " ";
+            }
+            std::cout << "\n";
+        }
+        std::cout << "\n";
+
+        // 1 & 2. Sistemas Lineares (Gauss & Gauss-Jordan)
+        try {
+            auto x_gauss = LinearSystemSolver::gaussPartialPivot(A, b);
+            std::cout << "[Tarefa 01] Solução por Eliminação de Gauss (Pivoteamento Parcial):\n";
+            for (double val : x_gauss) {
+                std::cout << std::setw(9) << val << " ";
+            }
+            std::cout << "\n\n";
+
+            auto x_gj = LinearSystemSolver::gaussJordanTotalPivot(A, b);
+            std::cout << "[Tarefa 02] Solução por Gauss-Jordan (Pivoteamento Total):\n";
+            for (double val : x_gj) {
+                std::cout << std::setw(9) << val << " ";
+            }
+            std::cout << "\n\n";
+        } catch (const std::exception& e) {
+            std::cout << "[Tarefas 01/02] Erro: " << e.what() << "\n";
+        }
+
+        // 3. Decomposição LU
+        try {
+            LinearSystemSolver::Matrix L, U;
+            LinearSystemSolver::luDecomposition(A, L, U);
+            std::cout << "[Tarefa 03] Decomposição LU (A = L * U):\n";
+            
+            std::cout << "Matriz L (Triangular Inferior):\n";
+            for (const auto& row : L) {
+                for (double val : row) { std::cout << std::setw(9) << val << " "; }
+                std::cout << "\n";
+            }
+            
+            std::cout << "Matriz U (Triangular Superior):\n";
+            for (const auto& row : U) {
+                for (double val : row) { std::cout << std::setw(9) << val << " "; }
+                std::cout << "\n";
+            }
+            std::cout << "\n";
+        } catch (const std::exception& e) {
+            std::cout << "[Tarefa 03] Exceção LU: " << e.what() << "\n\n";
+        }
+
+        // 4. RREF, Posto e Nulo
+        auto rrefRes = LinearSystemSolver::computeRREF(A);
+        std::cout << "[Tarefa 04] RREF, Posto e Nulo:\n"
+                  << " -> Posto (Rank): " << rrefRes.rank << "\n"
+                  << " -> Dimensão do Espaço Nulo (Nullity): " << rrefRes.nullity << "\n";
+        
+        std::cout << "Matriz RREF:\n";
+        for (const auto& row : rrefRes.rrefMatrix) {
+            for (double val : row) { std::cout << std::setw(9) << val << " "; }
+            std::cout << "\n";
+        }
+        std::cout << "\n";
+
+        // 5. Cholesky
+        try {
+            auto S = LinearSystemSolver::choleskyDecomposition(A_sym);
+            std::cout << "[Tarefa 05] Decomposição de Cholesky (S * S^T):\n";
+            for (const auto& row : S) {
+                for (double val : row) { std::cout << std::setw(9) << val << " "; }
+                std::cout << "\n";
+            }
+            std::cout << "\n";
+        } catch (const std::exception& e) {
+            std::cout << "[Tarefa 05] Parada: " << e.what() << "\n\n";
+        }
+
+        // 6. Gram-Schmidt
+        LinearSystemSolver::Matrix basis;
+        for (int i = 0; i < std::min(2, n); ++i)
+        {
+            LinearSystemSolver::Vector v(n, 0.0);
+            v[i] = 1.0;
+            basis.push_back(v);
+        }
+        auto extended = LinearSystemSolver::extendBasis(basis, n);
+        auto orthonormal = LinearSystemSolver::gramSchmidtOrthonormalize(extended);
+        std::cout << "[Tarefa 06] Gram-Schmidt (Base Ortonormal Gerada):\n";
+        for (const auto& row : orthonormal) {
+            for (double val : row) { std::cout << std::setw(9) << val << " "; }
+            std::cout << "\n";
+        }
+        std::cout << "\n";
+
+        // 7. Regressão Linear
+        auto reg = LinearSystemSolver::linearRegression(x_reg, y_reg);
+        std::cout << "[Tarefa 07] Regressão Linear por Mínimos Quadrados:\n"
+                  << " -> Equação da Reta: y = " << reg.slope << " * x + " << reg.intercept << "\n\n";
+
+        // 8. Método de Potência
+        try {
+            auto powRes = LinearSystemSolver::powerMethod(A_sym, x0, 1e-4, 300);
+            std::cout << "[Tarefa 08] Método de Potência Regular:\n"
+                      << " -> Maior Autovalor: " << powRes.eigenvalue << "\n"
+                      << " -> Iterações: " << powRes.iterations << "\n\n";
+        } catch (const std::exception& e) {
+            std::cout << "[Tarefa 08] Erro: " << e.what() << "\n\n";
+        }
+
+        // 9. Householder
+        auto houseRes = LinearSystemSolver::householderTransform(A_sym, false);
+        std::cout << "[Tarefa 09] Transformação de Householder (Matriz Tridiagonal):\n";
+        for (const auto& row : houseRes.outputMatrix) {
+            for (double val : row) { std::cout << std::setw(9) << val << " "; }
+            std::cout << "\n";
+        }
+        std::cout << "\n";
+
+        // 10. Decomposição QR
+        auto qr = LinearSystemSolver::qrDecomposition(A);
+        std::cout << "[Tarefa 10] Decomposição QR (A = Q * R):\n";
+        
+        std::cout << "Matriz Q (Ortogonal):\n";
+        for (const auto& row : qr.Q) {
+            for (double val : row) { std::cout << std::setw(9) << val << " "; }
+            std::cout << "\n";
+        }
+        
+        std::cout << "Matriz R (Triangular Superior):\n";
+        for (const auto& row : qr.R) {
+            for (double val : row) { std::cout << std::setw(9) << val << " "; }
+            std::cout << "\n";
+        }
+        std::cout << "\n";
+
+        // 11. Autovalores QR
+        auto eigenRes = LinearSystemSolver::qrEigenSymmetric(A_sym, 1e-4);
+        std::cout << "[Tarefa 11] Autovalores via Método QR:\n";
+        for (double val : eigenRes.eigenvalues) {
+            std::cout << std::setw(9) << val << " ";
+        }
+        std::cout << "\n\n";
+
+        // 12. Decomposição SVD
+        auto svd = LinearSystemSolver::svdDecomposition(A);
+        std::cout << "[Tarefa 12] Decomposição SVD (U, Sigma, V):\n";
+        
+        std::cout << "Matriz U:\n";
+        for (const auto& row : svd.U) {
+            for (double val : row) { std::cout << std::setw(9) << val << " "; }
+            std::cout << "\n";
+        }
+        
+        std::cout << "Matriz Sigma:\n";
+        for (const auto& row : svd.Sigma) {
+            for (double val : row) { std::cout << std::setw(9) << val << " "; }
+            std::cout << "\n";
+        }
+        
+        std::cout << "Matriz V:\n";
+        for (const auto& row : svd.V) {
+            for (double val : row) { std::cout << std::setw(9) << val << " "; }
+            std::cout << "\n";
+        }
+        std::cout << "\n====================================================\n\n";
     }
 
-    void initImGui()
-    {
-        IMGUI_CHECKVERSION();
+    std::cout << "CONCLUÍDO! Todos os testes foram executados com saída direcionada apenas para o console.\n";
 
-        ImGui::CreateContext();
-
-        ImGui::StyleColorsDark();
-
-        ImGui_ImplGlfw_InitForOpenGL(
-            window(),
-            true
-        );
-
-        ImGui_ImplOpenGL3_Init(
-            "#version 330"
-        );
-    }
-
-    void shutdownImGui()
-    {
-        ImGui_ImplOpenGL3_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
-    }
-
-    void beginImGui()
-    {
-        ImGui_ImplOpenGL3_NewFrame();
-
-        ImGui_ImplGlfw_NewFrame();
-
-        ImGui::NewFrame();
-    }
-
-    void endImGui()
-    {
-        ImGui::Render();
-
-        ImGui_ImplOpenGL3_RenderDrawData(
-            ImGui::GetDrawData()
-        );
-    }
-
-private:
-
-    std::vector<
-        std::unique_ptr<Activity>
-    > activities;
-
-    std::vector<
-        const char*
-    > activityNames;
-
-    int selectedActivity = 0;
-};
-
-// ============================================================
-//  ENTRY POINT
-// ============================================================
-int main() {
-    AlgebraLinear app;
-    app.run(1000, 750, "MDCC - Algebra Linear: Eliminacao de Gauss");
+    return 0;
 }

@@ -613,22 +613,6 @@ $$
 
 ---
 
-# Vantagens
-
-✅ Representação compacta
-
-✅ Sem triangulação
-
-✅ Compatível com PGA
-
-✅ Regiões infinitas
-
-✅ Regiões abertas
-
-✅ Corpo definido por restrições
-
----
-
 # Arquitetura Proposta
 
 ```text
@@ -648,3 +632,5 @@ Colisão
 ```
 
 ---
+
+![bg right:90% fit](img/cayley_table.png)
