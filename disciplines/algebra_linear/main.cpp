@@ -1,232 +1,527 @@
 #include "linear_system_solver.hpp"
+
+#include <algorithm>
+#include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <random>
-#include <iomanip>
+
+using Matrix = LinearSystemSolver::Matrix;
+using Vector = LinearSystemSolver::Vector;
+
+double matrixError(
+    const Matrix& A,
+    const Matrix& B)
+{
+    double err = 0.0;
+
+    for (size_t i = 0; i < A.size(); ++i)
+    {
+        for (size_t j = 0; j < A[0].size(); ++j)
+        {
+            err = std::max(
+                err,
+                std::abs(A[i][j] - B[i][j]));
+        }
+    }
+
+    return err;
+}
+
+double vectorError(
+    const Vector& a,
+    const Vector& b)
+{
+    double err = 0.0;
+
+    for (size_t i = 0; i < a.size(); ++i)
+    {
+        err = std::max(
+            err,
+            std::abs(a[i] - b[i]));
+    }
+
+    return err;
+}
+
+Matrix identity(int n)
+{
+    Matrix I(
+        n,
+        Vector(n, 0.0));
+
+    for (int i = 0; i < n; ++i)
+    {
+        I[i][i] = 1.0;
+    }
+
+    return I;
+}
 
 int main()
 {
-    // Configura fluxo de saída para console com formatação decimal limpa
-    std::cout << std::fixed << std::setprecision(4);
+    std::cout
+        << std::fixed
+        << std::setprecision(6);
 
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_real_distribution<double> dist(-5.0, 5.0);
 
-    std::vector<int> tamanhos = {3, 4, 5, 10};
+    std::uniform_real_distribution<double>
+        dist(-5.0, 5.0);
 
-    std::cout << "====================================================\n";
-    std::cout << " INICIANDO TESTES, MATRIZES E RESULTADOS (01 - 12)\n";
-    std::cout << "====================================================\n\n";
+    std::normal_distribution<double>
+        noise(0.0, 0.2);
+
+    std::vector<int> tamanhos =
+    {
+        3,
+        4,
+        5,
+        10
+    };
+
+    std::cout
+        << "====================================================\n";
+    std::cout
+        << " INICIANDO TESTES, MATRIZES E RESULTADOS (01 - 12)\n";
+    std::cout
+        << "====================================================\n";
 
     for (int n : tamanhos)
     {
-        std::string separator = "\n====================================================\n";
-        std::string header = separator + " >>> TAMANHO DAS MATRIZES: N = " + std::to_string(n) + " <<<\n" + separator + "\n";
-        
-        std::cout << header;
+        std::cout
+            << "\n====================================================\n";
+        std::cout
+            << ">>> TAMANHO DAS MATRIZES: N = "
+            << n
+            << " <<<\n";
+        std::cout
+            << "====================================================\n\n";
 
-        // Geração de matrizes e vetores aleatórios
-        LinearSystemSolver::Matrix A(n, LinearSystemSolver::Vector(n));
-        LinearSystemSolver::Matrix A_sym(n, LinearSystemSolver::Vector(n));
-        LinearSystemSolver::Vector b(n);
-        LinearSystemSolver::Vector x0(n, 1.0);
-        
-        LinearSystemSolver::Vector x_reg(n);
-        LinearSystemSolver::Vector y_reg(n);
+        // =====================================================
+        // MATRIZES BASE
+        // =====================================================
+
+        Matrix A(
+            n,
+            Vector(n));
+
+        Matrix M(
+            n,
+            Vector(n));
 
         for (int i = 0; i < n; ++i)
         {
-            b[i] = dist(gen);
-            x_reg[i] = static_cast<double>(i + 1);
-            y_reg[i] = 2.0 * x_reg[i] + dist(gen) * 0.1;
             for (int j = 0; j < n; ++j)
             {
                 A[i][j] = dist(gen);
+                M[i][j] = dist(gen);
             }
         }
 
-        // Matriz simétrica positiva definida para Cholesky e Autovalores
+        Matrix Mt =
+            LinearSystemSolver::transposeMatrix(M);
+
+        Matrix A_sym =
+            LinearSystemSolver::multiplyMatrices(
+                Mt,
+                M);
+
         for (int i = 0; i < n; ++i)
         {
-            for (int j = 0; j <= i; ++j)
-            {
-                double val = dist(gen);
-                A_sym[i][j] = val;
-                A_sym[j][i] = val;
-            }
-            A_sym[i][i] += 25.0; // Garante dominância diagonal positiva
+            A_sym[i][i] += n;
         }
 
-        // Impressão da Matriz Original A
-        std::cout << "--- Matriz Original A (" << n << "x" << n << ") ---\n";
+        LinearSystemSolver::printMatrix(
+            A,
+            "Matriz A");
+
+        // =====================================================
+        // TAREFA 01
+        // =====================================================
+
+        Vector xTrue(n);
+
         for (int i = 0; i < n; ++i)
+        {
+            xTrue[i] = i + 1;
+        }
+
+        Vector b =
+            LinearSystemSolver::multiplyMatrixVector(
+                A,
+                xTrue);
+
+        auto xGauss =
+            LinearSystemSolver::gaussPartialPivot(
+                A,
+                b);
+
+        std::cout
+            << "[Tarefa 01] Gauss\n";
+
+        LinearSystemSolver::printVector(
+            xGauss,
+            "Solucao");
+
+        std::cout
+            << "Erro: "
+            << vectorError(
+                   xTrue,
+                   xGauss)
+            << "\n\n";
+
+        // =====================================================
+        // TAREFA 02
+        // =====================================================
+
+        auto xJordan =
+            LinearSystemSolver::
+            gaussJordanTotalPivot(
+                A,
+                b);
+
+        std::cout
+            << "[Tarefa 02] Gauss-Jordan\n";
+
+        LinearSystemSolver::printVector(
+            xJordan,
+            "Solucao");
+
+        std::cout
+            << "Erro: "
+            << vectorError(
+                   xTrue,
+                   xJordan)
+            << "\n\n";
+
+        // =====================================================
+        // TAREFA 03
+        // =====================================================
+
+        Matrix L;
+        Matrix U;
+
+        LinearSystemSolver::
+        luDecomposition(
+            A,
+            L,
+            U);
+
+        auto LU =
+            LinearSystemSolver::
+            multiplyMatrices(
+                L,
+                U);
+
+        std::cout
+            << "[Tarefa 03] LU\n";
+
+        LinearSystemSolver::printMatrix(
+            L,
+            "L");
+
+        LinearSystemSolver::printMatrix(
+            U,
+            "U");
+
+        LinearSystemSolver::printMatrix(
+            LU,
+            "L*U");
+
+        std::cout
+            << "Erro LU: "
+            << matrixError(
+                   A,
+                   LU)
+            << "\n\n";
+
+        // =====================================================
+        // TAREFA 04
+        // =====================================================
+
+        auto singular = A;
+
+        if (n > 2)
         {
             for (int j = 0; j < n; ++j)
             {
-                std::cout << std::setw(9) << A[i][j] << " ";
+                singular[2][j] =
+                    singular[0][j]
+                    + singular[1][j];
             }
-            std::cout << "\n";
-        }
-        std::cout << "\n";
-
-        // 1 & 2. Sistemas Lineares (Gauss & Gauss-Jordan)
-        try {
-            auto x_gauss = LinearSystemSolver::gaussPartialPivot(A, b);
-            std::cout << "[Tarefa 01] Solução por Eliminação de Gauss (Pivoteamento Parcial):\n";
-            for (double val : x_gauss) {
-                std::cout << std::setw(9) << val << " ";
-            }
-            std::cout << "\n\n";
-
-            auto x_gj = LinearSystemSolver::gaussJordanTotalPivot(A, b);
-            std::cout << "[Tarefa 02] Solução por Gauss-Jordan (Pivoteamento Total):\n";
-            for (double val : x_gj) {
-                std::cout << std::setw(9) << val << " ";
-            }
-            std::cout << "\n\n";
-        } catch (const std::exception& e) {
-            std::cout << "[Tarefas 01/02] Erro: " << e.what() << "\n";
         }
 
-        // 3. Decomposição LU
-        try {
-            LinearSystemSolver::Matrix L, U;
-            LinearSystemSolver::luDecomposition(A, L, U);
-            std::cout << "[Tarefa 03] Decomposição LU (A = L * U):\n";
-            
-            std::cout << "Matriz L (Triangular Inferior):\n";
-            for (const auto& row : L) {
-                for (double val : row) { std::cout << std::setw(9) << val << " "; }
-                std::cout << "\n";
-            }
-            
-            std::cout << "Matriz U (Triangular Superior):\n";
-            for (const auto& row : U) {
-                for (double val : row) { std::cout << std::setw(9) << val << " "; }
-                std::cout << "\n";
-            }
-            std::cout << "\n";
-        } catch (const std::exception& e) {
-            std::cout << "[Tarefa 03] Exceção LU: " << e.what() << "\n\n";
-        }
+        auto rref =
+            LinearSystemSolver::
+            computeRREF(
+                singular);
 
-        // 4. RREF, Posto e Nulo
-        auto rrefRes = LinearSystemSolver::computeRREF(A);
-        std::cout << "[Tarefa 04] RREF, Posto e Nulo:\n"
-                  << " -> Posto (Rank): " << rrefRes.rank << "\n"
-                  << " -> Dimensão do Espaço Nulo (Nullity): " << rrefRes.nullity << "\n";
-        
-        std::cout << "Matriz RREF:\n";
-        for (const auto& row : rrefRes.rrefMatrix) {
-            for (double val : row) { std::cout << std::setw(9) << val << " "; }
-            std::cout << "\n";
-        }
-        std::cout << "\n";
+        std::cout
+            << "[Tarefa 04] RREF\n";
 
-        // 5. Cholesky
-        try {
-            auto S = LinearSystemSolver::choleskyDecomposition(A_sym);
-            std::cout << "[Tarefa 05] Decomposição de Cholesky (S * S^T):\n";
-            for (const auto& row : S) {
-                for (double val : row) { std::cout << std::setw(9) << val << " "; }
-                std::cout << "\n";
-            }
-            std::cout << "\n";
-        } catch (const std::exception& e) {
-            std::cout << "[Tarefa 05] Parada: " << e.what() << "\n\n";
-        }
+        LinearSystemSolver::printMatrix(
+            singular,
+            "Matriz Singular");
 
-        // 6. Gram-Schmidt
-        LinearSystemSolver::Matrix basis;
-        for (int i = 0; i < std::min(2, n); ++i)
+        LinearSystemSolver::printMatrix(
+            rref.rrefMatrix,
+            "RREF");
+
+        std::cout
+            << "Rank = "
+            << rref.rank
+            << "\n";
+
+        std::cout
+            << "Nullity = "
+            << rref.nullity
+            << "\n\n";
+
+        // =====================================================
+        // TAREFA 05
+        // =====================================================
+
+        auto S =
+            LinearSystemSolver::
+            choleskyDecomposition(
+                A_sym);
+
+        auto ST =
+            LinearSystemSolver::
+            transposeMatrix(
+                S);
+
+        auto ArecChol =
+            LinearSystemSolver::
+            multiplyMatrices(
+                S,
+                ST);
+
+        std::cout
+            << "[Tarefa 05] Cholesky\n";
+
+        LinearSystemSolver::printMatrix(
+            S,
+            "S");
+
+        std::cout
+            << "Erro Cholesky = "
+            << matrixError(
+                   A_sym,
+                   ArecChol)
+            << "\n\n";
+
+        // =====================================================
+        // TAREFA 06
+        // =====================================================
+
+        Matrix basis;
+
+        for (int i = 0; i < n; ++i)
         {
-            LinearSystemSolver::Vector v(n, 0.0);
-            v[i] = 1.0;
+            Vector v(n);
+
+            for (int j = 0; j < n; ++j)
+            {
+                v[j] = dist(gen);
+            }
+
             basis.push_back(v);
         }
-        auto extended = LinearSystemSolver::extendBasis(basis, n);
-        auto orthonormal = LinearSystemSolver::gramSchmidtOrthonormalize(extended);
-        std::cout << "[Tarefa 06] Gram-Schmidt (Base Ortonormal Gerada):\n";
-        for (const auto& row : orthonormal) {
-            for (double val : row) { std::cout << std::setw(9) << val << " "; }
-            std::cout << "\n";
-        }
-        std::cout << "\n";
 
-        // 7. Regressão Linear
-        auto reg = LinearSystemSolver::linearRegression(x_reg, y_reg);
-        std::cout << "[Tarefa 07] Regressão Linear por Mínimos Quadrados:\n"
-                  << " -> Equação da Reta: y = " << reg.slope << " * x + " << reg.intercept << "\n\n";
+        auto ortho =
+            LinearSystemSolver::
+            gramSchmidtOrthonormalize(
+                basis);
 
-        // 8. Método de Potência
-        try {
-            auto powRes = LinearSystemSolver::powerMethod(A_sym, x0, 1e-4, 300);
-            std::cout << "[Tarefa 08] Método de Potência Regular:\n"
-                      << " -> Maior Autovalor: " << powRes.eigenvalue << "\n"
-                      << " -> Iterações: " << powRes.iterations << "\n\n";
-        } catch (const std::exception& e) {
-            std::cout << "[Tarefa 08] Erro: " << e.what() << "\n\n";
+        std::cout
+            << "[Tarefa 06] Gram-Schmidt\n";
+
+        LinearSystemSolver::printMatrix(
+            basis,
+            "Base Original");
+
+        LinearSystemSolver::printMatrix(
+            ortho,
+            "Base Ortonormal");
+
+        // =====================================================
+        // TAREFA 07
+        // =====================================================
+
+        Vector xReg(50);
+        Vector yReg(50);
+
+        for (int i = 0; i < 50; ++i)
+        {
+            xReg[i] = i;
+
+            yReg[i] =
+                2.0 * i
+                + 1.0
+                + noise(gen);
         }
 
-        // 9. Householder
-        auto houseRes = LinearSystemSolver::householderTransform(A_sym, false);
-        std::cout << "[Tarefa 09] Transformação de Householder (Matriz Tridiagonal):\n";
-        for (const auto& row : houseRes.outputMatrix) {
-            for (double val : row) { std::cout << std::setw(9) << val << " "; }
-            std::cout << "\n";
-        }
-        std::cout << "\n";
+        auto reg =
+            LinearSystemSolver::
+            linearRegression(
+                xReg,
+                yReg);
 
-        // 10. Decomposição QR
-        auto qr = LinearSystemSolver::qrDecomposition(A);
-        std::cout << "[Tarefa 10] Decomposição QR (A = Q * R):\n";
-        
-        std::cout << "Matriz Q (Ortogonal):\n";
-        for (const auto& row : qr.Q) {
-            for (double val : row) { std::cout << std::setw(9) << val << " "; }
-            std::cout << "\n";
-        }
-        
-        std::cout << "Matriz R (Triangular Superior):\n";
-        for (const auto& row : qr.R) {
-            for (double val : row) { std::cout << std::setw(9) << val << " "; }
-            std::cout << "\n";
-        }
-        std::cout << "\n";
+        std::cout
+            << "[Tarefa 07] Regressao\n";
 
-        // 11. Autovalores QR
-        auto eigenRes = LinearSystemSolver::qrEigenSymmetric(A_sym, 1e-4);
-        std::cout << "[Tarefa 11] Autovalores via Método QR:\n";
-        for (double val : eigenRes.eigenvalues) {
-            std::cout << std::setw(9) << val << " ";
-        }
-        std::cout << "\n\n";
+        std::cout
+            << "Slope = "
+            << reg.slope
+            << "\n";
 
-        // 12. Decomposição SVD
-        auto svd = LinearSystemSolver::svdDecomposition(A);
-        std::cout << "[Tarefa 12] Decomposição SVD (U, Sigma, V):\n";
-        
-        std::cout << "Matriz U:\n";
-        for (const auto& row : svd.U) {
-            for (double val : row) { std::cout << std::setw(9) << val << " "; }
-            std::cout << "\n";
-        }
-        
-        std::cout << "Matriz Sigma:\n";
-        for (const auto& row : svd.Sigma) {
-            for (double val : row) { std::cout << std::setw(9) << val << " "; }
-            std::cout << "\n";
-        }
-        
-        std::cout << "Matriz V:\n";
-        for (const auto& row : svd.V) {
-            for (double val : row) { std::cout << std::setw(9) << val << " "; }
-            std::cout << "\n";
-        }
-        std::cout << "\n====================================================\n\n";
+        std::cout
+            << "Intercept = "
+            << reg.intercept
+            << "\n\n";
+
+        // =====================================================
+        // TAREFA 08
+        // =====================================================
+
+        Vector x0(
+            n,
+            1.0);
+
+        auto power =
+            LinearSystemSolver::
+            powerMethod(
+                A_sym,
+                x0,
+                1e-8,
+                1000);
+
+        std::cout
+            << "[Tarefa 08] Potencia\n";
+
+        std::cout
+            << "Maior autovalor = "
+            << power.eigenvalue
+            << "\n\n";
+
+        // =====================================================
+        // TAREFA 09
+        // =====================================================
+
+        auto house =
+            LinearSystemSolver::
+            householderTransform(
+                A_sym,
+                false);
+
+        std::cout
+            << "[Tarefa 09] Householder\n";
+
+        LinearSystemSolver::printMatrix(
+            house.outputMatrix,
+            "Tridiagonal");
+
+        // =====================================================
+        // TAREFA 10
+        // =====================================================
+
+        auto qr =
+            LinearSystemSolver::
+            qrDecomposition(
+                A);
+
+        auto QR =
+            LinearSystemSolver::
+            multiplyMatrices(
+                qr.Q,
+                qr.R);
+
+        std::cout
+            << "[Tarefa 10] QR\n";
+
+        LinearSystemSolver::printMatrix(
+            qr.Q,
+            "Q");
+
+        LinearSystemSolver::printMatrix(
+            qr.R,
+            "R");
+
+        std::cout
+            << "Erro QR = "
+            << matrixError(
+                   A,
+                   QR)
+            << "\n\n";
+
+        // =====================================================
+        // TAREFA 11
+        // =====================================================
+
+        auto eigen =
+            LinearSystemSolver::
+            qrEigenSymmetric(
+                A_sym,
+                1e-8);
+
+        std::cout
+            << "[Tarefa 11] Autovalores\n";
+
+        LinearSystemSolver::printVector(
+            eigen.eigenvalues,
+            "Eigenvalues");
+
+        // =====================================================
+        // TAREFA 12
+        // =====================================================
+
+        auto svd =
+            LinearSystemSolver::
+            svdDecomposition(
+                A);
+
+        Matrix Vt =
+            LinearSystemSolver::
+            transposeMatrix(
+                svd.V);
+
+        Matrix US =
+            LinearSystemSolver::
+            multiplyMatrices(
+                svd.U,
+                svd.Sigma);
+
+        Matrix Arec =
+            LinearSystemSolver::
+            multiplyMatrices(
+                US,
+                Vt);
+
+        std::cout
+            << "[Tarefa 12] SVD\n";
+
+        LinearSystemSolver::printMatrix(
+            svd.U,
+            "U");
+
+        LinearSystemSolver::printMatrix(
+            svd.Sigma,
+            "Sigma");
+
+        LinearSystemSolver::printMatrix(
+            svd.V,
+            "V");
+
+        std::cout
+            << "Erro SVD = "
+            << matrixError(
+                   A,
+                   Arec)
+            << "\n\n";
     }
-
-    std::cout << "CONCLUÍDO! Todos os testes foram executados com saída direcionada apenas para o console.\n";
 
     return 0;
 }

@@ -8,15 +8,15 @@
 using Matrix = LinearSystemSolver::Matrix;
 using Vector = LinearSystemSolver::Vector;
 
-void LinearSystemSolver::swapRows(Matrix& A, Vector& b, int r1, int r2)
+void LinearSystemSolver::swapRows(Matrix &A, Vector &b, int r1, int r2)
 {
     std::swap(A[r1], A[r2]);
     std::swap(b[r1], b[r2]);
 }
 
-void LinearSystemSolver::swapColumns(Matrix& A, std::vector<int>& permutation, int c1, int c2)
+void LinearSystemSolver::swapColumns(Matrix &A, std::vector<int> &permutation, int c1, int c2)
 {
-    for (auto& row : A)
+    for (auto &row : A)
     {
         std::swap(row[c1], row[c2]);
     }
@@ -34,15 +34,19 @@ Vector LinearSystemSolver::gaussPartialPivot(Matrix A, Vector b)
         int pivot = k;
         for (int i = k + 1; i < n; ++i)
         {
-            if (std::fabs(A[i][k]) > std::fabs(A[pivot][k])) pivot = i;
+            if (std::fabs(A[i][k]) > std::fabs(A[pivot][k]))
+                pivot = i;
         }
-        if (std::fabs(A[pivot][k]) < 1e-12) throw std::runtime_error("Matriz singular.");
-        if (pivot != k) swapRows(A, b, pivot, k);
+        if (std::fabs(A[pivot][k]) < 1e-12)
+            throw std::runtime_error("Matriz singular.");
+        if (pivot != k)
+            swapRows(A, b, pivot, k);
 
         for (int i = k + 1; i < n; ++i)
         {
             double m = A[i][k] / A[k][k];
-            for (int j = k; j < n; ++j) A[i][j] -= m * A[k][j];
+            for (int j = k; j < n; ++j)
+                A[i][j] -= m * A[k][j];
             b[i] -= m * b[k];
         }
     }
@@ -50,7 +54,8 @@ Vector LinearSystemSolver::gaussPartialPivot(Matrix A, Vector b)
     for (int i = n - 1; i >= 0; --i)
     {
         double sum = b[i];
-        for (int j = i + 1; j < n; ++j) sum -= A[i][j] * x[j];
+        for (int j = i + 1; j < n; ++j)
+            sum -= A[i][j] * x[j];
         x[i] = sum / A[i][i];
     }
     return x;
@@ -60,7 +65,8 @@ Vector LinearSystemSolver::gaussTotalPivot(Matrix A, Vector b)
 {
     const int n = static_cast<int>(A.size());
     std::vector<int> permutation(n);
-    for (int i = 0; i < n; ++i) permutation[i] = i;
+    for (int i = 0; i < n; ++i)
+        permutation[i] = i;
 
     for (int k = 0; k < n - 1; ++k)
     {
@@ -78,14 +84,18 @@ Vector LinearSystemSolver::gaussTotalPivot(Matrix A, Vector b)
                 }
             }
         }
-        if (maxValue < 1e-12) throw std::runtime_error("Matriz singular.");
-        if (pivotRow != k) swapRows(A, b, pivotRow, k);
-        if (pivotCol != k) swapColumns(A, permutation, pivotCol, k);
+        if (maxValue < 1e-12)
+            throw std::runtime_error("Matriz singular.");
+        if (pivotRow != k)
+            swapRows(A, b, pivotRow, k);
+        if (pivotCol != k)
+            swapColumns(A, permutation, pivotCol, k);
 
         for (int i = k + 1; i < n; ++i)
         {
             double m = A[i][k] / A[k][k];
-            for (int j = k; j < n; ++j) A[i][j] -= m * A[k][j];
+            for (int j = k; j < n; ++j)
+                A[i][j] -= m * A[k][j];
             b[i] -= m * b[k];
         }
     }
@@ -93,11 +103,13 @@ Vector LinearSystemSolver::gaussTotalPivot(Matrix A, Vector b)
     for (int i = n - 1; i >= 0; --i)
     {
         double sum = b[i];
-        for (int j = i + 1; j < n; ++j) sum -= A[i][j] * x[j];
+        for (int j = i + 1; j < n; ++j)
+            sum -= A[i][j] * x[j];
         x[i] = sum / A[i][i];
     }
     Vector reordered(n);
-    for (int i = 0; i < n; ++i) reordered[permutation[i]] = x[i];
+    for (int i = 0; i < n; ++i)
+        reordered[permutation[i]] = x[i];
     return reordered;
 }
 
@@ -112,20 +124,26 @@ Vector LinearSystemSolver::gaussJordanPartialPivot(Matrix A, Vector b)
         int pivot = k;
         for (int i = k + 1; i < n; ++i)
         {
-            if (std::fabs(A[i][k]) > std::fabs(A[pivot][k])) pivot = i;
+            if (std::fabs(A[i][k]) > std::fabs(A[pivot][k]))
+                pivot = i;
         }
-        if (std::fabs(A[pivot][k]) < 1e-12) throw std::runtime_error("Matriz singular.");
-        if (pivot != k) swapRows(A, b, pivot, k);
+        if (std::fabs(A[pivot][k]) < 1e-12)
+            throw std::runtime_error("Matriz singular.");
+        if (pivot != k)
+            swapRows(A, b, pivot, k);
 
         double diag = A[k][k];
-        for (int j = 0; j < n; ++j) A[k][j] /= diag;
+        for (int j = 0; j < n; ++j)
+            A[k][j] /= diag;
         b[k] /= diag;
 
         for (int i = 0; i < n; ++i)
         {
-            if (i == k) continue;
+            if (i == k)
+                continue;
             double factor = A[i][k];
-            for (int j = 0; j < n; ++j) A[i][j] -= factor * A[k][j];
+            for (int j = 0; j < n; ++j)
+                A[i][j] -= factor * A[k][j];
             b[i] -= factor * b[k];
         }
     }
@@ -136,7 +154,8 @@ Vector LinearSystemSolver::gaussJordanTotalPivot(Matrix A, Vector b)
 {
     const int n = static_cast<int>(A.size());
     std::vector<int> permutation(n);
-    for (int i = 0; i < n; ++i) permutation[i] = i;
+    for (int i = 0; i < n; ++i)
+        permutation[i] = i;
 
     for (int k = 0; k < n; ++k)
     {
@@ -154,31 +173,38 @@ Vector LinearSystemSolver::gaussJordanTotalPivot(Matrix A, Vector b)
                 }
             }
         }
-        if (maxValue < 1e-12) throw std::runtime_error("Matriz singular.");
-        if (pivotRow != k) swapRows(A, b, pivotRow, k);
-        if (pivotCol != k) swapColumns(A, permutation, pivotCol, k);
+        if (maxValue < 1e-12)
+            throw std::runtime_error("Matriz singular.");
+        if (pivotRow != k)
+            swapRows(A, b, pivotRow, k);
+        if (pivotCol != k)
+            swapColumns(A, permutation, pivotCol, k);
 
         double diag = A[k][k];
-        for (int j = 0; j < n; ++j) A[k][j] /= diag;
+        for (int j = 0; j < n; ++j)
+            A[k][j] /= diag;
         b[k] /= diag;
 
         for (int i = 0; i < n; ++i)
         {
-            if (i == k) continue;
+            if (i == k)
+                continue;
             double factor = A[i][k];
-            for (int j = 0; j < n; ++j) A[i][j] -= factor * A[k][j];
+            for (int j = 0; j < n; ++j)
+                A[i][j] -= factor * A[k][j];
             b[i] -= factor * b[k];
         }
     }
     Vector reordered(n);
-    for (int i = 0; i < n; ++i) reordered[permutation[i]] = b[i];
+    for (int i = 0; i < n; ++i)
+        reordered[permutation[i]] = b[i];
     return reordered;
 }
 
 // ==========================================
 // TAREFA 03
 // ==========================================
-void LinearSystemSolver::luDecomposition(const Matrix& A, Matrix& L, Matrix& U)
+void LinearSystemSolver::luDecomposition(const Matrix &A, Matrix &L, Matrix &U)
 {
     int n = static_cast<int>(A.size());
     L = Matrix(n, Vector(n, 0.0));
@@ -190,34 +216,39 @@ void LinearSystemSolver::luDecomposition(const Matrix& A, Matrix& L, Matrix& U)
         for (int j = i; j < n; ++j)
         {
             double sum = 0.0;
-            for (int k = 0; k < i; ++k) sum += L[i][k] * U[k][j];
+            for (int k = 0; k < i; ++k)
+                sum += L[i][k] * U[k][j];
             U[i][j] = A[i][j] - sum;
         }
         for (int j = i + 1; j < n; ++j)
         {
             double sum = 0.0;
-            for (int k = 0; k < i; ++k) sum += L[j][k] * U[k][i];
-            if (std::abs(U[i][i]) < 1e-12) throw std::runtime_error("Pivô zero na LU.");
+            for (int k = 0; k < i; ++k)
+                sum += L[j][k] * U[k][i];
+            if (std::abs(U[i][i]) < 1e-12)
+                throw std::runtime_error("Pivô zero na LU.");
             L[j][i] = (A[j][i] - sum) / U[i][i];
         }
     }
 }
 
-Vector LinearSystemSolver::solveLU(const Matrix& L, const Matrix& U, const Vector& b)
+Vector LinearSystemSolver::solveLU(const Matrix &L, const Matrix &U, const Vector &b)
 {
     int n = static_cast<int>(b.size());
     Vector y(n, 0.0);
     for (int i = 0; i < n; ++i)
     {
         double sum = 0.0;
-        for (int j = 0; j < i; ++j) sum += L[i][j] * y[j];
+        for (int j = 0; j < i; ++j)
+            sum += L[i][j] * y[j];
         y[i] = b[i] - sum;
     }
     Vector x(n, 0.0);
     for (int i = n - 1; i >= 0; --i)
     {
         double sum = 0.0;
-        for (int j = i + 1; j < n; ++j) sum += U[i][j] * x[j];
+        for (int j = i + 1; j < n; ++j)
+            sum += U[i][j] * x[j];
         x[i] = (y[i] - sum) / U[i][i];
     }
     return x;
@@ -234,7 +265,8 @@ LinearSystemSolver::RREFResult LinearSystemSolver::computeRREF(Matrix A)
 
     for (int r = 0; r < m; ++r)
     {
-        if (lead >= n) break;
+        if (lead >= n)
+            break;
         int i = r;
         while (std::abs(A[i][lead]) < 1e-12)
         {
@@ -243,19 +275,22 @@ LinearSystemSolver::RREFResult LinearSystemSolver::computeRREF(Matrix A)
             {
                 i = r;
                 lead++;
-                if (lead == n) goto end_rref;
+                if (lead == n)
+                    goto end_rref;
             }
         }
         std::swap(A[r], A[i]);
         double val = A[r][lead];
-        for (int j = 0; j < n; ++j) A[r][j] /= val;
+        for (int j = 0; j < n; ++j)
+            A[r][j] /= val;
 
         for (int i = 0; i < m; ++i)
         {
             if (i != r)
             {
                 double factor = A[i][lead];
-                for (int j = 0; j < n; ++j) A[i][j] -= factor * A[r][j];
+                for (int j = 0; j < n; ++j)
+                    A[i][j] -= factor * A[r][j];
             }
         }
         lead++;
@@ -266,9 +301,14 @@ end_rref:
         bool nonZero = false;
         for (int j = 0; j < n; ++j)
         {
-            if (std::abs(A[i][j]) > 1e-12) { nonZero = true; break; }
+            if (std::abs(A[i][j]) > 1e-12)
+            {
+                nonZero = true;
+                break;
+            }
         }
-        if (nonZero) rank++;
+        if (nonZero)
+            rank++;
     }
     return {A, rank, n - rank};
 }
@@ -276,7 +316,7 @@ end_rref:
 // ==========================================
 // TAREFA 05
 // ==========================================
-Matrix LinearSystemSolver::choleskyDecomposition(const Matrix& A)
+Matrix LinearSystemSolver::choleskyDecomposition(const Matrix &A)
 {
     int n = static_cast<int>(A.size());
     Matrix S(n, Vector(n, 0.0));
@@ -285,7 +325,8 @@ Matrix LinearSystemSolver::choleskyDecomposition(const Matrix& A)
         for (int j = 0; j <= i; ++j)
         {
             double sum = 0.0;
-            for (int k = 0; k < j; ++k) sum += S[i][k] * S[j][k];
+            for (int k = 0; k < j; ++k)
+                sum += S[i][k] * S[j][k];
             if (i == j)
             {
                 double val = A[i][i] - sum;
@@ -308,7 +349,7 @@ Matrix LinearSystemSolver::choleskyDecomposition(const Matrix& A)
 // ==========================================
 // TAREFA 06
 // ==========================================
-Matrix LinearSystemSolver::extendBasis(const Matrix& vectors, int m)
+Matrix LinearSystemSolver::extendBasis(const Matrix &vectors, int m)
 {
     Matrix basis = vectors;
     int n = static_cast<int>(vectors.size());
@@ -327,7 +368,7 @@ Matrix LinearSystemSolver::extendBasis(const Matrix& vectors, int m)
     return basis;
 }
 
-Matrix LinearSystemSolver::gramSchmidtOrthonormalize(const Matrix& basis)
+Matrix LinearSystemSolver::gramSchmidtOrthonormalize(const Matrix &basis)
 {
     int n = static_cast<int>(basis.size());
     int m = static_cast<int>(basis[0].size());
@@ -344,12 +385,14 @@ Matrix LinearSystemSolver::gramSchmidtOrthonormalize(const Matrix& basis)
                 dotDen += ortho[j][k] * ortho[j][k];
             }
             double proj = (dotDen != 0.0) ? (dotNum / dotDen) : 0.0;
-            for (int k = 0; k < m; ++k) ortho[i][k] -= proj * ortho[j][k];
+            for (int k = 0; k < m; ++k)
+                ortho[i][k] -= proj * ortho[j][k];
         }
         double norm = vectorNorm(ortho[i]);
         if (norm > 1e-12)
         {
-            for (int k = 0; k < m; ++k) ortho[i][k] /= norm;
+            for (int k = 0; k < m; ++k)
+                ortho[i][k] /= norm;
         }
     }
     return ortho;
@@ -358,7 +401,7 @@ Matrix LinearSystemSolver::gramSchmidtOrthonormalize(const Matrix& basis)
 // ==========================================
 // TAREFA 07
 // ==========================================
-Vector LinearSystemSolver::leastSquares(const Matrix& A, const Vector& b)
+Vector LinearSystemSolver::leastSquares(const Matrix &A, const Vector &b)
 {
     Matrix At = transposeMatrix(A);
     Matrix AtA = multiplyMatrices(At, A);
@@ -368,11 +411,12 @@ Vector LinearSystemSolver::leastSquares(const Matrix& A, const Vector& b)
     return solveLU(L, U, Atb);
 }
 
-LinearSystemSolver::RegressionResult LinearSystemSolver::linearRegression(const Vector& x, const Vector& y)
+LinearSystemSolver::RegressionResult LinearSystemSolver::linearRegression(const Vector &x, const Vector &y)
 {
     int m = static_cast<int>(x.size());
     Matrix A(m, Vector(2, 1.0));
-    for (int i = 0; i < m; ++i) A[i][1] = x[i];
+    for (int i = 0; i < m; ++i)
+        A[i][1] = x[i];
     Vector coeffs = leastSquares(A, y);
     return {coeffs[1], coeffs[0]};
 }
@@ -380,57 +424,130 @@ LinearSystemSolver::RegressionResult LinearSystemSolver::linearRegression(const 
 // ==========================================
 // TAREFA 08
 // ==========================================
-LinearSystemSolver::PowerResult LinearSystemSolver::powerMethod(const Matrix& A, Vector x0, double eps, int maxIter)
+LinearSystemSolver::PowerResult LinearSystemSolver::powerMethod(
+    const Matrix &A,
+    Vector x0,
+    double eps,
+    int maxIter)
 {
     Vector x = x0;
+
+    double normX = vectorNorm(x);
+
+    if (normX < 1e-12)
+    {
+        throw std::runtime_error("Vetor inicial nulo.");
+    }
+
+    for (double &v : x)
+    {
+        v /= normX;
+    }
+
     double lambda = 0.0;
     int iter = 0;
+
     for (; iter < maxIter; ++iter)
     {
         Vector y = multiplyMatrixVector(A, x);
-        double nextLambda = vectorNorm(y);
-        for (auto& val : y) val /= nextLambda;
+
+        double normY = vectorNorm(y);
+
+        if (normY < 1e-12)
+        {
+            throw std::runtime_error("Norma nula durante o método da potência.");
+        }
+
+        for (double &v : y)
+        {
+            v /= normY;
+        }
+
+        Vector Ay = multiplyMatrixVector(A, y);
+
+        double nextLambda = 0.0;
+
+        for (size_t i = 0; i < y.size(); ++i)
+        {
+            nextLambda += y[i] * Ay[i];
+        }
+
         if (std::abs(nextLambda - lambda) < eps)
         {
             lambda = nextLambda;
             x = y;
             break;
         }
+
         lambda = nextLambda;
         x = y;
     }
+
     return {lambda, x, iter};
 }
 
-LinearSystemSolver::PowerResult LinearSystemSolver::inversePowerMethod(const Matrix& A, Vector x0, double eps, int maxIter)
+LinearSystemSolver::PowerResult LinearSystemSolver::inversePowerMethod(
+    const Matrix& A,
+    Vector x0,
+    double eps,
+    int maxIter)
 {
     Matrix L, U;
+
     luDecomposition(A, L, U);
+
     Vector x = x0;
+
+    double normX = vectorNorm(x);
+
+    for (double& v : x)
+    {
+        v /= normX;
+    }
+
     double lambda = 0.0;
     int iter = 0;
+
     for (; iter < maxIter; ++iter)
     {
         Vector y = solveLU(L, U, x);
-        double nextLambda = vectorNorm(y);
-        for (auto& val : y) val /= nextLambda;
-        if (std::abs(1.0 / nextLambda - lambda) < eps)
+
+        double normY = vectorNorm(y);
+
+        for (double& v : y)
         {
-            lambda = 1.0 / nextLambda;
+            v /= normY;
+        }
+
+        Vector Ay = multiplyMatrixVector(A, y);
+
+        double rayleigh = 0.0;
+
+        for (size_t i = 0; i < y.size(); ++i)
+        {
+            rayleigh += y[i] * Ay[i];
+        }
+
+        if (std::abs(rayleigh - lambda) < eps)
+        {
+            lambda = rayleigh;
             x = y;
             break;
         }
-        lambda = 1.0 / nextLambda;
+
+        lambda = rayleigh;
         x = y;
     }
-    return {lambda, x, iter};
+
+    return { lambda, x, iter };
 }
 
-LinearSystemSolver::PowerResult LinearSystemSolver::shiftedPowerMethod(const Matrix& A, Vector x0, double eps, double mu, int maxIter)
+LinearSystemSolver::PowerResult LinearSystemSolver::shiftedPowerMethod(const Matrix &A, Vector x0, double eps, double mu, int maxIter)
 {
     int n = static_cast<int>(A.size());
     Matrix A_shifted = A;
-    for (int i = 0; i < n; ++i) A_shifted[i][i] -= mu;
+    for (int i = 0; i < n; ++i)
+        A_shifted[i][i] -= mu;
     auto res = powerMethod(A_shifted, x0, eps, maxIter);
     res.eigenvalue += mu;
     return res;
@@ -439,25 +556,31 @@ LinearSystemSolver::PowerResult LinearSystemSolver::shiftedPowerMethod(const Mat
 // ==========================================
 // TAREFA 09
 // ==========================================
-LinearSystemSolver::HouseholderResult LinearSystemSolver::householderTransform(const Matrix& A, bool printSteps)
+LinearSystemSolver::HouseholderResult LinearSystemSolver::householderTransform(const Matrix &A, bool printSteps)
 {
     int n = static_cast<int>(A.size());
     Matrix H_acc(n, Vector(n, 0.0));
-    for (int i = 0; i < n; ++i) H_acc[i][i] = 1.0;
+    for (int i = 0; i < n; ++i)
+        H_acc[i][i] = 1.0;
     Matrix curr = A;
-    if (printSteps) printMatrix(curr, "Matriz Original (Householder)");
+    if (printSteps)
+        printMatrix(curr, "Matriz Original (Householder)");
 
     for (int k = 0; k < n - 2; ++k)
     {
         Vector x(n - k - 1, 0.0);
-        for (int i = 0; i < n - k - 1; ++i) x[i] = curr[k + 1 + i][k];
+        for (int i = 0; i < n - k - 1; ++i)
+            x[i] = curr[k + 1 + i][k];
         double normX = vectorNorm(x);
-        if (normX < 1e-12) continue;
+        if (normX < 1e-12)
+            continue;
         double alpha = (x[0] > 0) ? -normX : normX;
         Vector u = x;
         u[0] -= alpha;
         double normU = vectorNorm(u);
-        if (normU > 1e-12) for (auto& val : u) val /= normU;
+        if (normU > 1e-12)
+            for (auto &val : u)
+                val /= normU;
 
         Matrix P_sub(n - k - 1, Vector(n - k - 1, 0.0));
         for (int i = 0; i < n - k - 1; ++i)
@@ -465,7 +588,8 @@ LinearSystemSolver::HouseholderResult LinearSystemSolver::householderTransform(c
                 P_sub[i][j] = (i == j ? 1.0 : 0.0) - 2.0 * u[i] * u[j];
 
         Matrix P(n, Vector(n, 0.0));
-        for (int i = 0; i < n; ++i) P[i][i] = 1.0;
+        for (int i = 0; i < n; ++i)
+            P[i][i] = 1.0;
         for (int i = 0; i < n - k - 1; ++i)
             for (int j = 0; j < n - k - 1; ++j)
                 P[k + 1 + i][k + 1 + j] = P_sub[i][j];
@@ -486,7 +610,7 @@ LinearSystemSolver::HouseholderResult LinearSystemSolver::householderTransform(c
 // ==========================================
 // TAREFA 10
 // ==========================================
-LinearSystemSolver::QRResult LinearSystemSolver::qrDecomposition(const Matrix& A)
+LinearSystemSolver::QRResult LinearSystemSolver::qrDecomposition(const Matrix &A)
 {
     int n = static_cast<int>(A.size());
     Matrix cols(n, Vector(n, 0.0));
@@ -507,12 +631,13 @@ LinearSystemSolver::QRResult LinearSystemSolver::qrDecomposition(const Matrix& A
 // ==========================================
 // TAREFA 11
 // ==========================================
-LinearSystemSolver::EigenResult LinearSystemSolver::qrEigenSymmetric(const Matrix& A, double eps)
+LinearSystemSolver::EigenResult LinearSystemSolver::qrEigenSymmetric(const Matrix &A, double eps)
 {
     int n = static_cast<int>(A.size());
     Matrix Ak = A;
     Matrix Q_acc(n, Vector(n, 0.0));
-    for (int i = 0; i < n; ++i) Q_acc[i][i] = 1.0;
+    for (int i = 0; i < n; ++i)
+        Q_acc[i][i] = 1.0;
 
     for (int iter = 0; iter < 100; ++iter)
     {
@@ -522,15 +647,18 @@ LinearSystemSolver::EigenResult LinearSystemSolver::qrEigenSymmetric(const Matri
         double offDiag = 0.0;
         for (int i = 0; i < n; ++i)
             for (int j = 0; j < n; ++j)
-                if (i != j) offDiag += std::abs(Ak[i][j]);
-        if (offDiag < eps) break;
+                if (i != j)
+                    offDiag += std::abs(Ak[i][j]);
+        if (offDiag < eps)
+            break;
     }
     Vector evals(n);
-    for (int i = 0; i < n; ++i) evals[i] = Ak[i][i];
+    for (int i = 0; i < n; ++i)
+        evals[i] = Ak[i][i];
     return {evals, Q_acc};
 }
 
-LinearSystemSolver::EigenResult LinearSystemSolver::qrEigenNonSymmetric(const Matrix& A, double eps)
+LinearSystemSolver::EigenResult LinearSystemSolver::qrEigenNonSymmetric(const Matrix &A, double eps)
 {
     auto [tri, H] = householderTransform(A, false);
     auto res = qrEigenSymmetric(tri, eps);
@@ -541,33 +669,113 @@ LinearSystemSolver::EigenResult LinearSystemSolver::qrEigenNonSymmetric(const Ma
 // ==========================================
 // TAREFA 12
 // ==========================================
-LinearSystemSolver::SVDResult LinearSystemSolver::svdDecomposition(const Matrix& A)
+LinearSystemSolver::SVDResult
+LinearSystemSolver::svdDecomposition(const Matrix& A)
 {
-    int m = static_cast<int>(A.size());
-    int n = static_cast<int>(A[0].size());
+    const int m = static_cast<int>(A.size());
+    const int n = static_cast<int>(A[0].size());
+
     Matrix At = transposeMatrix(A);
     Matrix AtA = multiplyMatrices(At, A);
-    auto [evals, V] = qrEigenSymmetric(AtA, 1e-9);
+
+    auto eigen = qrEigenSymmetric(AtA, 1e-9);
+
+    Vector eigenvalues = eigen.eigenvalues;
+    Matrix Vraw = eigen.eigenvectors;
+
+    std::vector<int> permutation(n);
+
+    for (int i = 0; i < n; ++i)
+    {
+        permutation[i] = i;
+    }
+
+    std::sort(
+        permutation.begin(),
+        permutation.end(),
+        [&](int a, int b)
+        {
+            return eigenvalues[a] > eigenvalues[b];
+        });
+
+    Vector sortedEigenvalues(n);
+    Matrix V(n, Vector(n, 0.0));
+
+    for (int k = 0; k < n; ++k)
+    {
+        sortedEigenvalues[k] = eigenvalues[permutation[k]];
+
+        for (int i = 0; i < n; ++i)
+        {
+            V[i][k] = Vraw[i][permutation[k]];
+        }
+    }
 
     Matrix Sigma(m, Vector(n, 0.0));
     Matrix U(m, Vector(m, 0.0));
-    for (int i = 0; i < std::min(m, n); ++i)
+
+    int r = std::min(m, n);
+
+    for (int i = 0; i < r; ++i)
     {
-        double sigmaVal = std::sqrt(std::max(0.0, evals[i]));
-        Sigma[i][i] = sigmaVal;
-        if (sigmaVal > 1e-12)
+        double lambda = std::max(0.0, sortedEigenvalues[i]);
+
+        double sigma = std::sqrt(lambda);
+
+        Sigma[i][i] = sigma;
+
+        if (sigma < 1e-12)
         {
-            Vector av = multiplyMatrixVector(A, V[i]);
-            for (int j = 0; j < m; ++j) U[j][i] = av[j] / sigmaVal;
+            continue;
+        }
+
+        Vector vi(n);
+
+        for (int j = 0; j < n; ++j)
+        {
+            vi[j] = V[j][i];
+        }
+
+        Vector ui = multiplyMatrixVector(A, vi);
+
+        for (int j = 0; j < m; ++j)
+        {
+            U[j][i] = ui[j] / sigma;
         }
     }
-    return {U, Sigma, V};
+
+    if (r > 0)
+    {
+        Matrix Ucols(r);
+
+        for (int col = 0; col < r; ++col)
+        {
+            Ucols[col].resize(m);
+
+            for (int row = 0; row < m; ++row)
+            {
+                Ucols[col][row] = U[row][col];
+            }
+        }
+
+        Matrix Uortho = gramSchmidtOrthonormalize(Ucols);
+
+        for (int col = 0; col < r; ++col)
+        {
+            for (int row = 0; row < m; ++row)
+            {
+                U[row][col] = Uortho[col][row];
+            }
+        }
+    }
+
+    return { U, Sigma, V };
 }
 
 // ==========================================
 // Utilitários
 // ==========================================
-Matrix LinearSystemSolver::multiplyMatrices(const Matrix& A, const Matrix& B)
+Matrix LinearSystemSolver::multiplyMatrices(const Matrix &A, const Matrix &B)
 {
     int rA = static_cast<int>(A.size()), cA = static_cast<int>(A[0].size());
     int rB = static_cast<int>(B.size()), cB = static_cast<int>(B[0].size());
@@ -579,7 +787,7 @@ Matrix LinearSystemSolver::multiplyMatrices(const Matrix& A, const Matrix& B)
     return C;
 }
 
-Vector LinearSystemSolver::multiplyMatrixVector(const Matrix& A, const Vector& v)
+Vector LinearSystemSolver::multiplyMatrixVector(const Matrix &A, const Vector &v)
 {
     int r = static_cast<int>(A.size()), c = static_cast<int>(A[0].size());
     Vector res(r, 0.0);
@@ -589,7 +797,7 @@ Vector LinearSystemSolver::multiplyMatrixVector(const Matrix& A, const Vector& v
     return res;
 }
 
-Matrix LinearSystemSolver::transposeMatrix(const Matrix& A)
+Matrix LinearSystemSolver::transposeMatrix(const Matrix &A)
 {
     int r = static_cast<int>(A.size()), c = static_cast<int>(A[0].size());
     Matrix At(c, Vector(r, 0.0));
@@ -599,27 +807,32 @@ Matrix LinearSystemSolver::transposeMatrix(const Matrix& A)
     return At;
 }
 
-double LinearSystemSolver::vectorNorm(const Vector& v)
+double LinearSystemSolver::vectorNorm(const Vector &v)
 {
     double sum = 0.0;
-    for (double val : v) sum += val * val;
+    for (double val : v)
+        sum += val * val;
     return std::sqrt(sum);
 }
 
-void LinearSystemSolver::printMatrix(const Matrix& A, const std::string& name)
+void LinearSystemSolver::printMatrix(const Matrix &A, const std::string &name)
 {
-    if (!name.empty()) std::cout << "=== " << name << " ===\n";
-    for (const auto& row : A)
+    if (!name.empty())
+        std::cout << "=== " << name << " ===\n";
+    for (const auto &row : A)
     {
-        for (double val : row) std::cout << std::setw(10) << std::fixed << std::setprecision(4) << val << " ";
+        for (double val : row)
+            std::cout << std::setw(10) << std::fixed << std::setprecision(4) << val << " ";
         std::cout << "\n";
     }
     std::cout << "\n";
 }
 
-void LinearSystemSolver::printVector(const Vector& v, const std::string& name)
+void LinearSystemSolver::printVector(const Vector &v, const std::string &name)
 {
-    if (!name.empty()) std::cout << "=== " << name << " ===\n";
-    for (double val : v) std::cout << std::setw(10) << std::fixed << std::setprecision(4) << val << " ";
+    if (!name.empty())
+        std::cout << "=== " << name << " ===\n";
+    for (double val : v)
+        std::cout << std::setw(10) << std::fixed << std::setprecision(4) << val << " ";
     std::cout << "\n\n";
 }

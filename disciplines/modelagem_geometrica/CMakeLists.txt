@@ -8,3 +8,5 @@ endif()
 if(BUILD_TRABALHO_2)
     add_subdirectory(trabalho_2)
 endif()
+
+add_subdirectory(utils)
