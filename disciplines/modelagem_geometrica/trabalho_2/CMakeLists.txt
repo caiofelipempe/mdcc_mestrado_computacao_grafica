@@ -7,6 +7,7 @@ target_link_libraries(modelagem_geometrica_trabalho2
         renderer
         geometry
         result
+        modelagem_geometrica_utils
         
         OpenGL::GL
         glfw

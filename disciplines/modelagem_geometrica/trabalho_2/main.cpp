@@ -3,11 +3,14 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <fstream>
 #include <limits>
 #include <memory>
 #include <numbers>
+#include <stdexcept>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include <imgui.h>
@@ -18,6 +21,8 @@
 
 #include "bounding_volume.hpp"
 #include "csg.hpp"
+#include "file_saver.hpp"
+#include "file_selector.hpp"
 #include "mesh.hpp"
 #include "shape.hpp"
 #include "shape_to_mesh.hpp"
@@ -380,6 +385,10 @@ private:
     SceneNode *m_selected = nullptr;
     int m_nextId = 1;
 
+    FileSelector m_selector{".txt"};
+    FileSaver m_saver{".txt"};
+    std::string m_fileStatus;
+
     Mesh3f m_mesh;
     Mesh3f m_boundsMesh;
     float m_volume = 0.0f;
@@ -457,6 +466,116 @@ private:
         removeNode(m_root, target);
         m_selected = m_root ? m_root.get() : nullptr;
         rebuildMesh();
+    }
+
+    /* ================= ARQUIVO (CSG em texto) ================= */
+
+    void saveScene(const std::string &path)
+    {
+        if (!m_root)
+            return;
+
+        std::ofstream file(path);
+        if (!file)
+        {
+            m_fileStatus = "Erro: nao foi possivel salvar em " + path;
+            return;
+        }
+
+        file << buildCsg(*m_root)->toString() << '\n';
+        m_fileStatus = "Salvo: " + path;
+    }
+
+    // Texto fora do formato: a cena atual nao e alterada.
+    void loadScene(const std::string &text)
+    {
+        const auto csg = CsgNode::parse(text);
+        if (!csg)
+        {
+            m_fileStatus = "Arquivo rejeitado: " + csg.error();
+            return;
+        }
+
+        m_nextId = 1;
+        m_root = sceneFromCsg(**csg);
+        m_selected = m_root.get();
+        m_fileStatus = "Cena carregada.";
+        rebuildMesh();
+    }
+
+    NodePtr sceneFromCsg(const CsgNode &csg)
+    {
+        if (const auto *operation = std::get_if<CsgOperation>(&csg.data()))
+        {
+            auto node = std::make_unique<SceneNode>();
+            node->operation = true;
+            node->op = operation->op;
+            node->name = std::string(kOperationNames[static_cast<std::size_t>(operation->op)]) + " " +
+                         std::to_string(m_nextId++);
+            node->left = sceneFromCsg(*operation->left);
+            node->right = sceneFromCsg(*operation->right);
+            return node;
+        }
+
+        const auto &primitive = std::get<CsgPrimitive>(csg.data());
+        const Shape &shape = *primitive.shape;
+        NodePtr node;
+
+        // Cube herda de Block e entra como Block.
+        if (const auto *s = dynamic_cast<const Sphere *>(&shape))
+        {
+            node = makePrimitive(ShapeKind::Sphere);
+            node->radius = s->radius();
+        }
+        else if (dynamic_cast<const Block *>(&shape))
+        {
+            node = makePrimitive(ShapeKind::Block);
+            node->blockSize = shape.boundSize();
+        }
+        else if (const auto *cyl = dynamic_cast<const Cylinder *>(&shape))
+        {
+            node = makePrimitive(ShapeKind::Cylinder);
+            node->radius = cyl->radius();
+            node->height = cyl->height();
+        }
+        else if (const auto *cone = dynamic_cast<const Cone *>(&shape))
+        {
+            node = makePrimitive(ShapeKind::Cone);
+            node->radius = cone->radius();
+            node->height = cone->height();
+        }
+        else if (const auto *cap = dynamic_cast<const Capsule *>(&shape))
+        {
+            node = makePrimitive(ShapeKind::Capsule);
+            node->radius = cap->radius();
+            node->height = cap->height();
+        }
+        else if (dynamic_cast<const RegularTetrahedron *>(&shape))
+        {
+            node = makePrimitive(ShapeKind::Tetrahedron);
+            node->edge = shape.boundSize()[0] * std::numbers::sqrt2_v<float>;
+        }
+        else
+            throw std::logic_error("Csg: shape sem equivalente na cena");
+
+        node->position = primitive.origin;
+        node->rotationDegrees = primitive.rotator.euler() * (1.0f / kDegToRad);
+        return node;
+    }
+
+    void drawFileDialogs()
+    {
+        m_selector.Draw();
+        m_saver.Draw();
+
+        if (!m_selector.IsOpen() && !m_selector.GetContent().empty())
+        {
+            loadScene(m_selector.GetContent());
+            m_selector.ClearContent();
+        }
+
+        if (m_saver.HasSelected())
+            saveScene(m_saver.GetSelectedPath());
     }
 
     /* ================= CAMERA ================= */
@@ -628,6 +747,7 @@ private:
 
         drawOutlinerPanel();
         drawPropertiesPanel();
+        drawFileDialogs();
 
         m_canvasHovered = ImGui::GetCurrentContext()->HoveredWindow == nullptr;
     }
@@ -636,6 +756,21 @@ private:
     {
         ImGui::SetNextWindowSize(ImVec2(300.0f, 500.0f), ImGuiCond_FirstUseEver);
         ImGui::Begin("Outliner (Arvore CSG)");
+
+        if (ImGui::Button("Abrir..."))
+            m_selector.Open();
+
+        ImGui::SameLine();
+
+        ImGui::BeginDisabled(!m_root);
+        if (ImGui::Button("Salvar..."))
+            m_saver.Open();
+        ImGui::EndDisabled();
+
+        if (!m_fileStatus.empty())
+            ImGui::TextWrapped("%s", m_fileStatus.c_str());
+
+        ImGui::Separator();
 
         if (!m_root)
         {

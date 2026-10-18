@@ -9,6 +9,7 @@
 #include <cstring>
 #include <algorithm>
 #include <cctype>
+#include <utility>
 
 #ifdef _WIN32
     #include <direct.h>
@@ -16,6 +17,9 @@
     #include <io.h>
     #define ACCESS _access
 
+    #ifndef NOMINMAX
+    #define NOMINMAX
+    #endif
     #include <windows.h>
 #else
     #include <unistd.h>
@@ -48,12 +52,14 @@ private:
     std::string selectedPath;
     bool hasSelected = false;
 
+    std::string extension; // minúscula, com ponto (ex.: ".txt")
+
 private:
     static bool IsValidDirectoryEntry(const std::string& name) {
         return name != "." && name != "..";
     }
 
-    static bool IsObjFile(const std::string& filename) {
+    bool HasExtension(const std::string& filename) const {
         size_t dotPos = filename.rfind('.');
 
         if (dotPos == std::string::npos)
@@ -68,7 +74,7 @@ private:
             ::tolower
         );
 
-        return ext == ".obj";
+        return ext == extension;
     }
 
     void UpdateFileList() {
@@ -105,7 +111,7 @@ private:
                     (findData.dwFileAttributes &
                      FILE_ATTRIBUTE_DIRECTORY) != 0;
 
-                if (item.isDirectory || IsObjFile(name))
+                if (item.isDirectory || HasExtension(name))
                     items.push_back(item);
 
             } while (
@@ -147,7 +153,7 @@ private:
                 item.isDirectory =
                     S_ISDIR(statbuf.st_mode);
 
-                if (item.isDirectory || IsObjFile(name))
+                if (item.isDirectory || HasExtension(name))
                     items.push_back(item);
             }
 
@@ -234,8 +240,8 @@ private:
         std::string finalPath =
             BuildPath(fileNameBuffer);
 
-        if (!IsObjFile(finalPath))
-            finalPath += ".obj";
+        if (!HasExtension(finalPath))
+            finalPath += extension;
 
         selectedPath = finalPath;
 
@@ -244,7 +250,8 @@ private:
     }
 
 public:
-    FileSaver() {
+    explicit FileSaver(std::string ext = ".txt")
+        : extension(std::move(ext)) {
 
         char buffer[1024];
 
@@ -299,7 +306,7 @@ public:
             return;
 
         ImGui::Begin(
-            "Salvar Arquivo .OBJ",
+            "Salvar Arquivo",
             &isOpen,
             ImGuiWindowFlags_AlwaysAutoResize
         );
@@ -327,7 +334,8 @@ public:
         ImGui::SameLine();
 
         ImGui::TextDisabled(
-            "(Arquivos .obj)"
+            "(Arquivos %s)",
+            extension.c_str()
         );
 
         ImGui::Separator();

@@ -1,3 +1,5 @@
+#pragma once
+
 #include "imgui.h"
 #include <string>
 #include <fstream>
@@ -6,6 +8,7 @@
 #include <cstring>
 #include <algorithm>
 #include <cctype>
+#include <utility>
 
 #ifdef _WIN32
     #include <direct.h>  // Windows para _getcwd
@@ -14,6 +17,9 @@
     #define ACCESS _access
     
     // Windows: estruturas para listar diretórios
+    #ifndef NOMINMAX
+    #define NOMINMAX
+    #endif
     #include <windows.h>
 #else
     #include <unistd.h>   // Linux/Mac para getcwd
@@ -36,10 +42,11 @@ private:
     bool isOpen;
     std::string currentDirectory;
     std::vector<std::string> pathHistory;  // Para navegação
+    std::string extension;                 // minúscula, com ponto (ex.: ".txt")
     bool isDirectorySelected;
     
-    // Verifica se o arquivo tem extensão .obj (case insensitive)
-    bool IsObjFile(const std::string& filename) {
+    // Verifica se o arquivo tem a extensão configurada (case insensitive)
+    bool HasExtension(const std::string& filename) {
         // Procura a última ocorrência de '.'
         size_t dotPos = filename.rfind('.');
         if (dotPos == std::string::npos) return false;
@@ -48,7 +55,7 @@ private:
         std::string ext = filename.substr(dotPos);
         std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
         
-        return ext == ".obj";
+        return ext == extension;
     }
     
     // Verifica se é uma entrada de diretório válida (não é . ou ..)
@@ -74,7 +81,7 @@ private:
                     item.isDirectory = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
                     
                     // Se for arquivo, verificar se é .obj
-                    if (!item.isDirectory && IsObjFile(name)) {
+                    if (!item.isDirectory && HasExtension(name)) {
                         items.push_back(item);
                     }
                     // Se for pasta, adicionar sempre
@@ -103,7 +110,7 @@ private:
                         item.isDirectory = S_ISDIR(statbuf.st_mode);
                         
                         // Se for arquivo, verificar se é .obj
-                        if (!item.isDirectory && IsObjFile(name)) {
+                        if (!item.isDirectory && HasExtension(name)) {
                             items.push_back(item);
                         }
                         // Se for pasta, adicionar sempre
@@ -152,7 +159,8 @@ private:
     }
     
 public:
-    FileSelector() {
+    explicit FileSelector(std::string ext = ".txt")
+        : extension(std::move(ext)) {
         // Obtém o diretório atual
         char buffer[1024];
         if (GETCWD(buffer, sizeof(buffer)) != nullptr) {
@@ -170,7 +178,7 @@ public:
     void Draw() {
         if (!isOpen) return;
         
-        ImGui::Begin("Selecionar Arquivo .OBJ", &isOpen, ImGuiWindowFlags_AlwaysAutoResize);
+        ImGui::Begin("Selecionar Arquivo", &isOpen, ImGuiWindowFlags_AlwaysAutoResize);
         
         // Barra de navegação
         ImGui::Text("Diretório atual:");
@@ -188,7 +196,7 @@ public:
             UpdateFileList();
         }
         ImGui::SameLine();
-        ImGui::TextDisabled("(Apenas arquivos .obj)");
+        ImGui::TextDisabled("(Apenas arquivos %s)", extension.c_str());
         
         ImGui::Separator();
         
@@ -197,7 +205,7 @@ public:
         ImGui::BeginChild("FileList", ImVec2(500, 400), true, ImGuiWindowFlags_HorizontalScrollbar);
         
         if (items.empty()) {
-            ImGui::TextDisabled("Nenhum arquivo .obj encontrado neste diretório");
+            ImGui::TextDisabled("Nenhum arquivo encontrado neste diretório");
         }
         
         for (size_t i = 0; i < items.size(); i++) {
@@ -269,7 +277,7 @@ public:
             } else {
                 ImGui::TextColored(ImVec4(0.8f, 0.8f, 0.2f, 1.0f), "Arquivo selecionado: %s", selectedItem.c_str());
                 
-                if (ImGui::Button("Ler Arquivo .OBJ")) {
+                if (ImGui::Button("Abrir Arquivo")) {
                     ReadFile();
                 }
                 ImGui::SameLine();
@@ -343,7 +351,7 @@ public:
                 }
             }
         } else {
-            fileContent = "Erro: Não foi possível ler o arquivo .OBJ!";
+            fileContent = "Erro: Não foi possível ler o arquivo!";
         }
         
         isOpen = false;

@@ -1,15 +1,23 @@
 #pragma once
 
 #include "rotator3.hpp"
+#include "result.hpp"
 #include "shape.hpp"
 
 #include <algorithm>
+#include <array>
+#include <charconv>
+#include <cctype>
 #include <cmath>
 #include <concepts>
 #include <limits>
 #include <memory>
+#include <numbers>
 #include <optional>
+#include <span>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -355,6 +363,84 @@ namespace geometry
 
             throw std::logic_error("Csg: shape sem interseção com raio");
         }
+
+        /* ---- Texto: serialização ---- */
+
+        inline void appendFloats(std::string &out, std::span<const float> values)
+        {
+            char buf[32];
+            bool first = true;
+
+            for (const float v : values)
+            {
+                if (!first)
+                    out += ',';
+                first = false;
+
+                // Representação mais curta que faz round-trip (inteiros saem sem ".0").
+                out.append(buf, std::to_chars(buf, buf + sizeof buf, v).ptr);
+            }
+        }
+
+        // Tag(Ps(x,y,z),Tr(x,y,z,w),args...)
+        inline std::string primitiveToString(const CsgPrimitive &p)
+        {
+            const Shape &s = *p.shape;
+            const Vec3f b = s.boundSize();
+            std::string_view tag;
+            std::vector<float> args;
+
+            // Cube herda de Block, então vem primeiro.
+            if (dynamic_cast<const Cube *>(&s))
+            {
+                tag = "Cb";
+                args = {b[0]};
+            }
+            else if (dynamic_cast<const Block *>(&s))
+            {
+                tag = "Cx";
+                args = {b[1], b[0], b[2]}; // altura, largura, profundidade
+            }
+            else if (const auto *sp = dynamic_cast<const Sphere *>(&s))
+            {
+                tag = "Es";
+                args = {sp->radius()};
+            }
+            else if (const auto *cy = dynamic_cast<const Cylinder *>(&s))
+            {
+                tag = "Ci";
+                args = {cy->radius(), cy->height()};
+            }
+            else if (const auto *co = dynamic_cast<const Cone *>(&s))
+            {
+                tag = "Cn";
+                args = {co->radius(), co->height()};
+            }
+            else if (const auto *ca = dynamic_cast<const Capsule *>(&s))
+            {
+                tag = "Cp";
+                args = {ca->radius(), ca->height()};
+            }
+            else if (dynamic_cast<const RegularTetrahedron *>(&s))
+            {
+                tag = "Te";
+                args = {b[0] * std::numbers::sqrt2_v<float>}; // aresta
+            }
+            else
+                throw std::logic_error("Csg: shape sem representação textual");
+
+            const Rot3f &q = p.rotator;
+
+            std::string out{tag};
+            out += "(Ps(";
+            appendFloats(out, std::array{p.origin[0], p.origin[1], p.origin[2]});
+            out += "),Tr(";
+            appendFloats(out, std::array{q.x(), q.y(), q.z(), q.w()});
+            out += "),";
+            appendFloats(out, args);
+            out += ')';
+            return out;
+        }
     } // namespace detail
 
     class CsgNode
@@ -364,6 +450,33 @@ namespace geometry
 
         explicit CsgNode(CsgPrimitive primitive) : m_data(std::move(primitive)) {}
         explicit CsgNode(CsgOperation operation) : m_data(std::move(operation)) {}
+
+        // Constrói a partir da expressão textual (ver toString). Lança
+        // std::invalid_argument se o texto for inválido.
+        explicit CsgNode(std::string_view text);
+
+        // Versão sem exceção: o erro é a mensagem do parser.
+        [[nodiscard]] static Result<CsgPtr, std::string> parse(std::string_view text);
+
+        // Expressão textual do sólido, ex.: U(Es(Ps(0,0,0),Tr(1,0,0,0),2),Cx(...)).
+        // U = união, D = diferença, I = interseção; Ps = posição, Tr = rotação
+        // (quaternion x,y,z,w, como no Rot3f).
+        [[nodiscard]] std::string toString() const
+        {
+            return std::visit(
+                [](const auto &node) -> std::string
+                {
+                    if constexpr (std::is_same_v<std::decay_t<decltype(node)>, CsgPrimitive>)
+                        return detail::primitiveToString(node);
+                    else
+                    {
+                        constexpr const char *tags = "UID"; // ordem de CsgOp
+                        return std::string{tags[static_cast<int>(node.op)]} + '(' +
+                               node.left->toString() + ',' + node.right->toString() + ')';
+                    }
+                },
+                m_data);
+        }
 
         [[nodiscard]] const Data &data() const noexcept { return m_data; }
         [[nodiscard]] bool isPrimitive() const noexcept { return std::holds_alternative<CsgPrimitive>(m_data); }
@@ -508,6 +621,183 @@ namespace geometry
     [[nodiscard]] inline CsgPtr csgDifference(CsgPtr left, CsgPtr right)
     {
         return csgOperation(CsgOp::Difference, std::move(left), std::move(right));
+    }
+
+    /* ================= TEXTO: PARSER ================= */
+
+    namespace detail
+    {
+        struct ShapeSpec
+        {
+            std::string_view tag;
+            std::size_t arity;                           // argumentos depois de Ps e Tr
+            std::unique_ptr<Shape> (*make)(const float *);
+        };
+
+        inline const std::array<ShapeSpec, 7> kShapeSpecs{{
+            {"Es", 1, [](const float *a) -> std::unique_ptr<Shape>
+             { return std::make_unique<Sphere>(a[0]); }},
+            {"Cx", 3, [](const float *a) -> std::unique_ptr<Shape> // altura, largura, profundidade
+             { return std::make_unique<Block>(a[1], a[0], a[2]); }},
+            {"Cb", 1, [](const float *a) -> std::unique_ptr<Shape>
+             { return std::make_unique<Cube>(a[0]); }},
+            {"Ci", 2, [](const float *a) -> std::unique_ptr<Shape>
+             { return std::make_unique<Cylinder>(a[0], a[1]); }},
+            {"Cn", 2, [](const float *a) -> std::unique_ptr<Shape>
+             { return std::make_unique<Cone>(a[0], a[1]); }},
+            {"Cp", 2, [](const float *a) -> std::unique_ptr<Shape>
+             { return std::make_unique<Capsule>(a[0], a[1]); }},
+            {"Te", 1, [](const float *a) -> std::unique_ptr<Shape> // aresta
+             { return std::make_unique<RegularTetrahedron>(a[0]); }},
+        }};
+
+        // Descida recursiva; lança std::invalid_argument com a posição do erro.
+        class CsgParser
+        {
+        public:
+            explicit CsgParser(std::string_view text) : m_text(text) {}
+
+            CsgPtr parse()
+            {
+                CsgPtr root = node();
+                skipSpaces();
+                if (m_pos != m_text.size())
+                    fail("texto após o fim da expressão");
+                return root;
+            }
+
+        private:
+            [[noreturn]] void fail(std::string_view message) const
+            {
+                throw std::invalid_argument("Csg: " + std::string{message} + " (posição " +
+                                            std::to_string(m_pos) + ")");
+            }
+
+            void skipSpaces()
+            {
+                while (m_pos < m_text.size() && std::isspace(static_cast<unsigned char>(m_text[m_pos])))
+                    ++m_pos;
+            }
+
+            void expect(char c)
+            {
+                skipSpaces();
+                if (m_pos >= m_text.size() || m_text[m_pos] != c)
+                    fail(std::string{"esperava '"} + c + "'");
+                ++m_pos;
+            }
+
+            std::string_view tag()
+            {
+                skipSpaces();
+                const std::size_t start = m_pos;
+                while (m_pos < m_text.size() && std::isalpha(static_cast<unsigned char>(m_text[m_pos])))
+                    ++m_pos;
+                return m_text.substr(start, m_pos - start);
+            }
+
+            float number()
+            {
+                skipSpaces();
+                const char *first = m_text.data() + m_pos;
+                const char *last = m_text.data() + m_text.size();
+
+                float v{};
+                const auto [end, ec] = std::from_chars(first, last, v);
+                if (ec != std::errc{} || !std::isfinite(v))
+                    fail("número inválido");
+
+                m_pos += static_cast<std::size_t>(end - first);
+                return v;
+            }
+
+            // name(n1,...,nN), com N <= 4
+            std::array<float, 4> tagged(std::string_view name, std::size_t n)
+            {
+                if (tag() != name)
+                    fail(std::string{"esperava "} + std::string{name});
+
+                std::array<float, 4> v{};
+                expect('(');
+                for (std::size_t i = 0; i < n; ++i)
+                {
+                    if (i > 0)
+                        expect(',');
+                    v[i] = number();
+                }
+                expect(')');
+                return v;
+            }
+
+            CsgPtr node()
+            {
+                const std::string_view t = tag();
+                expect('(');
+
+                CsgPtr n;
+                if (t == "U" || t == "I" || t == "D")
+                {
+                    CsgPtr left = node();
+                    expect(',');
+                    CsgPtr right = node();
+
+                    const CsgOp op = t == "U"   ? CsgOp::Union
+                                     : t == "I" ? CsgOp::Intersection
+                                                : CsgOp::Difference;
+                    n = csgOperation(op, std::move(left), std::move(right));
+                }
+                else
+                    n = primitive(t);
+
+                expect(')');
+                return n;
+            }
+
+            CsgPtr primitive(std::string_view t)
+            {
+                const auto spec = std::ranges::find(kShapeSpecs, t, &ShapeSpec::tag);
+                if (spec == kShapeSpecs.end())
+                    fail("shape ou operação desconhecida '" + std::string{t} + "'");
+
+                const auto pos = tagged("Ps", 3);
+                expect(',');
+                const auto rot = tagged("Tr", 4);
+                if (rot == std::array<float, 4>{})
+                    fail("quaternion nulo em Tr");
+
+                std::array<float, 3> args{};
+                for (std::size_t i = 0; i < spec->arity; ++i)
+                {
+                    expect(',');
+                    args[i] = number();
+                }
+
+                return std::make_unique<CsgNode>(CsgPrimitive{
+                    spec->make(args.data()),
+                    Vec3f{pos[0], pos[1], pos[2]},
+                    Rot3f{Rot3f::Quat{rot[0], rot[1], rot[2], rot[3]}}});
+            }
+
+            std::string_view m_text;
+            std::size_t m_pos = 0;
+        };
+    } // namespace detail
+
+    inline CsgNode::CsgNode(std::string_view text)
+        : m_data(std::move(detail::CsgParser{text}.parse()->m_data))
+    {
+    }
+
+    inline Result<CsgPtr, std::string> CsgNode::parse(std::string_view text)
+    {
+        try
+        {
+            return detail::CsgParser{text}.parse();
+        }
+        catch (const std::exception &e)
+        {
+            return result::err(std::string{e.what()});
+        }
     }
 
 } // namespace geometry
