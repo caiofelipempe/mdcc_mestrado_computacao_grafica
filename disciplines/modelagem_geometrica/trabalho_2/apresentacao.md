@@ -196,6 +196,14 @@ Cada primitiva devolve `{t0, t1, n0, n1}`. A normal viaja junto com o `t` pela �
 
 ---
 
+## Visão geral do raycast
+
+![h:470 center](img/raycast_quads_visao_geral.svg)
+
+<span class="small">Um raio por pixel da grade reduzida. Quem acerta vira um quad voltado para a câmera, no ponto de entrada.</span>
+
+---
+
 ## Transformações
 
 - O raio vai para o espaço local: `(o - origin).rotated(inverse)` e `d.rotated(inverse)`
