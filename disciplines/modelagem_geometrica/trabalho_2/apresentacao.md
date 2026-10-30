@@ -8,6 +8,7 @@ style: |
   section.lead h1 { font-size: 52px; }
   h1 { color: #1f4e8c; }
   h2 { color: #1f4e8c; }
+  header { color: #7a8aa0; font-size: 16px; }
   code { font-size: 0.85em; }
   pre { font-size: 0.72em; }
   table { font-size: 0.8em; }
@@ -15,6 +16,7 @@ style: |
 ---
 
 <!-- _class: lead -->
+<!-- _paginate: false -->
 
 # Modelador CSG com Raycast de Quads
 
@@ -22,6 +24,18 @@ Modelagem Geométrica — Trabalho 02
 C++20 · GLFW · OpenGL · ImGui
 
 ---
+
+## Roteiro
+
+1. **CSG:** o sólido como árvore de primitivas e operações
+2. **Raycast:** como um raio atravessa a árvore (álgebra de intervalos)
+3. **Renderização:** como esses raios viram a imagem na tela
+4. **Uso:** arquivo e interface
+5. **Balanço:** decisões e limitações
+
+---
+
+<!-- header: "1 · CSG" -->
 
 ## O que é
 
@@ -92,6 +106,8 @@ Cada shape fica no **espaço local**, centrado na origem, com o eixo Y como eixo
 
 ---
 
+<!-- header: "2 · Raycast na árvore" -->
+
 ## Raycast: o raio vira lista de intervalos
 
 Para um raio $o + t\,d$, cada nó devolve os intervalos de $t$ em que o raio está **dentro** do sólido:
@@ -102,7 +118,7 @@ using Intervals = std::vector<Interval>;          // ordenados e disjuntos
 ```
 
 - Operações booleanas sobre intervalos dão intervalos, então a conta fecha
-- `raycast()` pega o primeiro intervalo com $t_1>0$ e devolve um `RayHit`
+- `raycast()` pega o primeiro intervalo com $t_1>0$ e devolve um `RayHit` (`tEnter`, `tExit`, `normalEnter`)
 
 ---
 
@@ -135,23 +151,11 @@ cur.n0 = cut.n1 * -1.0f;
 
 ---
 
-## Por que cada shape guarda as normais de entrada e saída
+## Operações CSG sobre um raio
 
-Cada primitiva devolve `{t0, t1, n0, n1}`. A normal viaja junto com o `t` pela árvore.
+![h:400 center](img/raycast_intervalos.svg)
 
-- **Não dá para recalcular na raiz:** depois de combinar os nós só sobram `t0` e `t1`, e ninguém sabe qual primitiva definiu a fronteira
-- **Entrada (`n0`):** vira `normalEnter` e é a `lightNormal` do quad
-- **Saída (`n1`):** a álgebra precisa dela. Na diferença, a saída de B vira a entrada de A − B com sinal trocado (`cur.n0 = cut.n1 * -1`)
-- Em união e interseção vence a normal de quem define o menor `t0` / maior `t1`
-
-| Shape | Normal no ponto de contato |
-|---|---|
-| Semiespaço (bloco, tetraedro) | $n$ constante |
-| Esfera | $p - c$ |
-| Cilindro (lateral) | $(x,\ 0,\ z)$ |
-| Cone | $(x,\ m^2(h/2-y),\ z)$ |
-
-<span class="small">Com $t$ infinito, ou origem do raio já dentro, a normal é zero e o quad usa $-d$. As normais voltam do local para o mundo junto com a rotação.</span>
+<span class="small">Cada folha devolve `[t0, t1]`; cada nó combina os intervalos dos filhos. O `t0` do resultado é o `tEnter` do quad. Valores ilustrativos.</span>
 
 ---
 
@@ -190,17 +194,34 @@ Cada primitiva devolve `{t0, t1, n0, n1}`. A normal viaja junto com o `t` pela �
 ## Raycast na diferença contrário
 
 - Aqui o raio entra pelo lado de B, o objeto que subtrai
-- B é cortado de A: o resultado começa onde B termina (cur.t0 = cut.t1)
-- A normal de entrada é a saída de B invertida (cut.n1 * -1): aponta para dentro de B, que é o lado de fora do resultado
+- B é cortado de A: o resultado começa onde B termina (`cur.t0 = cut.t1`)
+- A normal de entrada é a saída de B invertida (`cut.n1 * -1`): aponta para dentro de B, que é o lado de fora do resultado
 - A saída é a de A, sem mudança
 
 ---
 
-## Visão geral do raycast
+## Por que cada shape guarda as normais de entrada e saída
 
-![h:470 center](img/raycast_quads_visao_geral.svg)
+Cada primitiva devolve `{t0, t1, n0, n1}`. A normal viaja junto com o `t` pela árvore.
 
-<span class="small">Um raio por pixel da grade reduzida. Quem acerta vira um quad voltado para a câmera, no ponto de entrada.</span>
+- **Não dá para recalcular na raiz:** depois de combinar os nós só sobram `t0` e `t1`, e ninguém sabe qual primitiva definiu a fronteira
+- **Entrada (`n0`):** vira `normalEnter` e é a `lightNormal` do quad
+- **Saída (`n1`):** a álgebra precisa dela. Na diferença, a saída de B vira a entrada de A − B com sinal trocado (`cur.n0 = cut.n1 * -1`)
+- Em união e interseção vence a normal de quem define o menor `t0` / maior `t1`
+
+---
+
+## Normal no ponto de contato, por shape
+
+| Shape | Normal |
+|---|---|
+| Semiespaço (bloco, tetraedro) | $n$ constante |
+| Esfera | $p - c$ |
+| Cilindro (lateral) | $(x,\ 0,\ z)$ |
+| Cone | $(x,\ m^2(h/2-y),\ z)$ |
+
+- Com $t$ infinito, ou origem do raio já dentro, a normal é zero e o quad usa $-d$
+- As normais voltam do local para o mundo junto com a rotação
 
 ---
 
@@ -213,17 +234,101 @@ Cada primitiva devolve `{t0, t1, n0, n1}`. A normal viaja junto com o `t` pela �
 
 ---
 
-## Geração dos quads
+<!-- header: "3 · Renderização" -->
 
-A cada frame (`onUpdate` → `rebuildMesh`):
+## Como a imagem é produzida
 
-1. Grade de `w × h` raios, com $w = \text{largura}/\text{escala}$ (escala de 1 a 8)
-2. Direção de cada pixel a partir de `forward`, `right`, `up` e do FOV
-3. Se acertou: ponto $= o + t_{enter}\,d$
-4. Quad virado para a câmera, com tamanho proporcional a $z_{in}$
-5. Dois triângulos com `lightNormal` = normal de entrada (se a origem está dentro, usa $-d$)
+![w:1000 center](img/raycast_pipeline.svg)
 
-Os raios saem da câmera atual, então a malha é refeita quando ela se move.
+- Não existe malha do sólido: a malha desenhada é **só a nuvem de quads** deste frame
+- Tudo antes do passo 5 roda na CPU; a GPU só rasteriza os triângulos
+
+---
+
+![bg left:60% fit](img/raycast_quads_visao_geral.svg)
+
+## A ideia em um corte lateral
+
+- A grade de pixels vira um leque de raios saindo da câmera
+- Raio que **acerta**: vira um quad no ponto de entrada, perpendicular a `forward`
+- Raio que **erra**: não gera nada (o fundo fica vazio)
+- Os quads vizinhos se encostam, e juntos desenham a silhueta do sólido
+
+---
+
+## Passo 1 — Um raio por pixel
+
+Grade reduzida: $w=\max(1,\lfloor L/s\rfloor)$ e $h=\max(1,\lfloor A/s\rfloor)$, com $s$ = escala de resolução (1 a 8, padrão 4).
+
+Com $T=\tan(\text{fov}/2)$ e $a$ = aspecto, o centro do pixel $(x,y)$ no plano de imagem é
+
+$$p_x=\Big(\tfrac{2(x+0.5)}{w}-1\Big)\,a\,T \qquad p_y=\Big(1-\tfrac{2(y+0.5)}{h}\Big)\,T$$
+
+$$d=\frac{f+p_x\,r+p_y\,u}{\lVert f+p_x\,r+p_y\,u\rVert}$$
+
+<span class="small">$f$, $r$, $u$ = `forward`, `right`, `up` da câmera. O raio parte sempre da posição da câmera. O $1-\dots$ em $p_y$ inverte o eixo: linhas de pixel crescem para baixo.</span>
+
+---
+
+![bg right:44% fit](img/raycast_quad_tamanho.svg)
+
+## Passo 2 — Do acerto ao quad
+
+1. `hit = csg->raycast(o, d)`; sem acerto, nada é gerado
+2. Ponto de entrada: $P=o+t_{enter}\,d$
+3. Profundidade: $z_{in}=t_{enter}\,(d\cdot f)$
+4. Meio tamanho: $\tfrac12\,\text{pixelW}\,z_{in}$ e $\tfrac12\,\text{pixelH}\,z_{in}$
+5. Cantos: $P \pm r\,h_w \pm u\,h_h$
+
+<span class="small">Com $\text{pixelW}=2aT/w$ e $\text{pixelH}=2T/h$ (tamanho do pixel a profundidade 1).</span>
+
+---
+
+## Por que o tamanho é `pixel × z_in`
+
+- Pela câmera pinhole, um pixel cobre `pixelH · z` de altura a uma profundidade $z$ (triângulos semelhantes)
+- Usa-se $z$ ao longo de `forward`, e não $t$, porque o quad fica num plano **perpendicular a `forward`**
+- Resultado: cada quad cobre **exatamente uma célula da grade** na tela, qualquer que seja a distância
+- Por isso os quads de um raio e do vizinho se encostam, sem buracos em superfícies de frente para a câmera
+
+---
+
+## Passo 3 — Malha e desenho
+
+- Por acerto: 4 vértices, 4 arestas e 2 triângulos, $(p_0,p_1,p_2)$ e $(p_0,p_2,p_3)$
+- Os dois triângulos recebem a mesma `lightNormal`: a normal de entrada do raycast (ou $-d$ se for zero)
+- **O quad diz *onde* está a superfície; a normal diz *como* ela é iluminada.** Por isso a luz sai suave mesmo com geometria feita de quadradinhos
+- A caixa de limites do mundo é uma malha separada (um bloco)
+- `drawer.rastMeshes(...)` pinta faces, arestas e vértices; cor transparente desliga cada camada
+- A malha é descartada e reconstruída a cada frame
+
+---
+
+## Resolução e custo
+
+Para uma janela de 1280 × 720:
+
+| Escala | Grade | Raios por frame | Vértices (máx.) |
+|---|---|---|---|
+| 1 | 1280 × 720 | 921 600 | 3 686 400 |
+| 2 | 640 × 360 | 230 400 | 921 600 |
+| **4 (padrão)** | 320 × 180 | 57 600 | 230 400 |
+| 8 | 160 × 90 | 14 400 | 57 600 |
+
+- Custo ≈ raios × nós da árvore: cada raio percorre a árvore inteira, sem aceleração
+- Escala menor = imagem mais nítida e mais lenta. A UI deixa ajustar em tempo real
+
+---
+
+## O que é exato e o que é aproximação
+
+| Exato | Aproximado |
+|---|---|
+| Ponto de entrada de cada raio (resolvido analiticamente) | Silhueta: feita de quadrados do tamanho de uma célula da grade |
+| Normal de cada ponto | Superfícies oblíquas: o quad é perpendicular à câmera, não à superfície |
+| Álgebra CSG sobre os intervalos | Volume: soma de troncos de pirâmide, só do primeiro intervalo |
+
+<span class="small">A imagem é uma amostra do sólido vista de **uma** câmera, e não uma superfície extraída dele.</span>
 
 ---
 
@@ -237,6 +342,8 @@ $$V_{pixel} = \text{pixelW}\cdot\text{pixelH}\cdot\frac{z_{out}^3 - z_{in}^3}{3}
 - Só usa o **primeiro intervalo** de cada raio, então subestima sólidos com mais de uma passagem (ex.: diferença que abre um vazio)
 
 ---
+
+<!-- header: "4 · Uso" -->
 
 ## Salvar e abrir em texto
 
@@ -260,29 +367,35 @@ U(Es(Ps(0,0,0),Tr(0,0,0,1),3),D(Cx(Ps(2,0,0),Tr(0,0,0,1),5,4,3),Ci(Ps(2,0,0),Tr(
 
 ---
 
+<!-- header: "5 · Balanço" -->
+
 ## Decisões
 
 - `variant` + `visit` em vez de hierarquia de nós com virtuais
 - `std::derived_from<Shape>` em `csgPrimitive`: só aceita shape válido, sem fábrica
 - Erro de parse como valor (`Result`), sem exceção na UI
 - `ShapeSpec` concentra tag, aridade e construtor de cada primitiva
-- Custo por frame: `w · h · (nós da árvore)`; a escala de resolução controla
+- Normal calculada na primitiva e carregada pela álgebra, em vez de recalculada na raiz
+- Escala de resolução como controle único de custo × nitidez
 
 ---
 
 ## Limitações
 
 - `dynamic_cast` repetido em `inside`, `shapeIntervals` e na serialização
-- Os quads dependem da câmera e da resolução; não são uma superfície extraída do sólido
+- Malha refeita **todo frame**, mesmo com câmera e cena paradas; edições na UI chamam `rebuildMesh` de novo no mesmo frame
 - Sem aceleração (BVH, AABB por nó) para descartar raios
+- Os limites do mundo só desenham a caixa; não recortam os raios
 - Volume só considera o primeiro intervalo de cada raio
 - Tudo em `float`, com tolerâncias fixas em `quadraticLE0`
 
 ---
 
 <!-- _class: lead -->
+<!-- header: "" -->
 
 # Resumo
 
 CSG como **árvore + álgebra de intervalos sobre raios**.
+Cada pixel vira um raio, cada acerto vira um quad do tamanho do pixel.
 O mesmo mecanismo dá visualização, normais e volume aproximado.
