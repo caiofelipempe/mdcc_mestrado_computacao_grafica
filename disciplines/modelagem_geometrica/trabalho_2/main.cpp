@@ -58,43 +58,36 @@ namespace
         "Esfera", "Bloco", "Cilindro", "Cone", "Capsula", "Tetraedro"};
 
     constexpr std::array<const char *, 3> kOperationLabels{
-        "Uniao (A | B)", "Intersecao (A & B)", "Diferenca (A - B)"};
+        "(A | B)", "(A & B)", "(A - B)"};
 
     constexpr std::array<const char *, 3> kOperationNames{
         "Uniao", "Intersecao", "Diferenca"};
 
-    const char *shapeIcon(ShapeKind kind)
+    const char *shapeNameFromKind(ShapeKind kind)
     {
         switch (kind)
         {
         case ShapeKind::Sphere:
-            return "(o)";
         case ShapeKind::Block:
-            return "[#]";
         case ShapeKind::Cylinder:
-            return "(=)";
         case ShapeKind::Cone:
-            return "/\\";
         case ShapeKind::Capsule:
-            return "(|)";
         case ShapeKind::Tetrahedron:
-            return "<>";
+            return kShapeLabels[static_cast<int>(kind)];
         }
-        return "(?)";
+        return "Inválido";
     }
 
-    const char *operationIcon(CsgOp op)
+    const char *operationName(CsgOp op)
     {
         switch (op)
         {
         case CsgOp::Union:
-            return "[U]";
         case CsgOp::Intersection:
-            return "[I]";
         case CsgOp::Difference:
-            return "[D]";
+            return kOperationNames[static_cast<int>(op)];
         }
-        return "[?]";
+        return "Operação Inválida";
     }
 
     bool drawColorEdit(const char *label, Color &color)
@@ -430,8 +423,7 @@ private:
     {
         auto node = std::make_unique<SceneNode>();
         node->kind = kind;
-        node->name = std::string(kShapeLabels[static_cast<std::size_t>(kind)]) + " " +
-                     std::to_string(m_nextId++);
+        node->name = "obj " + std::to_string(m_nextId++);
         return node;
     }
 
@@ -448,7 +440,7 @@ private:
         auto node = std::make_unique<SceneNode>();
         node->operation = true;
         node->op = op;
-        node->name = std::string(kOperationNames[static_cast<std::size_t>(op)]) + " " +
+        node->name = "op " +
                      std::to_string(m_nextId++);
         node->left = std::move(*slot);
         node->right = std::move(primitive);
@@ -818,7 +810,7 @@ private:
         ImGui::PushID(&node);
 
         const std::string label = std::string(role) +
-                                  (node.operation ? operationIcon(node.op) : shapeIcon(node.kind)) +
+                                  (node.operation ? operationName(node.op) : shapeNameFromKind(node.kind)) +
                                   "  " + node.name;
 
         const bool open = ImGui::TreeNodeEx(label.c_str(), flags);
@@ -932,7 +924,7 @@ private:
         SceneNode &node = *m_selected;
         bool changed = false;
 
-        ImGui::Text("%s", node.operation ? operationIcon(node.op) : shapeIcon(node.kind));
+        ImGui::Text("%s", node.operation ? operationName(node.op) : shapeNameFromKind(node.kind));
         ImGui::SameLine();
         ImGui::InputText("##name", &node.name);
 
