@@ -5,813 +5,587 @@ paginate: true
 math: katex
 style: |
   section {
-    background-color: #111827;
-    color: #f9fafb;
+    background-color: #1a1d12;
+    color: #d8d4c4;
     font-family: 'Georgia', serif;
     font-size: 26px;
     padding: 50px;
   }
   h1 {
-    color: #22d3ee;
-    border-bottom: 3px solid #06b6d4;
+    color: #d4af37;
+    border-bottom: 3px solid #cd7f32;
     padding-bottom: 6px;
   }
-  h2, h3 { color: #67e8f9; }
-  strong { color: #fbbf24; }
-  footer { font-size: 0.5em; color: #94a3b8; }
-  header { color: #94a3b8; }
+  h2, h3 { color: #a3b86c; }
+  strong { color: #d9904f; }
+  footer { font-size: 0.5em; color: #a8a89a; }
+  header { color: #a8a89a; }
   blockquote {
-    background-color: #1e293b;
-    border-left: 6px solid #22d3ee;
+    background-color: #252a18;
+    border-left: 6px solid #d4af37;
     padding: 12px 20px;
     border-radius: 8px;
-    color: #e2e8f0;
+    color: #e8e4d4;
   }
   table { font-size: 0.72em; margin: 0 auto; }
-  th { background-color: #0e7490; color: #f9fafb; }
-  td { background-color: #1e293b; }
-  code { color: #67e8f9; background-color: #1e293b; }
-  pre { background-color: #0b1220; border-radius: 8px; }
+  th { background-color: #556b2f; color: #d4af37; }
+  td { background-color: #252a18; color: #d8d4c4; }
+  code { color: #c0c0c0; background-color: #252a18; }
+  pre { background-color: #12150d; border-radius: 8px; }
   section.titulo { text-align: center; justify-content: center; }
   section.titulo h1 { border-bottom: none; font-size: 1.8em; }
+  ul { margin-top: 0.4em; }
+  p { margin: 0.4em 0; }
 ---
 
 <!-- _class: titulo -->
+<!-- _paginate: false -->
 
-# Estado da Arte em Simulação Física Baseada em Álgebra Geométrica
+# Estado da Arte em **Geometric Algebra** para Computação Gráfica, Robótica e Visão Computacional
 
-## Revisão da literatura recente (2020–2026)
+### Uma leitura dos 20 trabalhos de referência
 
----
-
-# O Problema
-
-![bg right:50% fit](img/unify.svg)
-
-Motores físicos modernos normalmente utilizam:
-
-- Álgebra linear
-- Matrizes
-- Quaternions
-- Dual quaternions
-- Coordenadas homogêneas
-
-A Álgebra Geométrica propõe unificar todas essas representações em uma única estrutura matemática.
+**Tópicos Especiais em Computação Gráfica**
 
 ---
 
-# Pergunta Principal
+## Agenda
 
-A Álgebra Geométrica pode servir como base para simuladores físicos modernos?
-
-Mais especificamente:
-
-- Representação geométrica
-- Cinemática
-- Dinâmica
-- Restrições
-- Sistemas multicorpos
-- Tempo real
-
-podem ser tratados dentro de uma mesma estrutura?
+1. **Motivação:** por que Geometric Algebra (GA)?
+2. **Bloco I — Fundamentos e livros-texto** — refs [2], [9], [10], [20], [6]
+3. **Bloco II — Geometria projetiva e cinemática** — refs [3], [4], [13], [16], [14]
+4. **Bloco III — Dinâmica em PGA** — ref [1]
+5. **Bloco IV — Conformal, quádricas e otimização** — refs [5], [7], [8], [15]
+6. **Bloco V — Implementações e indústria** — refs [19], [11], [12], [17], [18]
+7. **Síntese, tendências e conclusões**
 
 ---
 
-# Situação Atual da Área
+## Por que Geometric Algebra?
 
-A área ainda é pequena.
+> A GA — ou álgebra de Clifford — unifica vetores, complexos, quaterniões e álgebra exterior em um único formalismo.
 
-A maior parte da literatura recente está concentrada principalmente em duas linhas:
-
-- PGA (Projective Geometric Algebra)
-- Dinâmica e restrições em CGA/PGA
-
-A comunidade de pesquisa ainda é relativamente reduzida quando comparada à literatura tradicional de motores físicos.
+- **Representação unificada:** pontos, retas, planos, rotações e translações vivem no mesmo espaço algébrico.
+- **Sem matrizes 4×4:** operadores geométricos são **versores** e **rotores**, com composição por produto geométrico.
 
 ---
 
-# Evolução da Literatura
+## Por que GA? (cont.)
 
-```text
-Geometria
-      ↓
-
-Transformações
-      ↓
-
-Cinemática
-      ↓
-
-Dinâmica
-      ↓
-
-Restrições
-      ↓
-
-Tempo Real
-      ↓
-
-Multicorpos
-      ↓
-
-Corpos Flexíveis
-```
-
----
-
-# Linha do Tempo
-
-![w:1080](img/timeline.svg)
-
----
-
-# Principais Grupos de Pesquisa
-
-## Charles Gunn
-
-Foco:
-
-- Projective Geometric Algebra
-- Screw Theory
-- Motores geométricos
-- Mecânica rígida
-
-A maior parte dos trabalhos recentes em PGA deriva dessa linha.
-
----
-
-# Principais Grupos de Pesquisa
-
-## Grupo de Cambridge
-
-Pesquisadores:
-
-- Joan Lasenby
-- Hugo Hadfield
-
-Foco:
-
-- Dinâmica rígida
-- Sistemas multicorpos
-- Restrições mecânicas
-- Aplicações de CGA e PGA
-
----
-
-# Trabalho Revisado 1
-
-## Projective Geometric Algebra:
-## A New Framework for Doing Euclidean Geometry
-
-Charles Gunn
-
-2019
-
----
-
-# O Que o Trabalho Faz
-
-Propõe a PGA como uma estrutura unificada para:
-
-- Pontos
-- Linhas
-- Planos
-- Rotações
-- Translações
-- Movimentos rígidos
-
----
-
-# Contribuição
-
-O artigo não é sobre simulação física diretamente.
-
-Porém fornece a infraestrutura matemática utilizada praticamente por toda a literatura posterior.
-
----
-
-# Resultado
-
-Passa a existir uma representação geométrica única para:
-
-```text
-Geometria
-      +
-Transformações
-      +
-Movimento Rígido
-```
-
----
-
-# Importância
-
-É o trabalho que estabelece a base da PGA moderna.
-
-Sem ele praticamente não existe a linha recente de pesquisa em simuladores físicos baseados em PGA.
-
----
-
-# Trabalho Revisado 2
-
-## Constrained Dynamics in Conformal and Projective Geometric Algebra
-
-Hugo Hadfield
-
-Joan Lasenby
-
-2020
-
----
-
-# O Problema
-
-Representar sistemas mecânicos com restrições.
-
-Exemplos:
-
-- Juntas
-- Articulações
-- Vínculos
-- Forças de reação
-
----
-
-# Principal Contribuição
-
-Representa:
-
-- Forças
-- Torques
-- Momentos
-- Restrições
-
-como objetos geométricos dentro da álgebra.
-
----
-
-# O Que Muda?
-
-![bg right:50% fit](img/force-line.svg)
-
-Na mecânica tradicional:
-
-```text
-Força → Vetor
-
-Torque → Vetor
-```
-
-Neste trabalho:
-
-```text
-Força → Linha
-
-Torque → Entidade geométrica
-```
-
----
-
-# Importância
-
-Primeira formulação moderna a integrar **restrições mecânicas** à dinâmica em PGA/CGA:
-
-```text
-PGA
-      +
-Dinâmica
-      +
-Restrições
-```
-
-A dinâmica de corpos rígidos em PGA já havia sido formulada por Gunn; o trabalho mostra a equivalência com a sua formulação em CGA e acrescenta o tratamento de restrições.
-
----
-
-# Limitação
-
-Não aborda:
-
-- Colisão
-- Contato
-- Broad phase
-- Narrow phase
-
-O foco ainda é a formulação matemática.
-
----
-
-# Trabalho Revisado 3
-
-## Applications of Geometric Algebra in Mathematical Engineering
-
-Hugo Hadfield
-
-2023
-
----
-
-# O Que é?
-
-Tese de doutorado desenvolvida em Cambridge.
-
-Provavelmente a referência mais completa encontrada durante a revisão.
-
----
-
-# Temas Abordados
-
-- PGA
-- CGA
-- Screw Theory
-- Dinâmica rígida
-- Sistemas multicorpos
-- Robótica
-- Restrições
-
----
-
-# Principal Contribuição
-
-Consolida os resultados produzidos pela linha de pesquisa de Cambridge.
-
----
-
-# Importância
-
-Funciona como uma síntese moderna da área.
-
-É uma das melhores referências para quem deseja iniciar pesquisa aplicada.
-
----
-
-# Trabalho Revisado 4
-
-## Geometric Algebra in Real Time Rigid Body Physics Engines
-
-Timo Eberl
-
-2024
-
----
-
-# O Problema
-
-Uma dúvida frequente:
-
-```text
-PGA é elegante.
-
-Mas funciona em tempo real?
-```
-
----
-
-# Objetivo
-
-Implementar componentes de um motor físico utilizando:
-
-- Rigid Geometric Algebra
-- Pontos
-- Linhas
-- Planos
-- Transformações rígidas
-
----
-
-# Resultados
-
-![bg right:50% fit](img/overhead.svg)
-
-Os experimentos mostraram desempenho próximo das abordagens tradicionais.
-
-O custo adicional ficou próximo de:
-
-- 13%
-- 16%
-
-dependendo do algoritmo.
-
----
-
-# Importância
-
-Mostra que o uso de Álgebra Geométrica não é apenas teoricamente interessante.
-
-Também é computacionalmente viável.
-
----
-
-# Limitação
-
-Ainda está muito distante da complexidade encontrada em motores como:
-
-- Bullet
-- PhysX
-- Havok
-
----
-
-# Trabalho Revisado 5
-
-## Hamiltonian Mechanics in Terms of Geometric Algebras
-
-2024
-
----
-
-# O Problema
-
-Como representar a Mecânica Hamiltoniana dentro da PGA.
-
----
-
-# Motivação
-
-Grande parte dos simuladores físicos modernos depende de:
-
-- Integração numérica
-- Conservação de energia
-- Integradores geométricos
-
----
-
-# Contribuição
-
-Mostra que:
-
-- Hamiltonianos
-- Lagrangianos
-- Motores
-- Dinâmica rígida
-
-podem ser representados utilizando PGA.
-
----
-
-# Importância
-
-Abre caminho para:
-
-- Integradores geométricos
-- Integradores variacionais
-- Simulações fisicamente mais consistentes
-
----
-
-# Trabalho Revisado 6
-
-## Projective Geometric Algebra for Flexible Multibody Dynamics
-
-2026
-
----
-
-# O Problema
-
-Quase toda a literatura existente trabalha apenas com:
-
-```text
-Corpos rígidos
-```
-
----
-
-# Motivação
-
-Problemas reais possuem:
-
-- Deformação
-- Elasticidade
-- Vibração
-- Corpos flexíveis
-
----
-
-# Principal Contribuição
-
-Expande PGA para:
-
-- Sistemas multicorpos
-- Corpos flexíveis
-- Dinâmica estrutural
-
----
-
-# Importância
-
-Representa uma das extensões mais avançadas encontradas durante esta revisão.
-
-Mostra que a comunidade está avançando além dos corpos rígidos.
+- **Dimensionalidade agnóstica:** a formulação se generaliza naturalmente para $n$ dimensões.
+- **Estabilidade numérica:** elimina conversões entre representações e reduz casos especiais.
 
 ---
 
 <!-- _class: titulo -->
 
-# Trabalhos Complementares
-
-## Base da dinâmica em PGA e literatura de colisão e contato em computação gráfica
-
----
-
-# Complementar 1 — Gunn (2011)
-
-## Geometry, Kinematics, and Rigid Body Mechanics in Cayley-Klein Geometries
-
-Tese de doutorado, TU Berlin
-
-- Cinemática e **dinâmica de corpos rígidos** formuladas com álgebras de Clifford
-- Corpos rígidos construídos a partir de partículas; o tensor de inércia é representado como uma álgebra de Clifford própria
-- Implementação e simulações de movimento rígido
-
-> **Importância:** é a origem da dinâmica rígida em PGA citada por Hadfield & Lasenby (2020), anterior ao artigo de 2019.
+# Bloco I
+## Fundamentos e livros-texto
 
 ---
 
-# Complementar 2 — Dorst & De Keninck (2024)
+## [2] Dorst, Fontijne & Mann (2009) — *GA for Computer Science*
 
-## Physical Geometry by Plane-Based Geometric Algebra
+| Dado | Informação |
+|------|------------|
+| **Autores** | Leo Dorst, Daniel Fontijne, Stephen Mann |
+| **Veículo** | Morgan Kaufmann, 2009 |
+| **Tipo** | Livro-texto de referência |
+| **Escopo** | GA para programadores de CG e *entertainment computing* |
 
-ICACGA 2022 · Springer Proceedings in Mathematics & Statistics
-
-- Movimento de objetos com massa sob forças e torques, em PGA
-- Aspectos lineares e angulares unificados, sem coordenadas
-- Mapas de inércia simplesmente **aditivos**
-- Equações simples e código numérico direto
-
-> **Relevância:** tratamento atual e didático da dinâmica em PGA, com guia complementar em n dimensões (*May the Forque Be with You*).
+**O que propõe:** primeiro livro dedicado a apresentar a GA como alternativa prática à álgebra linear, com abordagem **orientada a objetos** para implementar operadores geométricos.
 
 ---
 
-# Complementar 3 — Colisão Contínua em Corpos Rígidos
+## [2] Dorst, Fontijne & Mann (2009) — *(cont.)*
 
-| Trabalho | Veículo | Contribuição |
-|---|---|---|
-| Redon, Kheddar & Coquillart (2002) | Computer Graphics Forum (Eurographics) | Tempo do primeiro contato calculado pelo próprio algoritmo; corpos rígidos poliédricos |
-| Brochu, Edwards & Bridson (2012) | ACM Trans. Graphics (SIGGRAPH) | CCD **geometricamente exato**, robusto a erros de arredondamento |
-| Wang et al. (2021) | ACM Trans. Graphics | *Benchmark* e algoritmo conservativo baseado em inclusão |
+**Uso industrial:** formação de equipes de P&D que substituem stacks matriciais por um formalismo unificado em *engines* gráficas, VR e robótica.
+
+**Conclusão dos autores:** a GA simplifica a expressão e a implementação de algoritmos geométricos; o custo de aprendizado é compensado pela **clareza conceitual** e pela redução de casos especiais.
 
 ---
 
-# Complementar 3 — O Que Cada Trabalho Traz
+## [9] Browne (2012) — *Grassmann Algebra, Vol. 1*
 
-- **Redon et al.:** polygon soups, vários corpos em movimento, corpos articulados acíclicos, acoplado a um simulador dinâmico em tempo real
-- **Brochu et al.:** nenhum contato perdido nem falso positivo; demonstrado em simulação de tecido
-- **Wang et al.:** compara algoritmos de CCD em casos degenerados e comuns; implementação aberta em C++ (Tight-Inclusion)
+| Dado | Informação |
+|------|------------|
+| **Autor** | John Browne |
+| **Veículo** | Barnard Publishing, 2012 |
+| **Tipo** | Livro (fundamentos) |
+| **Tema** | Álgebra exterior como sistema computacional para geometria |
 
-> Nenhum deles usa PGA: todos partem de vetores e matrizes.
-
----
-
-# Complementar 4 — Ferguson et al. (2021)
-
-## Intersection-free Rigid Body Dynamics
-
-ACM Transactions on Graphics (SIGGRAPH 2021)
-
-- Primeiro algoritmo **implícito** de integração para corpos rígidos com contato e atrito que garante ausência de interseção a cada passo
-- Modela as **trajetórias curvas** dos corpos na detecção e na resposta
-- Narrow phase conservativa, reduzida a consultas CCD lineares com separação mínima
-
-> **Limitação:** menos eficiente que alternativas, mas robusto em cenas complexas.
+**O que propõe:** apresenta a **álgebra de Grassmann** (precursora histórica da GA) com notação e ferramentas algorítmicas para *multivetores* e *versores*.
 
 ---
 
-# O Que Isso Muda na Lacuna?
+## [9] Browne (2012) — *(cont.)*
 
-- Colisão contínua e contato são **maduros** em computação gráfica
-- Na literatura de **GA/PGA** revisada, não apareceu formulação de colisão contínua nem de B-Rep
-- A lacuna é a **integração**: colisão contínua + contato dentro do formalismo da PGA
+**Uso industrial:** ponte incremental para equipes que já usam álgebra exterior em CAD, visão e robótica.
 
-> **Hipótese a investigar:** sobre um passo de tempo, o movimento de um corpo é um movimento helicoidal (*screw motion*), natural para motores da PGA.
+**Conclusão:** a obra estabelece a base sobre a qual a PGA moderna foi construída, mostrando que muitos conceitos já estavam presentes na álgebra de Grassmann.
 
 ---
 
-# Evolução Observada
+## [10] Dorst (2020) — *Correspondência Notacional Browne ↔ PGA*
 
-A literatura recente evoluiu aproximadamente da seguinte forma:
+| Dado | Informação |
+|------|------------|
+| **Autor** | Leo Dorst |
+| **Veículo** | Nota apendicular em bivector.net, 2020 |
+| **Tipo** | Nota técnica |
 
-```text
-Geometria
-      ↓
+**O que propõe:** mapeia explicitamente a notação e as operações da álgebra de Grassmann de Browne para a **Plane-based Geometric Algebra (PGA)**.
 
-Transformações
-      ↓
+**Uso industrial:** referência para migração de bibliotecas de álgebra exterior para PGA (ex.: Klein), reduzindo *onboarding* e erros de interpretação.
 
-Cinemática
-      ↓
-
-Dinâmica
-      ↓
-
-Restrições
-      ↓
-
-Tempo Real
-      ↓
-
-Multicorpos
-      ↓
-
-Corpos Flexíveis
-```
+**Conclusão:** a correspondência é **direta e sistemática**, validando a PGA como evolução natural da álgebra de Grassmann.
 
 ---
 
-# O Que Já Está Bem Desenvolvido?
+## [20] Dorst (2002) — *The Inner Products of GA*
 
-- PGA
-- Transformações rígidas
-- Screw Theory
-- Cinemática
-- Dinâmica rígida
-- Restrições mecânicas
-- Sistemas multicorpos
+| Dado | Informação |
+|------|------------|
+| **Autor** | Leo Dorst |
+| **Veículo** | *Applications of GA in CS and Engineering*, Birkhäuser, 2002 |
+| **Tipo** | Artigo de fundamentação |
 
----
-
-# O Que Ainda Tem Poucos Trabalhos em GA/PGA?
-
-Durante a revisão da literatura de GA/PGA apareceram poucos resultados em:
-
-- Colisão
-- Detecção de contato
-- Continuous Collision Detection
-- B-Rep
-- Modelagem sólida
-- CAD + Física
-- Motores físicos completos
+**O que propõe:** analisa as diferentes definições de **produto interno** em GA (escalar, contração à esquerda/direita, produto de Hestenes) e mostra que a escolha afeta a consistência das operações derivadas.
 
 ---
 
-# Principal Lacuna Encontrada
+## [20] Dorst (2002) — *(cont.)*
 
-![bg right:50% fit](img/gap.svg)
+**Uso industrial:** fundamental para implementações corretas de bibliotecas de GA; muitos *bugs* em geometria computacional vêm do uso inconsistente de produtos internos.
 
-A literatura avançou em:
-
-```text
-Representação
-      ↓
-
-Cinemática
-      ↓
-
-Dinâmica
-```
-
-Mas avançou pouco em:
-
-```text
-Colisão
-      ↓
-
-Contato
-      ↓
-
-Modelagem Sólida
-```
+**Conclusão:** a escolha do produto interno deve ser guiada pela **consistência geométrica**, não pela conveniência algébrica.
 
 ---
 
-# Proposta Inicial
+## [6] Doran (2020) — *Euclidean Geometry and GA*
 
-![bg right:50% fit](img/proposta.svg)
+| Dado | Informação |
+|------|------------|
+| **Autor** | Chris Doran |
+| **Veículo** | Blogpost, Cambridge, junho de 2020 |
+| **Tipo** | Divulgação técnica |
 
-Investigar o uso de PGA para aproximar:
+**O que propõe:** apresenta a GA como linguagem natural para a **geometria euclidiana**, mostrando como reflexões, rotações, translações e movimentos rígidos emergem diretamente dos produtos geométricos.
 
-```text
-Geometria
-      +
-Colisão
-      +
-Dinâmica
-```
+**Uso industrial:** material introdutório para engenheiros e cientistas que desejam reformular problemas euclidianos clássicos em GA.
 
-dentro de uma única estrutura matemática.
+**Conclusão:** a GA não é apenas uma notação alternativa — é uma **reformulação conceitual** que torna a geometria euclidiana mais transparente e algorítmica.
 
 ---
 
-# Direção Proposta
+<!-- _class: titulo -->
 
-Representar sólidos utilizando:
-
-- Faces
-- Arestas
-- Vértices
-
-seguindo um modelo B-Rep.
+# Bloco II
+## Geometria projetiva e cinemática de corpos rígidos
 
 ---
 
-# Ideia Principal
+## [3] Selig (2000) — *Clifford Algebra of Points, Lines and Planes*
 
-![bg right:50% fit](img/ccd.svg)
+| Dado | Informação |
+|------|------------|
+| **Autor** | J. M. Selig |
+| **Veículo** | *Robotica*, vol. 18, pp. 545–556, 2000 |
+| **Tipo** | Artigo de periódico |
 
-Ao invés de analisar apenas:
-
-```text
-Posição em t0
-
-Posição em t1
-```
-
-investigar o movimento contínuo durante o intervalo.
+**O que propõe:** descreve a **álgebra de Clifford do grupo de movimentos** de corpos rígidos, com pontos, retas e planos como **elementos homogêneos**. Deriva incidência, distância, *meet* e *join* diretamente na álgebra.
 
 ---
 
-# Hipótese
+## [3] Selig (2000) — *(cont.)*
 
-A detecção de colisão poderia considerar simultaneamente:
+**Uso industrial:**
+- Robótica de montagem (*peg-in-hole*) com modelagem de tolerâncias.
+- Visão estéreo: geometria epipolar compacta.
+- CG: visibilidade e *clipping* de primitivas lineares.
 
-- Tempo
-- Velocidade linear
-- Velocidade angular
-- Geometria das faces
-
-permitindo representar a varredura dos objetos durante o movimento.
+**Conclusão:** a álgebra de Clifford fornece um **arcabouço unificado** para pontos, retas e planos, eliminando múltiplas representações.
 
 ---
 
-# Tratamento dos Contatos
+## [4] Dorst (2016) — *3D Oriented Projective Geometry*
 
-![bg right:50% fit](img/islands.svg)
+| Dado | Informação |
+|------|------------|
+| **Autor** | Leo Dorst |
+| **Veículo** | *Adv. Appl. Clifford Algebras*, vol. 26, pp. 1137–1172, 2016 |
+| **Tipo** | Artigo de periódico |
 
-Após detectar contatos:
-
-```text
-A ↔ B ↔ C ↔ D
-```
-
-os objetos seriam agrupados em:
-
-## Ilhas de Colisão
+**O que propõe:** representa transformações projetivas 3D por **rotores em \( \mathbb{R}^{3,3} \)** (espaço das retas orientadas). Introduz uma **reflexão orientada** sobre retas e compara com Klawitter e Goldman et al.
 
 ---
 
-# Resolução
+## [4] Dorst (2016) — *(cont.)*
 
-Investigar a resolução simultânea dos contatos de uma mesma ilha.
+**Uso industrial:**
+- CAD e *shape matching*: transformações projetivas orientadas.
+- Visão 3D: estimação de pose a partir de linhas.
+- AR: composição contínua de cenas.
 
-Possíveis vantagens:
-
-- Melhor estabilidade
-- Menor dependência da ordem dos contatos
-- Paralelização natural
-
----
-
-# Conclusão
-
-A literatura recente demonstra que:
-
-- PGA tornou-se o principal formalismo geométrico da área;
-- Dinâmica rígida baseada em Álgebra Geométrica é viável;
-- Sistemas multicorpos já estão sendo explorados;
-- Implementações em tempo real são possíveis.
+**Conclusão:** a representação por versores de $\mathbb{R}^{3,3}$ é **mais expressiva e eficiente** do que abordagens não orientadas.
 
 ---
 
-# Conclusão
+## [13] Gunn (2011) — *Cayley–Klein Geometries*
 
-As principais oportunidades de pesquisa identificadas são:
+| Dado | Informação |
+|------|------------|
+| **Autor** | Charles G. Gunn |
+| **Veículo** | Tese de doutorado, TU Berlin, 2011 |
+| **Tipo** | Tese |
 
-- Colisão contínua
-- Detecção de contato
-- Modelagem B-Rep
-- Integração CAD + Física
-- Motores físicos completos em PGA
-
-A proposta apresentada se posiciona exatamente nessa região ainda pouco explorada da literatura de Álgebra Geométrica.
+**O que propõe:** formula a **mecânica de corpos rígidos** em espaços de curvatura constante (euclidiano, elíptico, hiperbólico) usando as **geometrias de Cayley–Klein**, unificando cinemática e dinâmica.
 
 ---
 
-# Referências
+## [13] Gunn (2011) — *(cont.)*
 
-GUNN, Charles. *Projective Geometric Algebra: A New Framework for Doing Euclidean Geometry*. 2019.
+**Uso industrial:**
+- Simulação física em ambientes não euclidianos (VR com distorções).
+- Robótica em variedades.
+- Visualização científica.
 
-HADFIELD, Hugo; LASENBY, Joan. *Constrained Dynamics in Conformal and Projective Geometric Algebra*. 2020.
-
-HADFIELD, Hugo. *Applications of Geometric Algebra in Mathematical Engineering*. PhD Thesis, University of Cambridge. 2023.
-
-EBERL, Timo. *Geometric Algebra in Real Time Rigid Body Physics Engines*. 2024.
-
-NAVRAT, Aleš; VAŠÍK, Petr. *Hamiltonian Mechanics in Terms of Geometric Algebras*. 2024.
-
-DILERI, Eirini; EBEL, Henrik; BAUCHAU, Olivier. *Projective Geometric Algebra for Flexible Multibody Dynamics*. 2026
+**Conclusão:** as geometrias de Cayley–Klein fornecem um **arcabouço unificado**, e a GA é a linguagem natural para expressar essa unificação nos três espaços clássicos.
 
 ---
 
-# Referências — Complementares
+## [16] Fontijne & Dorst (2011) — *Reconstructing Motions through Reflections*
 
-GUNN, Charles. *Geometry, Kinematics, and Rigid Body Mechanics in Cayley-Klein Geometries*. PhD Thesis, Technische Universität Berlin. 2011.
+| Dado | Informação |
+|------|------------|
+| **Autores** | Daniel Fontijne, Leo Dorst |
+| **Veículo** | *Guide to GA in Practice*, Springer, 2011, pp. 63–78 |
+| **Tipo** | Capítulo de livro |
 
-DORST, Leo; DE KENINCK, Steven. *Physical Geometry by Plane-Based Geometric Algebra*. In: Advanced Computational Applications of Geometric Algebra (ICACGA 2022). Springer, 2024. p. 43–76.
+**O que propõe:** novo algoritmo para reconstruir um **movimento de corpo rígido** a partir de correspondências exatas de pontos, construindo uma sequência de **reflexões** em GA, com fórmula compacta e rápida.
 
-REDON, Stéphane; KHEDDAR, Abderrahmane; COQUILLART, Sabine. *Fast Continuous Collision Detection between Rigid Bodies*. Computer Graphics Forum, v. 21, n. 3, p. 279–287, 2002.
+---
 
-BROCHU, Tyson; EDWARDS, Essex; BRIDSON, Robert. *Efficient Geometrically Exact Continuous Collision Detection*. ACM Transactions on Graphics, v. 31, n. 4, 2012.
+## [16] Fontijne & Dorst (2011) — *(cont.)*
 
-WANG, Bolun et al. *A Large-scale Benchmark and an Inclusion-based Algorithm for Continuous Collision Detection*. ACM Transactions on Graphics, v. 40, n. 5, 2021.
+**Uso industrial:**
+- Registro 3D e *shape matching* (escaneamento, inspeção).
+- Robótica: calibração *hand-eye*.
+- AR: pose de marcadores em tempo real.
 
-FERGUSON, Zachary et al. *Intersection-free Rigid Body Dynamics*. ACM Transactions on Graphics, v. 40, n. 4, 2021.
+**Conclusão:** a abordagem por reflexões é **numericamente estável e eficiente**, dispensando SVD e outras decomposições custosas.
+
+---
+
+## [14] Dorst & Valkenburg (2011) — *Square Root and Logarithm of Rotors*
+
+| Dado | Informação |
+|------|------------|
+| **Autores** | Leo Dorst, Robert Valkenburg |
+| **Veículo** | *Guide to GA in Practice*, Springer, 2011, pp. 81–104 |
+| **Tipo** | Capítulo de livro |
+
+**O que propõe:** fórmulas explícitas para **raiz quadrada e logaritmo de rotores** em CGA 3D, via **decomposição polar**. O logaritmo é essencial para interpolação suave e velocidades angulares.
+
+---
+
+## [14] Dorst & Valkenburg (2011) — *(cont.)*
+
+**Uso industrial:**
+- Animação: interpolação de rotações com aceleração contínua.
+- Simulação de robôs: trajetórias suaves em espaço de juntas.
+- Visão: *averaging* de rotações.
+
+**Conclusão:** a decomposição polar permite calcular raízes e logaritmos de forma **robusta e eficiente**, viabilizando aplicações em tempo real.
+
+---
+
+<!-- _class: titulo -->
+
+# Bloco III
+## Dinâmica e física em PGA
+
+---
+
+## [1] Dorst & De Keninck (2022) — *May the Forque Be with You*
+
+| Dado | Informação |
+|------|------------|
+| **Autores** | Leo Dorst, Steven De Keninck |
+| **Veículo** | bivector.net, 2022 (guia técnico) |
+| **Tipo** | Guia técnico / artigo estendido |
+
+**O que propõe:** aplica a PGA à **dinâmica de corpos rígidos** em qualquer dimensão. Introduz o conceito de **“forque”** (*force + torque*) como um bivetor unificado.
+
+---
+
+## [1] Dorst & De Keninck (2022) — *(cont.)*
+
+**Uso industrial:**
+- Motores de física para jogos e simulação.
+- Robótica: dinâmica de manipuladores e veículos.
+- Simulação de multidões e corpos deformáveis.
+
+**Conclusão:** a PGA permite uma **unificação completa entre aspectos lineares e angulares** da dinâmica, madura para substituir formalismos vetoriais tradicionais.
+
+---
+
+<!-- _class: titulo -->
+
+# Bloco IV
+## Geometria conformal, quádricas e otimização
+
+---
+
+## [5] Breuils et al. (2018) — *QCGA em \( \mathbb{R}^{9,6} \)*
+
+| Dado | Informação |
+|------|------------|
+| **Autores** | S. Breuils, V. Nozick, A. Sugimoto, E. Hitzer |
+| **Veículo** | *Adv. Appl. Clifford Algebras*, vol. 28, 2018 |
+| **Tipo** | Artigo de periódico |
+
+**O que propõe:** introduz a **Quadric Conformal GA (QCGA)** em $\mathbb{R}^{9,6}$, capaz de construir **quádricas gerais** (elipsoides, paraboloides, hiperboloides, cilindros) a partir de pontos de controle via produto externo.
+
+---
+
+## [5] Breuils et al. (2018) — *(cont.)*
+
+**Uso industrial:**
+- CAD: modelagem e manipulação de quádricas.
+- Visão: detecção e ajuste de superfícies em nuvens de pontos.
+- CG: *ray tracing* de quádricas com transformações versoriais.
+
+**Conclusão:** a QCGA fornece **representação unificada** para quádricas, com construção, transformação e interseção inteiramente dentro da álgebra.
+
+---
+
+## [7] De Keninck & Dorst (2019) — *GA Levenberg–Marquardt*
+
+| Dado | Informação |
+|------|------------|
+| **Autores** | Steven De Keninck, Leo Dorst |
+| **Veículo** | *Advances in Computer Graphics* (CGI 2019), Springer, pp. 511–522 |
+| **Tipo** | Artigo de conferência |
+
+**O que propõe:** implementação **livre de matrizes** do **Levenberg–Marquardt** em GA. Jacobianas e operações matriciais são substituídas por **produtos geométricos e contrações**.
+
+---
+
+## [7] De Keninck & Dorst (2019) — *(cont.)*
+
+**Uso industrial:**
+- *Bundle adjustment* e calibração de câmeras.
+- Registro de nuvens de pontos (ICP e variantes).
+- Estimação de parâmetros cinemáticos/dinâmicos em robótica.
+
+**Conclusão:** a versão em GA é **compacta, expressiva e numericamente competitiva**, facilitando a incorporação de restrições geométricas.
+
+---
+
+## [8] De Keninck & Dorst (2020) — *Hyperwedge*
+
+| Dado | Informação |
+|------|------------|
+| **Autores** | Steven De Keninck, Leo Dorst |
+| **Veículo** | *Advances in Computer Graphics* (CGI 2020), Springer, pp. 549–554 |
+| **Tipo** | Artigo de conferência |
+
+**O que propõe:** resolve o problema da **construção direta de elementos geométricos** em álgebras de dimensão $N$ via produto externo de $N-1$ pontos, com sérios problemas numéricos em CGA e QCGA com *float* 64 bits.
+
+---
+
+## [8] De Keninck & Dorst (2020) — *(cont.)*
+
+**Uso industrial:**
+- Bibliotecas de GA: esferas, círculos, planos e quádricas com precisão.
+- Visão: ajuste de modelos em altas dimensões.
+- CG: construção eficiente em *shaders* e GPU.
+
+**Conclusão:** o *hyperwedge* otimizado resolve um **gargalo numérico crítico** e torna viáveis aplicações em álgebras de alta dimensão.
+
+---
+
+## [15] Hitzer & Ichikawa (2013) — *Crystallographic Subperiodic Groups*
+
+| Dado | Informação |
+|------|------------|
+| **Autores** | Eckhard Hitzer, Daisuke Ichikawa |
+| **Veículo** | *Adv. Appl. Clifford Algebras*, vol. 23, pp. 887–906, 2013 |
+| **Tipo** | Artigo de periódico |
+
+**O que propõe:** representa **grupos cristalográficos subperiódicos** (camadas, cadeias, grupos pontuais) usando **versores e rotores** da álgebra de Clifford.
+
+---
+
+## [15] Hitzer & Ichikawa (2013) — *(cont.)*
+
+**Uso industrial:**
+- Cristalografia computacional e classificação de estruturas.
+- Ciência dos materiais: nanotubos, filmes finos, interfaces.
+- Visualização científica.
+
+**Conclusão:** a GA fornece **representação compacta e algébrica** para grupos subperiódicos, facilitando a implementação computacional.
+
+---
+
+<!-- _class: titulo -->
+
+# Bloco V
+## Implementações, bibliotecas e aplicações industriais
+
+---
+
+## [19] Ong (2020) — *jeremyong/klein: v2.2.1*
+
+| Dado | Informação |
+|------|------------|
+| **Autor** | Jeremy Ong (com S. De Keninck e Faaux) |
+| **Veículo** | Zenodo, 2020 (software) |
+| **Tipo** | Biblioteca C++ de código aberto |
+
+**O que propõe:** **Klein** é uma implementação especializada e **otimizada com SIMD** da PGA 3D ($\mathcal{P}(\mathbb{R}^*_{3,0,1})$). A v2.2.1 oferece suporte a C++11/14.
+
+---
+
+## [19] Ong (2020) — *(cont.)*
+
+**Uso industrial:**
+- Motores gráficos e de jogos: rotações, translações, planos e pontos sem *overhead* de matrizes 4×4.
+- Robótica e visão: integração em *pipelines* C++.
+- Prototipagem: código aberto, bem documentado.
+
+**Conclusão:** Klein demonstra que a PGA é **viável em produção**, com desempenho competitivo e API expressiva.
+
+---
+
+## [11] De Keninck & Gunn (2019) — *PGA Cheat Sheets*
+
+| Dado | Informação |
+|------|------------|
+| **Autores** | Steven De Keninck, Charles G. Gunn |
+| **Veículo** | Material do curso SIGGRAPH 2019 (bivector.net) |
+| **Tipo** | Material de referência rápida |
+
+**O que propõe:** duas folhas de referência para **PGA 3D e 2D**, cobrindo pontos, retas, planos, produtos geométricos, contrações, *meet/join*, rotores, motores e transformações comuns.
+
+**Uso industrial:** apoio a desenvolvedores que implementam PGA em software comercial; padroniza a notação dentro das equipes.
+
+**Conclusão:** as *cheat sheets* consolidam a PGA como ferramenta **prática e pronta para uso**.
+
+---
+
+## [12] De Keninck & Dorst (2020) — *PGA: Clean Up Your Mesh!*
+
+| Dado | Informação |
+|------|------------|
+| **Autores** | Steven De Keninck, Leo Dorst |
+| **Veículo** | Em preparação, 2020 |
+| **Tipo** | Artigo em desenvolvimento |
+
+**O que propõe:** embora o conteúdo completo não estivesse disponível, o título indica aplicação de PGA ao **processamento e limpeza de malhas poligonais**, usando operações geométricas exatas (*meet*, *join*, interseção de planos).
+
+**Potencial industrial:** *pipeline* de assets (correção de auto-interseções, buracos, normais), impressão 3D (reparo de modelos) e CAD (validação geométrica).
+
+**Conclusão esperada:** a PGA oferece abordagem **robusta e conceitualmente limpa** para *cleanup* de malhas.
+
+---
+
+## [17] Doran, Hestenes, Sommen & Van Acker (1993) — *Lie Groups as Spin Groups*
+
+| Dado | Informação |
+|------|------------|
+| **Autores** | C. Doran, D. Hestenes, F. Sommen, N. Van Acker |
+| **Veículo** | *J. Math. Phys.*, vol. 34, no. 8, pp. 3642–3669, 1993 |
+| **Tipo** | Artigo de periódico |
+
+**O que propõe:** demonstra que **grupos de Lie clássicos** podem ser representados como **grupos de spin** em GA. Rotações, translações e outras transformações contínuas tornam-se **versores**.
+
+---
+
+## [17] Doran et al. (1993) — *(cont.)*
+
+**Uso industrial:**
+- Robótica: representação de $SE(3)$ e $SO(3)$ com versores.
+- Visão: otimização em variedades.
+- Física e gráficos: simulação de sistemas com simetria contínua.
+
+**Conclusão:** a identificação Lie ↔ Spin **simplifica a teoria de representações** e é um marco teórico que sustenta muitas aplicações práticas posteriores.
+
+---
+
+## [18] Stolfi (1991) — *Oriented Projective Geometry*
+
+| Dado | Informação |
+|------|------------|
+| **Autor** | Jorge Stolfi |
+| **Veículo** | Academic Press, 1991 |
+| **Tipo** | Livro |
+
+**O que propõe:** desenvolve a **geometria projetiva orientada** como arcabouço unificado para CG e geometria computacional, com pontos, retas e planos **orientados** e operações consistentes de incidência, interseção e transformação.
+
+---
+
+## [18] Stolfi (1991) — *(cont.)*
+
+**Uso industrial:**
+- Geometria computacional robusta.
+- CG: *clipping* e faces visíveis.
+- CAD: modelagem de sólidos e booleanas.
+
+**Conclusão:** a geometria projetiva orientada é **precursora conceitual da PGA** e fornece base sólida para operações geométricas em CG.
+
+---
+
+## Síntese: o que os trabalhos têm em comum
+
+| Dimensão | Padrão observado |
+|----------|------------------|
+| **Unificação** | Substituição de múltiplas representações (matrizes, quaterniões, vetores) por uma única álgebra |
+| **Eficiência** | Vários artigos mostram GA **mais rápida e estável** que abordagens matriciais, com otimizações (SIMD, *hyperwedge*) |
+| **Aplicabilidade** | Do fundamento teórico a bibliotecas prontas para produção (Klein), otimização (LM) e dinâmica (PGA) |
+| **Generalidade** | PGA e QCGA formulam problemas em **dimensões arbitrárias** |
+
+---
+
+## Lacunas e direções futuras
+
+- **Adoção em larga escala:** poucas bibliotecas comerciais maduras; Klein é um passo importante, mas faltam ferramentas de *debug*, *profiling* e integração com *engines*.
+- **Educação:** a curva de aprendizado da GA é íngreme; livros e *cheat sheets* ajudam, mas falta formação sistemática.
+
+---
+
+## Lacunas e direções futuras (cont.)
+
+- **Hardware:** GA pode se beneficiar de aceleradores dedicados (GPU/FPGA); o artigo *Hyperwedge* mostra que precisão numérica é um desafio tratável.
+- **Integração com ML:** potencial inexplorado em redes neurais geométricas e *differentiable rendering*.
+
+---
+
+## Conclusões finais
+
+> A GA deixou de ser curiosidade matemática para se tornar **tecnologia viável e vantajosa** em CG, robótica e visão computacional.
+
+- **Maturidade teórica:** representações compactas e unificadas para uma ampla gama de objetos geométricos.
+- **Viabilidade prática:** bibliotecas otimizadas e algoritmos estáveis tornam a GA competitiva com abordagens tradicionais.
+
+---
+
+## Conclusões finais (cont.)
+
+- **Impacto industrial:** aplicações em simulação física, CAD, robótica, visão 3D e cristalografia já são realidade ou estão em estágio avançado.
+
+**Tendência:** a GA se consolidará no *toolkit* de CG à medida que a complexidade geométrica crescer e a demanda por soluções unificadas aumentar.
+
+---
+
+<!-- _class: titulo -->
+<!-- _paginate: false -->
+
+# Obrigado!
+
+### Perguntas e discussão
+
+**Tópicos Especiais em Computação Gráfica**
+
+*Estado da Arte em Geometric Algebra*
