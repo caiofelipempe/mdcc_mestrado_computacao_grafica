@@ -41,11 +41,9 @@ style: |
 <!-- _class: titulo -->
 <!-- _paginate: false -->
 
-# Estado da Arte em **Geometric Algebra** para Computação Gráfica, Robótica e Visão Computacional
+# Tópicos Especiais em Computação Gráfica
 
-### Uma leitura dos 20 trabalhos de referência
-
-**Tópicos Especiais em Computação Gráfica**
+### Trabalho 3
 
 ---
 
@@ -584,8 +582,4 @@ style: |
 
 # Obrigado!
 
-### Perguntas e discussão
-
 **Tópicos Especiais em Computação Gráfica**
-
-*Estado da Arte em Geometric Algebra*
