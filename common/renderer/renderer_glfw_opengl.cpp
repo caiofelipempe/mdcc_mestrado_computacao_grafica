@@ -159,7 +159,6 @@ void RendererGlfwOpengl::run(const int w, const int h, const std::string &t)
     using clock = std::chrono::steady_clock;
     auto lastTime = clock::now();
     DrawerOpengl drawer;
-    drawer.setCamera(&m_camera); 
 
     while (!glfwWindowShouldClose(m_window))
     {

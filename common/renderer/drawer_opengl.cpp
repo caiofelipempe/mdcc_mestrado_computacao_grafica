@@ -1,9 +1,7 @@
 #include "drawer_opengl.hpp"
-#include "camera.hpp"
 
 #include <GL/glew.h>
 
-#include <algorithm>
 #include <vector>
 
 using namespace geometry;
@@ -191,56 +189,10 @@ void DrawerOpengl::rastMeshes(const Mesh3f *meshes, std::size_t count,
 }
 
 // ─────────────────────────────────────────────────────────────────────
-//  Raytracer — alimenta a cena
-// ─────────────────────────────────────────────────────────────────────
-void DrawerOpengl::traceFaces(const Vec3f *points, std::size_t count,
-                              const Color &color)
-{
-    if (!points || count == 0 || color.a <= 0.0f)
-        return;
-
-    const std::size_t total = count * 3;
-    for (std::size_t i = 0; i < total; i += 3)
-        m_scene.addTriangle(points[i + 0], points[i + 1], points[i + 2], color);
-}
-
-void DrawerOpengl::traceMeshes(const Mesh3f *meshes, std::size_t count,
-                               const Color &faceColor)
-{
-    if (!meshes || count == 0 || faceColor.a <= 0.0f)
-        return;
-
-    for (std::size_t m = 0; m < count; ++m)
-    {
-        const auto &V = meshes[m].vertices();
-        const auto &F = meshes[m].faces();
-        for (const auto &f : F)
-            m_scene.addTriangle(V[f.indices[0]], V[f.indices[1]],
-                                V[f.indices[2]], faceColor);
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────
-//  Construtor / Destrutor
-// ─────────────────────────────────────────────────────────────────────
-DrawerOpengl::DrawerOpengl() = default;
-
-DrawerOpengl::~DrawerOpengl()
-{
-    if (m_tex)
-    {
-        glDeleteTextures(1, &m_tex);
-        m_tex = 0;
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────
 //  Lifecycle — só o renderer chama (via friend)
 // ─────────────────────────────────────────────────────────────────────
 void DrawerOpengl::frameBegin()
 {
-    m_scene.clear();
-
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
 
@@ -272,124 +224,4 @@ void DrawerOpengl::frameBegin()
 void DrawerOpengl::frameEnd()
 {
     glFlush();
-
-    if (!m_rtEnabled || m_scene.empty() || !m_camera)
-        return;
-
-    composeAndBlit();
-}
-
-// ─────────────────────────────────────────────────────────────────────
-//  Composição por profundidade
-// ─────────────────────────────────────────────────────────────────────
-void DrawerOpengl::composeAndBlit()
-{
-    GLint vp[4];
-    glGetIntegerv(GL_VIEWPORT, vp);
-    const int w = vp[2];
-    const int h = vp[3];
-
-    if (w <= 0 || h <= 0)
-        return;
-
-    const int rtW = std::max(1, w / m_rtDivisor);
-    const int rtH = std::max(1, h / m_rtDivisor);
-
-    const float n = m_camera->nearPlane();
-    const float f = m_camera->farPlane();
-
-    m_rasterDepth.resize(static_cast<std::size_t>(w) * h);
-    glReadPixels(0, 0, w, h, GL_DEPTH_COMPONENT, GL_FLOAT, m_rasterDepth.data());
-
-    m_scene.build();
-    m_scene.render(*m_camera, rtW, rtH);
-
-    const auto &rtRGB = m_scene.color();
-    const auto &rtDepth = m_scene.depth();
-
-    m_compositeRGBA.assign(static_cast<std::size_t>(w) * h * 4, 0);
-
-    for (int y = 0; y < h; ++y)
-    {
-        const int rtYfull = h - 1 - y;
-        const int rtY = rtYfull * rtH / h;
-
-        for (int x = 0; x < w; ++x)
-        {
-            const int rtX = x * rtW / w; // escala X pra RT
-
-            const std::size_t fbIdx = static_cast<std::size_t>(y) * w + x;
-            const std::size_t rtIdx = static_cast<std::size_t>(rtY) * rtW + rtX;
-            const std::size_t dst = fbIdx * 4;
-
-            const float z = m_rasterDepth[fbIdx];
-            const float rasterDist = (z >= 1.0f)
-                                         ? 1e30f
-                                         : (n * f) / (f - z * (f - n));
-
-            const float td = rtDepth[rtIdx];
-
-            if (td < rasterDist && td < 1e29f)
-            {
-                m_compositeRGBA[dst + 0] = rtRGB[rtIdx * 3 + 0];
-                m_compositeRGBA[dst + 1] = rtRGB[rtIdx * 3 + 1];
-                m_compositeRGBA[dst + 2] = rtRGB[rtIdx * 3 + 2];
-                m_compositeRGBA[dst + 3] = 255;
-            }
-        }
-    }
-
-    if (m_tex == 0)
-    {
-        glGenTextures(1, &m_tex);
-        glBindTexture(GL_TEXTURE_2D, m_tex);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    }
-    else
-    {
-        glBindTexture(GL_TEXTURE_2D, m_tex);
-    }
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0,
-                 GL_RGBA, GL_UNSIGNED_BYTE, m_compositeRGBA.data());
-
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-    glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_LIGHTING);
-    glDisable(GL_CULL_FACE);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_TEXTURE_2D);
-    glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-
-    glBegin(GL_QUADS);
-    glTexCoord2f(0.0f, 0.0f);
-    glVertex2f(0.0f, 0.0f);
-    glTexCoord2f(1.0f, 0.0f);
-    glVertex2f(1.0f, 0.0f);
-    glTexCoord2f(1.0f, 1.0f);
-    glVertex2f(1.0f, 1.0f);
-    glTexCoord2f(0.0f, 1.0f);
-    glVertex2f(0.0f, 1.0f);
-    glEnd();
-
-    glDisable(GL_TEXTURE_2D);
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_LIGHTING);
-
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-    glMatrixMode(GL_MODELVIEW);
-    glPopMatrix();
 }
