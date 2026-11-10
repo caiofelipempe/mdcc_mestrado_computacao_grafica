@@ -1000,7 +1000,7 @@ private:
 
         if (ImGui::CollapsingHeader("Estatisticas"))
         {
-            ImGui::Text("Volume aprox: %.6f", m_volume);
+            ImGui::Text("Volume aprox: %.6f", 0.0f);
             ImGui::Text("Vertices: %zu", m_mesh.vertices().size());
             ImGui::Text("Faces: %zu", m_mesh.faces().size());
         }

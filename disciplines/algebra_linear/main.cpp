@@ -1,527 +1,152 @@
-#include "linear_system_solver.hpp"
+// main.cpp — testes do Método da Potência e da Potência Inversa
+// Compilar: g++ -std=c++17 -O2 -Wall -Wextra main.cpp -o eigen && ./eigen
+#include "linear_algebra.hpp"
 
 #include <algorithm>
-#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <random>
+#include <string>
 
-using Matrix = LinearSystemSolver::Matrix;
-using Vector = LinearSystemSolver::Vector;
+using la::Matrix;
+using la::Vector;
 
-double matrixError(
-    const Matrix& A,
-    const Matrix& B)
-{
-    double err = 0.0;
-
-    for (size_t i = 0; i < A.size(); ++i)
-    {
-        for (size_t j = 0; j < A[0].size(); ++j)
-        {
-            err = std::max(
-                err,
-                std::abs(A[i][j] - B[i][j]));
-        }
-    }
-
-    return err;
+// ---------------------------------------------------------------------------
+// Gera matriz simétrica aleatória: sorteia o triângulo superior em [lo, hi]
+// e espelha. A semente fixa torna o relatório reproduzível.
+// ---------------------------------------------------------------------------
+Matrix random_symmetric(std::size_t n, unsigned seed, double lo = -10.0, double hi = 10.0) {
+    std::mt19937 gen(seed);
+    std::uniform_real_distribution<double> dist(lo, hi);
+    Matrix A(n);
+    for (std::size_t i = 0; i < n; ++i)
+        for (std::size_t j = i; j < n; ++j) A(i, j) = A(j, i) = dist(gen);
+    return A;
 }
 
-double vectorError(
-    const Vector& a,
-    const Vector& b)
-{
-    double err = 0.0;
+// ---------------------------------------------------------------------------
+// Referência independente: Jacobi cíclico (só para VALIDAR o relatório —
+// calcula todos os autovalores e confere se acertamos o maior/menor |λ|).
+// ---------------------------------------------------------------------------
+Vector jacobi_eigenvalues(Matrix A) {
+    const std::size_t n = A.size();
+    for (int sweep = 0; sweep < 100; ++sweep) {
+        double off = 0.0;
+        for (std::size_t i = 0; i < n; ++i)
+            for (std::size_t j = i + 1; j < n; ++j) off += A(i, j) * A(i, j);
+        if (off < 1e-30) break;
 
-    for (size_t i = 0; i < a.size(); ++i)
-    {
-        err = std::max(
-            err,
-            std::abs(a[i] - b[i]));
+        for (std::size_t p = 0; p < n; ++p)
+            for (std::size_t q = p + 1; q < n; ++q) {
+                if (std::abs(A(p, q)) < 1e-300) continue;
+                const double theta = (A(q, q) - A(p, p)) / (2.0 * A(p, q));
+                const double t = (theta >= 0 ? 1.0 : -1.0) / (std::abs(theta) + std::sqrt(theta * theta + 1.0));
+                const double c = 1.0 / std::sqrt(t * t + 1.0), s = t * c;
+                for (std::size_t k = 0; k < n; ++k) { // A ← A·J
+                    const double akp = A(k, p), akq = A(k, q);
+                    A(k, p) = c * akp - s * akq;
+                    A(k, q) = s * akp + c * akq;
+                }
+                for (std::size_t k = 0; k < n; ++k) { // A ← Jᵀ·A
+                    const double apk = A(p, k), aqk = A(q, k);
+                    A(p, k) = c * apk - s * aqk;
+                    A(q, k) = s * apk + c * aqk;
+                }
+            }
     }
-
-    return err;
+    Vector ev(n);
+    for (std::size_t i = 0; i < n; ++i) ev[i] = A(i, i);
+    std::sort(ev.begin(), ev.end(), [](double a, double b) { return std::abs(a) > std::abs(b); });
+    return ev; // ordenados por |λ| decrescente
 }
 
-Matrix identity(int n)
-{
-    Matrix I(
-        n,
-        Vector(n, 0.0));
+// ---------------------------------------------------------------------------
+// Impressão
+// ---------------------------------------------------------------------------
+void rule(char c = '=', int w = 96) { std::cout << std::string(w, c) << '\n'; }
 
-    for (int i = 0; i < n; ++i)
-    {
-        I[i][i] = 1.0;
+void print_matrix(const std::string& name, const Matrix& A) {
+    std::cout << name << " (" << A.size() << "x" << A.size() << "):\n";
+    for (std::size_t i = 0; i < A.size(); ++i) {
+        std::cout << "  [";
+        for (std::size_t j = 0; j < A.size(); ++j) std::cout << std::setw(9) << std::fixed << std::setprecision(4) << A(i, j);
+        std::cout << " ]\n";
     }
-
-    return I;
 }
 
-int main()
-{
-    std::cout
-        << std::fixed
-        << std::setprecision(6);
-
-    std::random_device rd;
-    std::mt19937 gen(rd());
-
-    std::uniform_real_distribution<double>
-        dist(-5.0, 5.0);
-
-    std::normal_distribution<double>
-        noise(0.0, 0.2);
-
-    std::vector<int> tamanhos =
-    {
-        3,
-        4,
-        5,
-        10
-    };
-
-    std::cout
-        << "====================================================\n";
-    std::cout
-        << " INICIANDO TESTES, MATRIZES E RESULTADOS (01 - 12)\n";
-    std::cout
-        << "====================================================\n";
-
-    for (int n : tamanhos)
-    {
-        std::cout
-            << "\n====================================================\n";
-        std::cout
-            << ">>> TAMANHO DAS MATRIZES: N = "
-            << n
-            << " <<<\n";
-        std::cout
-            << "====================================================\n\n";
-
-        // =====================================================
-        // MATRIZES BASE
-        // =====================================================
-
-        Matrix A(
-            n,
-            Vector(n));
-
-        Matrix M(
-            n,
-            Vector(n));
-
-        for (int i = 0; i < n; ++i)
-        {
-            for (int j = 0; j < n; ++j)
-            {
-                A[i][j] = dist(gen);
-                M[i][j] = dist(gen);
-            }
-        }
-
-        Matrix Mt =
-            LinearSystemSolver::transposeMatrix(M);
-
-        Matrix A_sym =
-            LinearSystemSolver::multiplyMatrices(
-                Mt,
-                M);
-
-        for (int i = 0; i < n; ++i)
-        {
-            A_sym[i][i] += n;
-        }
-
-        LinearSystemSolver::printMatrix(
-            A,
-            "Matriz A");
-
-        // =====================================================
-        // TAREFA 01
-        // =====================================================
-
-        Vector xTrue(n);
-
-        for (int i = 0; i < n; ++i)
-        {
-            xTrue[i] = i + 1;
-        }
-
-        Vector b =
-            LinearSystemSolver::multiplyMatrixVector(
-                A,
-                xTrue);
-
-        auto xGauss =
-            LinearSystemSolver::gaussPartialPivot(
-                A,
-                b);
-
-        std::cout
-            << "[Tarefa 01] Gauss\n";
-
-        LinearSystemSolver::printVector(
-            xGauss,
-            "Solucao");
-
-        std::cout
-            << "Erro: "
-            << vectorError(
-                   xTrue,
-                   xGauss)
-            << "\n\n";
-
-        // =====================================================
-        // TAREFA 02
-        // =====================================================
-
-        auto xJordan =
-            LinearSystemSolver::
-            gaussJordanTotalPivot(
-                A,
-                b);
-
-        std::cout
-            << "[Tarefa 02] Gauss-Jordan\n";
-
-        LinearSystemSolver::printVector(
-            xJordan,
-            "Solucao");
-
-        std::cout
-            << "Erro: "
-            << vectorError(
-                   xTrue,
-                   xJordan)
-            << "\n\n";
-
-        // =====================================================
-        // TAREFA 03
-        // =====================================================
-
-        Matrix L;
-        Matrix U;
-
-        LinearSystemSolver::
-        luDecomposition(
-            A,
-            L,
-            U);
-
-        auto LU =
-            LinearSystemSolver::
-            multiplyMatrices(
-                L,
-                U);
-
-        std::cout
-            << "[Tarefa 03] LU\n";
-
-        LinearSystemSolver::printMatrix(
-            L,
-            "L");
-
-        LinearSystemSolver::printMatrix(
-            U,
-            "U");
-
-        LinearSystemSolver::printMatrix(
-            LU,
-            "L*U");
-
-        std::cout
-            << "Erro LU: "
-            << matrixError(
-                   A,
-                   LU)
-            << "\n\n";
-
-        // =====================================================
-        // TAREFA 04
-        // =====================================================
-
-        auto singular = A;
-
-        if (n > 2)
-        {
-            for (int j = 0; j < n; ++j)
-            {
-                singular[2][j] =
-                    singular[0][j]
-                    + singular[1][j];
-            }
-        }
-
-        auto rref =
-            LinearSystemSolver::
-            computeRREF(
-                singular);
-
-        std::cout
-            << "[Tarefa 04] RREF\n";
-
-        LinearSystemSolver::printMatrix(
-            singular,
-            "Matriz Singular");
-
-        LinearSystemSolver::printMatrix(
-            rref.rrefMatrix,
-            "RREF");
-
-        std::cout
-            << "Rank = "
-            << rref.rank
-            << "\n";
-
-        std::cout
-            << "Nullity = "
-            << rref.nullity
-            << "\n\n";
-
-        // =====================================================
-        // TAREFA 05
-        // =====================================================
-
-        auto S =
-            LinearSystemSolver::
-            choleskyDecomposition(
-                A_sym);
-
-        auto ST =
-            LinearSystemSolver::
-            transposeMatrix(
-                S);
-
-        auto ArecChol =
-            LinearSystemSolver::
-            multiplyMatrices(
-                S,
-                ST);
-
-        std::cout
-            << "[Tarefa 05] Cholesky\n";
-
-        LinearSystemSolver::printMatrix(
-            S,
-            "S");
-
-        std::cout
-            << "Erro Cholesky = "
-            << matrixError(
-                   A_sym,
-                   ArecChol)
-            << "\n\n";
-
-        // =====================================================
-        // TAREFA 06
-        // =====================================================
-
-        Matrix basis;
-
-        for (int i = 0; i < n; ++i)
-        {
-            Vector v(n);
-
-            for (int j = 0; j < n; ++j)
-            {
-                v[j] = dist(gen);
-            }
-
-            basis.push_back(v);
-        }
-
-        auto ortho =
-            LinearSystemSolver::
-            gramSchmidtOrthonormalize(
-                basis);
-
-        std::cout
-            << "[Tarefa 06] Gram-Schmidt\n";
-
-        LinearSystemSolver::printMatrix(
-            basis,
-            "Base Original");
-
-        LinearSystemSolver::printMatrix(
-            ortho,
-            "Base Ortonormal");
-
-        // =====================================================
-        // TAREFA 07
-        // =====================================================
-
-        Vector xReg(50);
-        Vector yReg(50);
-
-        for (int i = 0; i < 50; ++i)
-        {
-            xReg[i] = i;
-
-            yReg[i] =
-                2.0 * i
-                + 1.0
-                + noise(gen);
-        }
-
-        auto reg =
-            LinearSystemSolver::
-            linearRegression(
-                xReg,
-                yReg);
-
-        std::cout
-            << "[Tarefa 07] Regressao\n";
-
-        std::cout
-            << "Slope = "
-            << reg.slope
-            << "\n";
-
-        std::cout
-            << "Intercept = "
-            << reg.intercept
-            << "\n\n";
-
-        // =====================================================
-        // TAREFA 08
-        // =====================================================
-
-        Vector x0(
-            n,
-            1.0);
-
-        auto power =
-            LinearSystemSolver::
-            powerMethod(
-                A_sym,
-                x0,
-                1e-8,
-                1000);
-
-        std::cout
-            << "[Tarefa 08] Potencia\n";
-
-        std::cout
-            << "Maior autovalor = "
-            << power.eigenvalue
-            << "\n\n";
-
-        // =====================================================
-        // TAREFA 09
-        // =====================================================
-
-        auto house =
-            LinearSystemSolver::
-            householderTransform(
-                A_sym,
-                false);
-
-        std::cout
-            << "[Tarefa 09] Householder\n";
-
-        LinearSystemSolver::printMatrix(
-            house.outputMatrix,
-            "Tridiagonal");
-
-        // =====================================================
-        // TAREFA 10
-        // =====================================================
-
-        auto qr =
-            LinearSystemSolver::
-            qrDecomposition(
-                A);
-
-        auto QR =
-            LinearSystemSolver::
-            multiplyMatrices(
-                qr.Q,
-                qr.R);
-
-        std::cout
-            << "[Tarefa 10] QR\n";
-
-        LinearSystemSolver::printMatrix(
-            qr.Q,
-            "Q");
-
-        LinearSystemSolver::printMatrix(
-            qr.R,
-            "R");
-
-        std::cout
-            << "Erro QR = "
-            << matrixError(
-                   A,
-                   QR)
-            << "\n\n";
-
-        // =====================================================
-        // TAREFA 11
-        // =====================================================
-
-        auto eigen =
-            LinearSystemSolver::
-            qrEigenSymmetric(
-                A_sym,
-                1e-8);
-
-        std::cout
-            << "[Tarefa 11] Autovalores\n";
-
-        LinearSystemSolver::printVector(
-            eigen.eigenvalues,
-            "Eigenvalues");
-
-        // =====================================================
-        // TAREFA 12
-        // =====================================================
-
-        auto svd =
-            LinearSystemSolver::
-            svdDecomposition(
-                A);
-
-        Matrix Vt =
-            LinearSystemSolver::
-            transposeMatrix(
-                svd.V);
-
-        Matrix US =
-            LinearSystemSolver::
-            multiplyMatrices(
-                svd.U,
-                svd.Sigma);
-
-        Matrix Arec =
-            LinearSystemSolver::
-            multiplyMatrices(
-                US,
-                Vt);
-
-        std::cout
-            << "[Tarefa 12] SVD\n";
-
-        LinearSystemSolver::printMatrix(
-            svd.U,
-            "U");
-
-        LinearSystemSolver::printMatrix(
-            svd.Sigma,
-            "Sigma");
-
-        LinearSystemSolver::printMatrix(
-            svd.V,
-            "V");
-
-        std::cout
-            << "Erro SVD = "
-            << matrixError(
-                   A,
-                   Arec)
-            << "\n\n";
+void print_vector(const std::string& name, const Vector& v) {
+    std::cout << "  " << name << " = [";
+    for (std::size_t i = 0; i < v.size(); ++i)
+        std::cout << (i ? ", " : "") << std::fixed << std::setprecision(6) << std::setw(9) << v[i];
+    std::cout << " ]\n";
+}
+
+void print_result(const std::string& method, const la::EigenResult& r, double reference) {
+    std::cout << "\n  >> " << method << "\n";
+    std::cout << "  convergiu       : " << (r.converged ? "sim" : "NAO") << "\n";
+    std::cout << "  iteracoes       : " << r.iterations << "\n";
+    std::cout << "  lambda          : " << std::setprecision(12) << r.lambda << "\n";
+    std::cout << "  lambda (Jacobi) : " << std::setprecision(12) << reference << "\n";
+    std::cout << "  |erro lambda|   : " << std::scientific << std::setprecision(3) << std::abs(r.lambda - reference) << "\n";
+    std::cout << "  ||Av - lambda v||: " << r.residual << std::fixed << "\n";
+    print_vector("v", r.v);
+}
+
+// ---------------------------------------------------------------------------
+struct Summary {
+    std::size_t n;
+    la::EigenResult pw, inv;
+    double ref_max, ref_min;
+};
+
+Summary run_case(std::size_t n, unsigned seed) {
+    rule();
+    std::cout << "CASO " << n << "x" << n << "   (semente = " << seed << ")\n";
+    rule();
+
+    const Matrix A = random_symmetric(n, seed);
+    print_matrix("A", A);
+    std::cout << "  simetrica? " << (la::is_symmetric(A) ? "sim" : "nao") << "\n";
+
+    const Vector ev = jacobi_eigenvalues(A);
+    std::cout << "\n  Espectro de referencia (Jacobi, ordenado por |lambda|):\n  ";
+    for (double x : ev) std::cout << std::setprecision(4) << std::setw(10) << x;
+    std::cout << "\n  razao de convergencia potencia  |l2/l1|      = " << std::setprecision(4) << std::abs(ev[1] / ev[0])
+              << "\n  razao de convergencia inversa   |l_n/l_(n-1)| = " << std::abs(ev[n - 1] / ev[n - 2]) << "\n";
+
+    la::IterOptions opt;
+    opt.tol = 1e-10;
+    opt.max_iter = 20000;
+
+    Summary s{n, la::power_method(A, opt), la::inverse_power_method(A, 0.0, opt), ev.front(), ev.back()};
+    print_result("Metodo da Potencia (maior |lambda|)", s.pw, s.ref_max);
+    print_result("Metodo da Potencia Inversa, sigma = 0 (menor |lambda|)", s.inv, s.ref_min);
+    std::cout << '\n';
+    return s;
+}
+
+int main() {
+    std::cout << "RELATORIO — METODO DA POTENCIA E POTENCIA INVERSA (matrizes simetricas)\n"
+              << "Criterio de parada: ||Av - lambda v|| <= 1e-10 * max(1, |lambda|)\n"
+              << "Potencia inversa: (A - sigma I) fatorada uma vez por LDL^T\n\n";
+
+    std::vector<Summary> all;
+    unsigned seed = 42;
+    for (std::size_t n : {3u, 5u, 10u}) all.push_back(run_case(n, seed++));
+
+    rule();
+    std::cout << "RESUMO\n";
+    rule();
+    std::cout << std::left << std::setw(7) << "n" << std::setw(15) << "lambda_max" << std::setw(8) << "iter"
+              << std::setw(12) << "erro" << std::setw(15) << "lambda_min" << std::setw(8) << "iter"
+              << std::setw(12) << "erro" << '\n';
+    rule('-');
+    for (const auto& s : all) {
+        std::cout << std::left << std::setw(7) << (std::to_string(s.n) + "x" + std::to_string(s.n))
+                  << std::fixed << std::setprecision(6) << std::setw(15) << s.pw.lambda << std::setw(8) << s.pw.iterations
+                  << std::scientific << std::setprecision(2) << std::setw(12) << std::abs(s.pw.lambda - s.ref_max)
+                  << std::fixed << std::setprecision(6) << std::setw(15) << s.inv.lambda << std::setw(8) << s.inv.iterations
+                  << std::scientific << std::setprecision(2) << std::setw(12) << std::abs(s.inv.lambda - s.ref_min) << '\n';
     }
-
     return 0;
 }
