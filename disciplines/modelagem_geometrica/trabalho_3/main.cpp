@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <memory>
 #include <numbers>
 #include <string>
 #include <utility>
@@ -16,7 +15,6 @@
 #include <imgui_internal.h>
 
 #include "mesh.hpp"
-#include "shape.hpp"
 #include "winged_edge.hpp"
 
 using namespace geometry;
@@ -171,24 +169,37 @@ namespace
         return rot;
     }
 
-    std::unique_ptr<Shape> makeShape(const SceneObject &obj)
+    // Cada primitiva é construída pelas operações do winged-edge (lâmina, extrusão, varredura e
+    // cone, todas compostas por MVFS/MEV/MEF) e depois posicionada.
+    winged::Solid makeSolid(const SceneObject &obj)
     {
+        const auto n = static_cast<std::size_t>(obj.segments);
+        winged::Solid solid;
+
         switch (obj.kind)
         {
         case ShapeKind::Sphere:
-            return std::make_unique<Sphere>(obj.radius);
+            solid = winged::Solid::sphere(obj.radius, n);
+            break;
         case ShapeKind::Block:
-            return std::make_unique<Block>(obj.blockSize[0], obj.blockSize[1], obj.blockSize[2]);
+            solid = winged::Solid::block(obj.blockSize[0], obj.blockSize[1], obj.blockSize[2]);
+            break;
         case ShapeKind::Cylinder:
-            return std::make_unique<Cylinder>(obj.radius, obj.height);
+            solid = winged::Solid::cylinder(obj.radius, obj.height, n);
+            break;
         case ShapeKind::Cone:
-            return std::make_unique<Cone>(obj.radius, obj.height);
+            solid = winged::Solid::cone(obj.radius, obj.height, n);
+            break;
         case ShapeKind::Capsule:
-            return std::make_unique<Capsule>(obj.radius, obj.height);
+            solid = winged::Solid::capsule(obj.radius, obj.height, n);
+            break;
         case ShapeKind::Tetrahedron:
-            return std::make_unique<RegularTetrahedron>(obj.edge);
+            solid = winged::Solid::tetrahedron(obj.edge);
+            break;
         }
-        return nullptr;
+
+        solid.transform(obj.position, rotatorOf(obj));
+        return solid;
     }
 
     float volumeOf(const Mesh3f &mesh)
@@ -375,9 +386,7 @@ private:
 
         for (const SceneObject &obj : m_objects)
         {
-            const auto shape = makeShape(obj);
-            m_solids.emplace_back(*shape, obj.position, rotatorOf(obj),
-                                  static_cast<std::size_t>(obj.segments));
+            m_solids.push_back(makeSolid(obj));
             m_meshes.push_back(m_solids.back().toMesh());
             m_volume += volumeOf(m_meshes.back());
         }

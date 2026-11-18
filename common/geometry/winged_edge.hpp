@@ -11,7 +11,6 @@
 
 #include "mesh.hpp"
 #include "rotator3.hpp"
-#include "shape.hpp"
 
 #include <algorithm>
 #include <array>
@@ -65,18 +64,6 @@ namespace geometry::winged
         std::vector<Face> F;
 
         Solid() = default;
-
-        Solid(const Shape &shape, const Vec3f &origin, const Rot3f &rotator, std::size_t segments = 16)
-        {
-            Profile pr = profileOf(shape, segments);
-            auto place = [&](const Vec3f &p) { return origin + rotator.rotateVector(p); };
-            for (auto &ring : pr.rings)
-                for (auto &p : ring)
-                    p = place(p);
-            if (pr.bottom) pr.bottom = place(*pr.bottom);
-            if (pr.top) pr.top = place(*pr.top);
-            loft(pr);
-        }
 
         // ───────────────────────── operadores de Euler ─────────────────────────
 
@@ -161,6 +148,134 @@ namespace geometry::winged
             loops.push_back(ringAtEnd ? na : nb);
         }
 
+        // ──────────────── operações de construção (compostas por MVFS/MEV/MEF) ────────────────
+
+        struct Lamina { FId front, back; };
+
+        // Lâmina: polígono plano com duas faces (MVFS + cadeia de MEVs + um MEF que fecha o ciclo).
+        // `front` percorre pts na ordem dada (normal pela regra da mão direita); `back`, ao contrário.
+        Lamina lamina(const std::vector<Vec3f> &pts)
+        {
+            if (pts.size() < 3) throw std::invalid_argument("lamina: são necessários >= 3 pontos");
+            auto [v0, back] = MVFS(pts[0]);
+            std::vector<VId> vs{v0};
+            for (std::size_t i = 1; i < pts.size(); ++i)
+                vs.push_back(MEV({back, vs[i - 1]}, pts[i]).v);
+            const FId front = MEF({back, vs.front()}, {back, vs.back()}).f;
+            return {front, back};
+        }
+
+        // Varredura: de cada vértice do contorno de f ergue uma aresta (MEV) até map(posição) e fecha
+        // cada lado com uma face quadrilateral (MEF). f vira uma das faces laterais; a face devolvida
+        // é a nova tampa, percorrida no mesmo sentido que f.
+        template <class Map>
+        FId sweep(FId f, Map map)
+        {
+            if (at(f).loops.size() != 1) throw std::invalid_argument("sweep: a face deve ter um único ciclo");
+            const std::vector<VId> q = FV(f);
+            const std::size_t n = q.size();
+            std::vector<VId> t;
+            for (VId v : q)
+            {
+                const Vec3f p = map(at(v).p);
+                t.push_back(MEV({f, v}, p).v);
+            }
+            for (std::size_t j = 0; j + 1 < n; ++j)
+                MEF({f, t[j]}, {f, t[j + 1]});
+            return MEF({f, t[0]}, {f, t[n - 1]}).f;
+        }
+
+        // Extrusão (varredura translacional) de f ao longo de d.
+        FId extrude(FId f, const Vec3f &d)
+        {
+            return sweep(f, [&](const Vec3f &p) { return p + d; });
+        }
+
+        // Cone: liga todos os vértices do contorno de f a um vértice novo em apex (MEV + MEFs),
+        // substituindo f por um leque de triângulos. Devolve o vértice do ápice.
+        VId cone(FId f, const Vec3f &apex)
+        {
+            if (at(f).loops.size() != 1) throw std::invalid_argument("cone: a face deve ter um único ciclo");
+            const std::vector<VId> p = FV(f);
+            const VId a = MEV({f, p[0]}, apex).v;
+            FId big = f;
+            for (std::size_t j = p.size() - 1; j >= 1; --j)
+                big = MEF({big, a}, {big, p[j]}).f;
+            return a;
+        }
+
+        // Aplica rotação e translação a todos os vértices (a topologia não muda).
+        void transform(const Vec3f &origin, const Rot3f &rotator)
+        {
+            for (Vertex &v : V)
+                v.p = origin + rotator.rotateVector(v.p);
+        }
+
+        // ───────────────────── primitivas (centradas na origem, eixo y) ─────────────────────
+
+        // Bloco: lâmina retangular na base, extrudada até o topo.
+        static Solid block(float w, float h, float d)
+        {
+            const float hx = w / 2, hy = h / 2, hz = d / 2;
+            Solid s;
+            auto [bottom, top] = s.lamina({{-hx, -hy, -hz}, {hx, -hy, -hz}, {hx, -hy, hz}, {-hx, -hy, hz}});
+            s.extrude(top, {0.f, h, 0.f});
+            return s;
+        }
+
+        // Cilindro: lâmina circular na base, extrudada até o topo.
+        static Solid cylinder(float r, float h, std::size_t n)
+        {
+            Solid s;
+            auto [bottom, top] = s.lamina(circle(r, -h / 2, n));
+            s.extrude(top, {0.f, h, 0.f});
+            return s;
+        }
+
+        // Cone: lâmina circular na base e cone até o ápice.
+        static Solid cone(float r, float h, std::size_t n)
+        {
+            Solid s;
+            auto [bottom, top] = s.lamina(circle(r, -h / 2, n));
+            s.cone(top, {0.f, h / 2, 0.f});
+            return s;
+        }
+
+        // Tetraedro regular inscrito no cubo de lado edge/sqrt(2): lâmina triangular e cone até o
+        // vértice restante.
+        static Solid tetrahedron(float edge)
+        {
+            const float h = edge / std::numbers::sqrt2_v<float> / 2;
+            Solid s;
+            auto [bottom, top] = s.lamina({{h, -h, -h}, {-h, -h, h}, {-h, h, -h}});
+            s.cone(top, {h, h, h});
+            return s;
+        }
+
+        // Esfera: sólido de revolução com stacks - 1 paralelos.
+        static Solid sphere(float r, std::size_t n)
+        {
+            constexpr float pi = std::numbers::pi_v<float>;
+            const std::size_t stacks = std::max<std::size_t>(2, n / 2);
+            std::vector<Parallel> ps;
+            for (std::size_t k = 1; k < stacks; ++k)
+                ps.push_back(latitude(r, -pi / 2 + pi * float(k) / float(stacks), 0.f));
+            return revolution(ps, -r, r, n);
+        }
+
+        // Cápsula: dois hemisférios ligados pelo trecho cilíndrico de altura h.
+        static Solid capsule(float r, float h, std::size_t n)
+        {
+            constexpr float pi = std::numbers::pi_v<float>;
+            const float half = h / 2;
+            const std::size_t q = std::max<std::size_t>(1, n / 4);
+            std::vector<Parallel> ps;
+            for (std::size_t k = 1; k <= q; ++k) // hemisfério inferior, termina no equador
+                ps.push_back(latitude(r, -pi / 2 + (pi / 2) * float(k) / float(q), -half));
+            for (std::size_t k = 0; k < q; ++k) // hemisfério superior, começa no equador
+                ps.push_back(latitude(r, (pi / 2) * float(k) / float(q), half));
+            return revolution(ps, -half - r, half + r, n);
+        }
         // ──────────────────────── operadores de adjacência ─────────────────────
         // Resultados sem repetição, na ordem de percurso.
 
@@ -250,115 +365,40 @@ namespace geometry::winged
     private:
         struct Found { int loop; Dart in; };
 
-        // Anéis paralelos (mesmo número de pontos, do primeiro ao último) e, opcionalmente, um polo
-        // em cada ponta. O primeiro anel é anti-horário visto de fora (de "baixo").
-        struct Profile
-        {
-            std::vector<std::vector<Vec3f>> rings = {};
-            std::optional<Vec3f> bottom = std::nullopt, top = std::nullopt;
-        };
+        struct Parallel { float r, y; }; // círculo horizontal de raio r na altura y
 
-        static Profile profileOf(const Shape &s, std::size_t n)
+        static std::vector<Vec3f> circle(float r, float y, std::size_t n)
         {
             if (n < 3) throw std::invalid_argument("Solid: segments deve ser >= 3");
             constexpr float pi = std::numbers::pi_v<float>;
-            const Vec3f b = s.boundSize();
-            const float hx = b[0] / 2, hy = b[1] / 2, hz = b[2] / 2;
-
-            auto circle = [&](float r, float y)
+            std::vector<Vec3f> ring;
+            for (std::size_t i = 0; i < n; ++i)
             {
-                std::vector<Vec3f> ring;
-                for (std::size_t i = 0; i < n; ++i)
-                {
-                    const float t = 2 * pi * float(i) / float(n);
-                    ring.push_back({r * std::cos(t), y, r * std::sin(t)});
-                }
-                return ring;
-            };
-            // anel na latitude phi de uma esfera de raio R centrada em y = yc
-            auto latitude = [&](float R, float phi, float yc) { return circle(R * std::cos(phi), yc + R * std::sin(phi)); };
-
-            if (dynamic_cast<const Block *>(&s)) // inclui Cube
-            {
-                auto quad = [&](float y) -> std::vector<Vec3f>
-                { return {{-hx, y, -hz}, {hx, y, -hz}, {hx, y, hz}, {-hx, y, hz}}; };
-                return {.rings = {quad(-hy), quad(hy)}};
+                const float t = 2 * pi * float(i) / float(n);
+                ring.push_back({r * std::cos(t), y, r * std::sin(t)});
             }
-            if (dynamic_cast<const RegularTetrahedron *>(&s)) // base + vértice (h,h,h)
-                return {.rings = {{{hx, -hx, -hx}, {-hx, -hx, hx}, {-hx, hx, -hx}}}, .top = Vec3f{hx, hx, hx}};
-            if (dynamic_cast<const Cylinder *>(&s))
-                return {.rings = {circle(hx, -hy), circle(hx, hy)}};
-            if (dynamic_cast<const Cone *>(&s))
-                return {.rings = {circle(hx, -hy)}, .top = Vec3f{0.f, hy, 0.f}};
-            if (dynamic_cast<const Sphere *>(&s))
-            {
-                const std::size_t stacks = std::max<std::size_t>(2, n / 2);
-                Profile p{.bottom = Vec3f{0.f, -hx, 0.f}, .top = Vec3f{0.f, hx, 0.f}};
-                for (std::size_t k = 1; k < stacks; ++k)
-                    p.rings.push_back(latitude(hx, -pi / 2 + pi * float(k) / float(stacks), 0.f));
-                return p;
-            }
-            if (dynamic_cast<const Capsule *>(&s))
-            {
-                const float half = hy - hx; // metade da parte cilíndrica
-                const std::size_t q = std::max<std::size_t>(1, n / 4);
-                Profile p{.bottom = Vec3f{0.f, -hy, 0.f}, .top = Vec3f{0.f, hy, 0.f}};
-                for (std::size_t k = 1; k <= q; ++k) // hemisfério inferior, termina no equador
-                    p.rings.push_back(latitude(hx, -pi / 2 + (pi / 2) * float(k) / float(q), -half));
-                for (std::size_t k = 0; k < q; ++k) // hemisfério superior, começa no equador
-                    p.rings.push_back(latitude(hx, (pi / 2) * float(k) / float(q), half));
-                return p;
-            }
-            throw std::invalid_argument("Solid: shape sem construção de B-rep");
+            return ring;
         }
 
-        // Anel inicial (MVFS + MEV em cadeia + MEF = tampa e face "aberta"); cada anel seguinte é
-        // erguido com MEV a partir da face aberta e fechado com n MEFs: n-1 faces laterais, a
-        // lateral que sobra na face aberta e a nova face aberta (a tampa do anel). A face aberta
-        // sempre tem o anel em ordem decrescente de índice.
-        void loft(const Profile &pr)
+        // paralelo na latitude phi de uma esfera de raio R centrada em y = yc
+        static Parallel latitude(float R, float phi, float yc) { return {R * std::cos(phi), yc + R * std::sin(phi)}; }
+
+        // Sólido de revolução em torno do eixo y: lâmina do primeiro paralelo, cone até o polo sul,
+        // uma varredura (escala radial + translação) para cada paralelo seguinte e cone até o polo
+        // norte.
+        static Solid revolution(const std::vector<Parallel> &ps, float yBottom, float yTop, std::size_t n)
         {
-            const auto &rings = pr.rings;
-            const std::size_t n = rings.front().size();
-
-            auto [v0, open] = MVFS(rings[0][0]);
-            std::vector<VId> cur{v0};
-            for (std::size_t i = 1; i < n; ++i)
-                cur.push_back(MEV({open, cur[i - 1]}, rings[0][i]).v);
-            FId cap = MEF({open, cur[0]}, {open, cur[n - 1]}).f; // tampa inferior, ordem crescente
-            if (pr.bottom) fan(cap, cur, *pr.bottom);
-
-            for (std::size_t k = 1; k < rings.size(); ++k)
+            Solid s;
+            auto [bottom, top] = s.lamina(circle(ps[0].r, ps[0].y, n));
+            s.cone(bottom, {0.f, yBottom, 0.f});
+            for (std::size_t k = 1; k < ps.size(); ++k)
             {
-                std::vector<VId> nxt;
-                for (std::size_t i = 0; i < n; ++i)
-                    nxt.push_back(MEV({open, cur[i]}, rings[k][i]).v);
-                MEF({open, nxt[0]}, {open, nxt[n - 1]});
-                for (std::size_t i = n - 1; i >= 2; --i)
-                    MEF({open, nxt[i]}, {open, nxt[i - 1]});
-                open = MEF({open, nxt[0]}, {open, nxt[1]}).f;
-                cur = std::move(nxt);
+                const float scale = ps[k].r / ps[k - 1].r, y = ps[k].y;
+                top = s.sweep(top, [=](const Vec3f &p) { return Vec3f{p[0] * scale, y, p[2] * scale}; });
             }
-
-            if (pr.top)
-            {
-                std::vector<VId> q; // contorno de `open` na ordem de percurso
-                for (std::size_t j = 0; j < n; ++j)
-                    q.push_back(cur[(n - j) % n]);
-                fan(open, q, *pr.top);
-            }
+            s.cone(top, {0.f, yTop, 0.f});
+            return s;
         }
-
-        // Substitui a face `cap` (contorno p[0] -> p[1] -> ... ) por um leque de triângulos
-        // ligados a um vértice novo em `apex`.
-        void fan(FId cap, const std::vector<VId> &p, const Vec3f &apex)
-        {
-            const VId a = MEV({cap, p[0]}, apex).v;
-            FId big = cap;
-            for (std::size_t j = p.size() - 1; j >= 1; --j)
-                big = MEF({big, a}, {big, p[j]}).f;
-        }
-
         VId addVertex(const Vec3f &p) { V.push_back({p, {}}); return {int(V.size()) - 1}; }
         FId addFace() { F.emplace_back(); return {int(F.size()) - 1}; }
         EId addEdge(VId a, VId b, FId l, FId r) { E.push_back({.v = {a, b}, .f = {l, r}, .next = {}, .prev = {}}); return {int(E.size()) - 1}; }
