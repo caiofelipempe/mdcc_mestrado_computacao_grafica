@@ -39,13 +39,11 @@ namespace
         Sphere,
         Block,
         Cylinder,
-        Cone,
-        Capsule,
-        Tetrahedron
+        Cone
     };
 
-    constexpr std::array<const char *, 6> kShapeLabels{
-        "Esfera", "Bloco", "Cilindro", "Cone", "Capsula", "Tetraedro"};
+    constexpr std::array<const char *, 4> kShapeLabels{
+        "Esfera", "Bloco", "Cilindro", "Cone"};
 
     const char *shapeNameFromKind(ShapeKind kind)
     {
@@ -55,8 +53,6 @@ namespace
         case ShapeKind::Block:
         case ShapeKind::Cylinder:
         case ShapeKind::Cone:
-        case ShapeKind::Capsule:
-        case ShapeKind::Tetrahedron:
             return kShapeLabels[static_cast<int>(kind)];
         }
         return "Inválido";
@@ -82,7 +78,6 @@ namespace
         ShapeKind kind = ShapeKind::Sphere;
         float radius = 3.0f;
         float height = 5.0f;
-        float edge = 6.0f;
         Vec3f blockSize{4.0f, 5.0f, 3.0f};
         int segments = 16;
 
@@ -119,19 +114,9 @@ namespace
                 changed |= ImGui::DragFloat("Raio", &radius, kDragSpeed, kDragMin, kDragMax);
                 changed |= ImGui::DragFloat("Altura", &height, kDragSpeed, kDragMin, kDragMax);
                 break;
-
-            case ShapeKind::Capsule:
-                changed |= ImGui::DragFloat("Raio", &radius, kDragSpeed, kDragMin, kDragMax);
-                changed |= ImGui::DragFloat("Altura (trecho cilindrico)", &height,
-                                            kDragSpeed, kDragMin, kDragMax);
-                break;
-
-            case ShapeKind::Tetrahedron:
-                changed |= ImGui::DragFloat("Aresta", &edge, kDragSpeed, kDragMin, kDragMax);
-                break;
             }
 
-            if (kind != ShapeKind::Block && kind != ShapeKind::Tetrahedron)
+            if (kind != ShapeKind::Block)
                 changed |= ImGui::SliderInt("Segmentos", &segments, 3, 64);
 
             return changed;
@@ -189,12 +174,6 @@ namespace
             break;
         case ShapeKind::Cone:
             solid = winged::Solid::cone(obj.radius, obj.height, n);
-            break;
-        case ShapeKind::Capsule:
-            solid = winged::Solid::capsule(obj.radius, obj.height, n);
-            break;
-        case ShapeKind::Tetrahedron:
-            solid = winged::Solid::tetrahedron(obj.edge);
             break;
         }
 
@@ -309,7 +288,52 @@ protected:
         imguiEndRender();
     }
 
+    // Só redesenha quando algo muda (entrada, câmera, cena). Caso contrário o buffer não é
+    // trocado e a janela mantém a última imagem.
+    bool shouldRender() override
+    {
+        const InputState &in = input();
+
+        const bool anyKey = std::ranges::any_of(in.m_keys, [](bool b) { return b; });
+        const bool anyButton = std::ranges::any_of(in.m_mouseButtons, [](bool b) { return b; });
+        const bool mouseMoved = in.m_mouseX != m_prevMouseX || in.m_mouseY != m_prevMouseY;
+
+        m_prevMouseX = in.m_mouseX;
+        m_prevMouseY = in.m_mouseY;
+
+        if (anyKey || anyButton || mouseMoved || in.scrollOffset() != 0.0 ||
+            camera().viewDirty() || camera().projectionDirty())
+            requestRedraw();
+
+        m_renderedThisFrame = m_redrawFrames > 0;
+        if (m_renderedThisFrame)
+            --m_redrawFrames;
+
+        return m_renderedThisFrame;
+    }
+
+    // Enquanto desenha, o vsync limita a taxa; ocioso, limita o laço para não ocupar a CPU.
+    int targetFPS() override
+    {
+        return m_renderedThisFrame ? 0 : kIdleFPS;
+    }
+
 private:
+    // Quadros extras após cada mudança: o ImGui precisa de alguns quadros para estabilizar
+    // (hover, popups, alterações feitas na UI que só aparecem no quadro seguinte).
+    static constexpr int kRedrawTail = 3;
+    static constexpr int kIdleFPS = 60;
+
+    int m_redrawFrames = kRedrawTail;
+    bool m_renderedThisFrame = true;
+    double m_prevMouseX = 0.0;
+    double m_prevMouseY = 0.0;
+
+    void requestRedraw()
+    {
+        m_redrawFrames = kRedrawTail;
+    }
+
     int m_width = 1280;
     int m_height = 720;
 
@@ -390,6 +414,8 @@ private:
             m_meshes.push_back(m_solids.back().toMesh());
             m_volume += volumeOf(m_meshes.back());
         }
+
+        requestRedraw();
     }
 
     /* ================= CAMERA ================= */

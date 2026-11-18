@@ -241,17 +241,6 @@ namespace geometry::winged
             return s;
         }
 
-        // Tetraedro regular inscrito no cubo de lado edge/sqrt(2): lâmina triangular e cone até o
-        // vértice restante.
-        static Solid tetrahedron(float edge)
-        {
-            const float h = edge / std::numbers::sqrt2_v<float> / 2;
-            Solid s;
-            auto [bottom, top] = s.lamina({{h, -h, -h}, {-h, -h, h}, {-h, h, -h}});
-            s.cone(top, {h, h, h});
-            return s;
-        }
-
         // Esfera: sólido de revolução com stacks - 1 paralelos.
         static Solid sphere(float r, std::size_t n)
         {
@@ -263,19 +252,6 @@ namespace geometry::winged
             return revolution(ps, -r, r, n);
         }
 
-        // Cápsula: dois hemisférios ligados pelo trecho cilíndrico de altura h.
-        static Solid capsule(float r, float h, std::size_t n)
-        {
-            constexpr float pi = std::numbers::pi_v<float>;
-            const float half = h / 2;
-            const std::size_t q = std::max<std::size_t>(1, n / 4);
-            std::vector<Parallel> ps;
-            for (std::size_t k = 1; k <= q; ++k) // hemisfério inferior, termina no equador
-                ps.push_back(latitude(r, -pi / 2 + (pi / 2) * float(k) / float(q), -half));
-            for (std::size_t k = 0; k < q; ++k) // hemisfério superior, começa no equador
-                ps.push_back(latitude(r, (pi / 2) * float(k) / float(q), half));
-            return revolution(ps, -half - r, half + r, n);
-        }
         // ──────────────────────── operadores de adjacência ─────────────────────
         // Resultados sem repetição, na ordem de percurso.
 
