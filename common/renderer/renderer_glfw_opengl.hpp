@@ -37,6 +37,10 @@ protected:
 
     virtual void onWindowResize(int width, int height);
 
+    // O sistema pediu para redesenhar a janela (conteúdo perdido). Quem sobrescreve
+    // shouldRender() deve usar isto para forçar um novo quadro.
+    virtual void onWindowRefresh() {}
+
 private:
     void initGLFW(
         int width,
@@ -76,6 +80,8 @@ private:
         int height);
 
     static void framebufferSizeCallback(GLFWwindow *, int, int);
+
+    static void windowRefreshCallback(GLFWwindow *window);
 
     void onFramebufferResize(int width, int height);
 

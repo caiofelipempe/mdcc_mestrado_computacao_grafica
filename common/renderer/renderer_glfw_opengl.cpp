@@ -63,6 +63,7 @@ void RendererGlfwOpengl::initGLFW(const int w, const int h, const std::string &t
     glfwSetScrollCallback(m_window, scrollCallback);
     glfwSetWindowSizeCallback(m_window, windowSizeCallback);
     glfwSetFramebufferSizeCallback(m_window, framebufferSizeCallback);
+    glfwSetWindowRefreshCallback(m_window, windowRefreshCallback);
     glfwGetFramebufferSize(m_window, &m_lastFbW, &m_lastFbH);
     glViewport(0, 0, m_lastFbW, m_lastFbH);
 }
@@ -255,6 +256,16 @@ void RendererGlfwOpengl::windowSizeCallback(GLFWwindow *window, int width, int h
     if (!self)
         return;
     self->onWindowResize(width, height);
+}
+
+// Chamado quando o conteúdo da janela foi perdido (ex.: ao ser descoberta por outra janela) e
+// precisa ser redesenhado, mesmo sem nenhuma entrada do usuário.
+void RendererGlfwOpengl::windowRefreshCallback(GLFWwindow *window)
+{
+    auto *self = static_cast<RendererGlfwOpengl *>(glfwGetWindowUserPointer(window));
+    if (!self)
+        return;
+    self->onWindowRefresh();
 }
 
 void RendererGlfwOpengl::framebufferSizeCallback(GLFWwindow *window, int /*w*/, int /*h*/)

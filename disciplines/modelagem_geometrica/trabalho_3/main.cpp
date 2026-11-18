@@ -312,6 +312,11 @@ protected:
         return m_renderedThisFrame;
     }
 
+    void onWindowRefresh() override
+    {
+        requestRedraw();
+    }
+
     // Enquanto desenha, o vsync limita a taxa; ocioso, limita o laço para não ocupar a CPU.
     int targetFPS() override
     {
